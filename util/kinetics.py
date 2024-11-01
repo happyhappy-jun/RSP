@@ -61,7 +61,7 @@ class PairedKinetics(Dataset):
         super().__init__()
         self.root = root
         with open(
-            os.path.join(self.root, "labels", f"label_1.0.pickle"), "rb"
+            os.path.join(self.root, "labels", f"label_full_1.0.pickle"), "rb"
         ) as f:
             self.samples = pickle.load(f)
 

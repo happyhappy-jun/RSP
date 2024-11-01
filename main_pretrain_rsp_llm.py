@@ -12,6 +12,8 @@ import torch
 import torch.backends.cudnn as cudnn
 from torch.utils.tensorboard import SummaryWriter
 
+from DeBERTa import deberta
+from util.kinetics_caption import PairedKineticsWithCaption
 import timm
 assert timm.__version__ == "0.3.2"  # version check
 import timm.optim.optim_factory as optim_factory
@@ -23,6 +25,7 @@ from util.kinetics import PairedKinetics
 import models_rsp
 
 from engine_pretrain_repsamp import train_one_epoch
+from transformers import AutoModel
 
 
 def get_args_parser():
@@ -101,9 +104,8 @@ def main(args):
 
     cudnn.benchmark = True
 
-    dataset_train = PairedKinetics(
-        args.data_path,
-        max_distance=args.max_distance,
+    dataset_train = PairedKineticsWithCaption(
+        args.data_path, 
         repeated_sampling=args.repeated_sampling
     )
 
@@ -147,11 +149,16 @@ def main(args):
         mask_ratio=args.mask_ratio,
         noise_scale=args.noise_scale
     )
+    lm_model = deberta.DeBERTa(pre_trained='base')
+    lm_model.apply_state()
 
     model.to(device)
+    lm_model.to(device)
 
     model_without_ddp = model
+    lm_model_without_ddp = lm_model
     print("Model = %s" % str(model_without_ddp))
+    print("LM Model = %s" % str(lm_model_without_ddp))
 
     eff_batch_size = args.batch_size * args.accum_iter * misc.get_world_size()
 
@@ -169,6 +176,10 @@ def main(args):
             model, device_ids=[args.gpu], find_unused_parameters=True
         )
         model_without_ddp = model.module
+        lm_model = torch.nn.parallel.DistributedDataParallel(
+            lm_model, device_ids=[args.gpu], find_unused_parameters=True
+        )   
+        lm_model_without_ddp = lm_model.module
 
     # following timm: set wd as 0 for bias and norm layers
     param_groups = optim_factory.add_weight_decay(model_without_ddp, args.weight_decay)
@@ -193,6 +204,7 @@ def main(args):
             data_loader_train.sampler.set_epoch(epoch)
         train_stats = train_one_epoch(
             model,
+            lm_model,
             data_loader_train,
             optimizer,
             device,
@@ -201,7 +213,7 @@ def main(args):
             log_writer=log_writer,
             args=args,
         )
-        if args.output_dir and (epoch % 10 == 0 or epoch in [args.epochs - 2, args.epochs - 1, args.epochs]):
+        if args.output_dir and (epoch % 50 == 0 or epoch in [args.epochs - 2, args.epochs - 1, args.epochs]):
             misc.save_model(
                 args=args,
                 model=model,

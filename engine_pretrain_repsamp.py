@@ -11,6 +11,7 @@ import util.lr_sched as lr_sched
 
 def train_one_epoch(
     model: torch.nn.Module,
+    lm_model: torch.nn.Module,
     data_loader: Iterable,
     optimizer: torch.optim.Optimizer,
     device: torch.device,
@@ -32,23 +33,34 @@ def train_one_epoch(
     if log_writer is not None:
         print("log_dir: {}".format(log_writer.log_dir))
 
-    for data_iter_step, (src_samples, tgt_samples, _) in enumerate(
+    for data_iter_step, batch in enumerate(
         metric_logger.log_every(data_loader, print_freq, header)
     ):
         # we use a per iteration (instead of per epoch) lr scheduler
+        batch_size = batch["src_images"].shape[0]
         if data_iter_step % accum_iter == 0:
             lr_sched.adjust_learning_rate(
                 optimizer, data_iter_step / len(data_loader) + epoch, args
             )
-
+        src_samples = batch["src_images"]
+        tgt_samples = batch["tgt_images"]
+        captions = batch["input_ids"].to(device, non_blocking=True)
+            # "input_masks": batch["input_masks"].to(device, non_blocking=True),
+            # "token_type_ids": batch["token_type_ids"].to(device, non_blocking=True),
         src_samples = src_samples.to(device, non_blocking=True)
         tgt_samples = tgt_samples.to(device, non_blocking=True)
-
+        captions = captions.view(-1, captions.size(-1))
+        
+        
+        with torch.no_grad():
+            lm_output = lm_model(captions)['embeddings']
+            lm_logits = lm_output[:, -1, :]
+            
         src_samples = src_samples.reshape(-1, *src_samples.shape[2:])
         tgt_samples = tgt_samples.reshape(-1, *tgt_samples.shape[2:])
         with torch.cuda.amp.autocast():
             loss, _, (loss_post, loss_prior, loss_kl, value_kl, loss_mae) = model(
-                src_samples, tgt_samples, data_iter_step / len(data_loader) + epoch
+                src_samples, tgt_samples, lm_logits, data_iter_step / len(data_loader) + epoch
             )
 
         loss_value = loss.item()

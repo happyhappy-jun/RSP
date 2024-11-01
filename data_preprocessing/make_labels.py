@@ -6,15 +6,17 @@ from decord import VideoReader, cpu
 
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--datadir', type=str, default='/data/kinetics400')
+parser.add_argument('--datadir', type=str, default='/data/kinetics400/')
 parser.add_argument('--filedir', type=str, default='train2')
 args = parser.parse_args()
 
 # get entire mp4 files
 labels = []
-for class_idx, dir in enumerate(os.listdir(args.filedir)):
-    for filename in os.listdir(os.path.join(args.filedir, dir)):
-        labels.append((class_idx, os.path.join(args.filedir, dir, filename)))
+for class_idx, dir in enumerate(os.listdir(os.path.join(args.datadir, args.filedir))):
+    if not os.path.isdir(os.path.join(args.datadir, args.filedir, dir)):
+        continue
+    for filename in os.listdir(os.path.join(args.datadir, args.filedir, dir)):
+        labels.append((class_idx, os.path.join(args.datadir, args.filedir, dir, filename)))
 
 print(len(labels))
 
@@ -36,6 +38,7 @@ print(len(removing_paths))
 filtered_labels = [tup for tup in labels if tup[1] not in removing_paths]
 
 print(len(filtered_labels))
+os.makedirs(os.path.join(args.datadir, 'labels'), exist_ok=True)
 
-with open('./labels/label_full_1.0.pickle', 'wb') as f:
+with open(f'{args.datadir}/labels/label_full_1.0.pickle', 'wb') as f:
     pickle.dump(filtered_labels, f)

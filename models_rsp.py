@@ -1,5 +1,6 @@
 from functools import partial
 
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.distributions as td
@@ -99,6 +100,8 @@ class RSP(nn.Module):
         super().__init__()
         self.patch_embed = PatchEmbed(img_size, patch_size, in_chans, embed_dim)
         num_patches = self.patch_embed.num_patches
+        context_len = 768
+        total_decoder_len = num_patches + context_len + 1
 
         self.cls_token = nn.Parameter(torch.zeros(1, 1, embed_dim))
         self.pos_embed = nn.Parameter(
@@ -148,9 +151,9 @@ class RSP(nn.Module):
         self.mask_token = nn.Parameter(torch.zeros(1, 1, decoder_embed_dim))
 
         self.decoder_pos_embed = nn.Parameter(
-            torch.zeros(1, num_patches + 1, decoder_embed_dim), requires_grad=False
-        )  # fixed sin-cos embedding
-
+            torch.zeros(1, total_decoder_length, decoder_embed_dim),
+            requires_grad=False
+        )
         self.decoder_blocks = nn.ModuleList(
             [
                 CSABlock(
@@ -187,20 +190,34 @@ class RSP(nn.Module):
     def initialize_weights(self):
         # initialization
         # initialize (and freeze) pos_embed by sin-cos embedding
+        
         pos_embed = get_2d_sincos_pos_embed(
             self.pos_embed.shape[-1],
             int(self.patch_embed.num_patches**0.5),
             cls_token=True,
         )
         self.pos_embed.data.copy_(torch.from_numpy(pos_embed).float().unsqueeze(0))
+        
+        context_length = 768  # Length of context embedding
+        context_pos_embed = get_2d_sincos_pos_embed(
+            self.decoder_pos_embed.shape[-1],
+            int(np.ceil(np.sqrt(context_length))),  # Make it 2D grid
+            cls_token=False
+        )[:context_length] 
 
         decoder_pos_embed = get_2d_sincos_pos_embed(
             self.decoder_pos_embed.shape[-1],
             int(self.patch_embed.num_patches**0.5),
             cls_token=True,
         )
+        
+        combined_pos_embed = np.concatenate([
+            decoder_pos_embed,
+            context_pos_embed
+        ], axis=0)
+                
         self.decoder_pos_embed.data.copy_(
-            torch.from_numpy(decoder_pos_embed).float().unsqueeze(0)
+            torch.from_numpy(combined_pos_embed).float().unsqueeze(0)
         )
 
         # initialize patch_embed like nn.Linear (instead of nn.Conv2d)
@@ -304,8 +321,8 @@ class RSP(nn.Module):
         x = self.norm(x)
         return x, mask, ids_restore
 
-    def forward_decoder_fut(self, h, z):
-        kvx_h = self.get_feat(h, z)
+    def forward_decoder_fut(self, h, h_context, z):
+        kvx_h = self.get_feat(h, h_context, z)
 
         mask_tokens = self.mask_token.repeat(h.shape[0], h.shape[1], 1)
         x = mask_tokens + self.decoder_pos_embed
@@ -364,12 +381,15 @@ class RSP(nn.Module):
 
         return recon_loss
 
-    def get_feat(self, h, z):
-        h = self.decoder_embed_deter(h) + self.decoder_pos_embed
+    def get_feat(self, h, h_context, z):
+        # h = self.decoder_embed_deter(h) + self.decoder_pos_embed
+        h = self.decoder_embed_deter(h)
+        h_concat = torch.cat([h, h_context], dim=1)
+        h_concat = h_concat + self.decoder_pos_embed
         if self.discrete != 0:
             z = z.reshape(*z.shape[:-2], 1, self.stoch * self.discrete)
         z = self.decoder_embed_stoch(z)
-        feat = torch.cat([z, h], dim=1)
+        feat = torch.cat([z, h_concat], dim=1)
         return feat
 
     def make_dist(self, logits):
@@ -396,7 +416,7 @@ class RSP(nn.Module):
         kl_loss = torch.maximum(kl_value, torch.ones_like(kl_value) * freebit)
         return kl_loss, kl_value
 
-    def forward(self, src_imgs, tgt_imgs, epoch):
+    def forward(self, src_imgs, tgt_imgs, context, epoch):
         # Extract embeddings
         src_h, _, _ = self.forward_encoder(src_imgs, mask_ratio=0)
         tgt_h, _, _ = self.forward_encoder(self.perturb(tgt_imgs), mask_ratio=0)
@@ -413,7 +433,7 @@ class RSP(nn.Module):
         prior_dist = self.make_dist(prior_logits)
         prior_z = prior_dist.rsample()
 
-        tgt_pred = self.forward_decoder_fut(src_h, post_z)
+        tgt_pred = self.forward_decoder_fut(src_h, context, post_z)
         loss_post = self.forward_loss(tgt_imgs, tgt_pred)
         kl_loss, kl_value = self.kl_loss(post_logits, prior_logits)
 
