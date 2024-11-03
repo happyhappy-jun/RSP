@@ -100,13 +100,15 @@ class RSP(nn.Module):
         super().__init__()
         self.patch_embed = PatchEmbed(img_size, patch_size, in_chans, embed_dim)
         num_patches = self.patch_embed.num_patches
-        context_len = 768
-        total_decoder_len = num_patches + context_len + 1
+        self.context_patch_length = 1
 
         self.cls_token = nn.Parameter(torch.zeros(1, 1, embed_dim))
         self.pos_embed = nn.Parameter(
             torch.zeros(1, num_patches + 1, embed_dim), requires_grad=False
         )  # fixed sin-cos embedding
+        self.type_embed = nn.Parameter(
+            torch.zeros(1, 1, decoder_embed_dim), requires_grad=True
+        )
 
         self.blocks = nn.ModuleList(
             [
@@ -149,9 +151,10 @@ class RSP(nn.Module):
         self.decoder_embed_deter = nn.Linear(embed_dim, decoder_embed_dim, bias=True)
         self.decoder_embed_stoch = nn.Linear(stoch_size, decoder_embed_dim, bias=True)
         self.mask_token = nn.Parameter(torch.zeros(1, 1, decoder_embed_dim))
+        self.context_proj = nn.Linear(768, decoder_embed_dim, bias=True)
 
         self.decoder_pos_embed = nn.Parameter(
-            torch.zeros(1, total_decoder_length, decoder_embed_dim),
+            torch.zeros(1, num_patches + 1, decoder_embed_dim),
             requires_grad=False
         )
         self.decoder_blocks = nn.ModuleList(
@@ -199,25 +202,15 @@ class RSP(nn.Module):
         self.pos_embed.data.copy_(torch.from_numpy(pos_embed).float().unsqueeze(0))
         
         context_length = 768  # Length of context embedding
-        context_pos_embed = get_2d_sincos_pos_embed(
-            self.decoder_pos_embed.shape[-1],
-            int(np.ceil(np.sqrt(context_length))),  # Make it 2D grid
-            cls_token=False
-        )[:context_length] 
 
         decoder_pos_embed = get_2d_sincos_pos_embed(
             self.decoder_pos_embed.shape[-1],
             int(self.patch_embed.num_patches**0.5),
             cls_token=True,
         )
-        
-        combined_pos_embed = np.concatenate([
-            decoder_pos_embed,
-            context_pos_embed
-        ], axis=0)
                 
         self.decoder_pos_embed.data.copy_(
-            torch.from_numpy(combined_pos_embed).float().unsqueeze(0)
+            torch.from_numpy(decoder_pos_embed).float().unsqueeze(0)
         )
 
         # initialize patch_embed like nn.Linear (instead of nn.Conv2d)
@@ -383,9 +376,15 @@ class RSP(nn.Module):
 
     def get_feat(self, h, h_context, z):
         # h = self.decoder_embed_deter(h) + self.decoder_pos_embed
+        h_context = self.context_proj(h_context)
         h = self.decoder_embed_deter(h)
-        h_concat = torch.cat([h, h_context], dim=1)
-        h_concat = h_concat + self.decoder_pos_embed
+        h = h + self.decoder_pos_embed
+        h_context = h_context.unsqueeze(1)  # [B, 1, decoder_embed_dim]
+        h_context = h_context + self.type_embed  # Add type embedding
+        
+        # Concatenate along sequence dimension
+        h_concat = torch.cat([h, h_context], dim=1)  # [B, L+1, decoder_embed_dim]
+    
         if self.discrete != 0:
             z = z.reshape(*z.shape[:-2], 1, self.stoch * self.discrete)
         z = self.decoder_embed_stoch(z)
@@ -443,7 +442,7 @@ class RSP(nn.Module):
         mae_loss = self.forward_loss(tgt_imgs, pred_masked, mask)
 
         with torch.no_grad():
-            tgt_pred_prior = self.forward_decoder_fut(src_h, prior_z)
+            tgt_pred_prior = self.forward_decoder_fut(src_h, context, prior_z)
             loss_prior = self.forward_loss(tgt_imgs, tgt_pred_prior)
 
         loss = loss_post + self.kl_scale * kl_loss + mae_loss

@@ -193,6 +193,7 @@ def main(args):
             data_loader_train.sampler.set_epoch(epoch)
         train_stats = train_one_epoch(
             model,
+            lm_model,
             data_loader_train,
             optimizer,
             device,
