@@ -66,8 +66,10 @@ class PairedKineticsWithCaption(Dataset):
             data = json.load(f)
     
         self.videos = defaultdict(list)
-        for pair in data['results']:
-            self.videos[pair['video_idx']].append(pair)
+        for i, pair in enumerate(data['results']):
+            self.videos[pair["video_idx"]].append(pair)
+        self.videos = list(self.videos.values())
+        print(self.videos[0])
         
         self.repeated_sampling = repeated_sampling
         
@@ -111,39 +113,36 @@ class PairedKineticsWithCaption(Dataset):
 
     def __getitem__(self, index):
         pair_infos = self.videos[index]
-        assert len(pair_infos) <= self.repeated_sampling
+        assert len(pair_infos) == self.repeated_sampling
 
         src_images = []
         tgt_images = []
         captions = []
         
-        for pair in pair_infos:
+        for pair_idx, pair in enumerate(pair_infos):
             frame_cur = self.load_frame(pair['frame_cur_path'])
             frame_fut = self.load_frame(pair['frame_fut_path'])
+                
+                # Apply transforms
             src_image, tgt_image = self.transforms(frame_cur, frame_fut)
             src_image = self.basic_transform(src_image)
             tgt_image = self.basic_transform(tgt_image)
+                
             
             src_images.append(src_image)
             tgt_images.append(tgt_image)
             
-            # captions.append(self.tokenizer(pair['analysis'], add_special_tokens=True,
-            #                                return_tensors='pt', padding='max_length', max_length=512, truncation=True))
-            captions.append(self.tokenize_caption(pair['analysis']))
-        
-        # Stack augmented samples
-        src_images = torch.stack(src_images, dim=0)  # [repeated_sampling, C, H, W]
-        tgt_images = torch.stack(tgt_images, dim=0)  # [repeated_sampling, C, H, W]
-        input_ids = torch.stack(captions, dim=0)    # [repeated_sampling, max_seq_len]
-        # token_type_ids = torch.stack([caption['token_type_ids'] for caption in captions], dim=0)
-        
+            caption = self.tokenize_caption(pair['analysis'])
+            captions.append(caption)
+            
         return {
-            "src_images": src_images,
-            "tgt_images": tgt_images,
-            "input_ids": input_ids,
-            # "token_type_ids": token_type_ids
+            "src_images": torch.stack(src_images, dim=0),
+            "tgt_images": torch.stack(tgt_images, dim=0),
+            "input_ids": torch.stack(captions, dim=0)
         }
+            
         
+    
 def collate_fn(batch):
     src_images = torch.stack([x['src_images'] for x in batch], dim=0)
     tgt_images = torch.stack([x['tgt_images'] for x in batch], dim=0)
@@ -158,25 +157,14 @@ def collate_fn(batch):
     }
     
 if __name__ == "__main__":
+    print("Initializing dataset...")
     dataset = PairedKineticsWithCaption(
-        json_path="/home/bjyoon/rsp-llm/artifacts/results/frame_analysis_results_complete.json",
+        json_path="/home/junyoon/rsp-llm/artifacts/results/frame_analysis_results_complete.json",
         repeated_sampling=2
     )
-    print(dataset[0])
-    sampler_train = torch.utils.data.RandomSampler(dataset)
-    dataloader = torch.utils.data.DataLoader(
-        dataset,
-        batch_size=2,
-        collate_fn=collate_fn,
-        sampler=sampler_train,
-        num_workers=4,
-        pin_memory=True,
-        drop_last=True
-    )
     
-    for x in dataloader:
-        for a in x.keys():
-            print( x[a].shape)
-
-        break
+    for x in range(len(dataset)):
+        b = dataset[x]
+        
+    print("done")
     
