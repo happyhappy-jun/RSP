@@ -10,7 +10,6 @@ from torchvision import transforms
 import torchvision.transforms.functional as F
 from collections import defaultdict
 from PIL import Image
-from transformers import AutoTokenizer
 
 from DeBERTa import deberta
 
@@ -159,7 +158,7 @@ def collate_fn(batch):
 if __name__ == "__main__":
     print("Initializing dataset...")
     dataset = PairedKineticsWithCaption(
-        json_path="/home/junyoon/rsp-llm/artifacts/results/frame_analysis_results_complete.json",
+        json_path="/home/byungjun/RSP/artifacts/results/frame_analysis_results_complete.json",
         repeated_sampling=2
     )
     

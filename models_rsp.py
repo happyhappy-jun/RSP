@@ -376,10 +376,12 @@ class RSP(nn.Module):
 
     def get_feat(self, h, h_context, z):
         # h = self.decoder_embed_deter(h) + self.decoder_pos_embed
+        h_context = h_context.reshape(-1, h_context.size(-1))
         h_context = self.context_proj(h_context)
+        h_context = h_context.reshape(-1, 1, h_context.size(-1))  # [16, 1, 512]
+    
         h = self.decoder_embed_deter(h)
         h = h + self.decoder_pos_embed
-        h_context = h_context.unsqueeze(1)  # [B, 1, decoder_embed_dim]
         h_context = h_context + self.type_embed  # Add type embedding
         
         # Concatenate along sequence dimension
