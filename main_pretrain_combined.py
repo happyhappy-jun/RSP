@@ -59,33 +59,33 @@ def main(cfg: DictConfig):
     else:
         sampler_train = torch.utils.data.RandomSampler(dataset_train)
 
-    if global_rank == 0 and args.log_dir is not None:
-        os.makedirs(args.log_dir, exist_ok=True)
-        log_writer = SummaryWriter(log_dir=args.log_dir)
+    if global_rank == 0 and cfg.log_dir is not None:
+        os.makedirs(cfg.log_dir, exist_ok=True)
+        log_writer = SummaryWriter(log_dir=cfg.log_dir)
     else:
         log_writer = None
 
     data_loader_train = torch.utils.data.DataLoader(
         dataset_train,
         sampler=sampler_train,
-        batch_size=args.batch_size,
-        num_workers=args.num_workers,
-        pin_memory=args.pin_mem,
-        prefetch_factor=args.prefetch_factor,
+        batch_size=cfg.batch_size,
+        num_workers=cfg.num_workers,
+        pin_memory=cfg.pin_mem,
+        prefetch_factor=cfg.prefetch_factor,
         drop_last=True,
         multiprocessing_context=torch.multiprocessing.get_context("spawn"),
     )
 
     # define the model
-    model = models_rsp.__dict__[args.model](
-        norm_pix_loss=args.norm_pix_loss,
-        kl_scale=args.kl_scale,
-        kl_balance=args.kl_balance,
-        kl_freebit=args.kl_freebit,
-        stoch=args.stoch,
-        discrete=args.discrete,
-        mask_ratio=args.mask_ratio,
-        noise_scale=args.noise_scale
+    model = models_rsp.__dict__[cfg.model](
+        norm_pix_loss=cfg.norm_pix_loss,
+        kl_scale=cfg.kl_scale,
+        kl_balance=cfg.kl_balance,
+        kl_freebit=cfg.kl_freebit,
+        stoch=cfg.stoch,
+        discrete=cfg.discrete,
+        mask_ratio=cfg.mask_ratio,
+        noise_scale=cfg.noise_scale
     )
 
     model.to(device)
@@ -93,43 +93,43 @@ def main(cfg: DictConfig):
     model_without_ddp = model
     print("Model = %s" % str(model_without_ddp))
 
-    eff_batch_size = args.batch_size * args.accum_iter * misc.get_world_size()
+    eff_batch_size = cfg.batch_size * cfg.accum_iter * misc.get_world_size()
 
-    if args.lr is None:  # only base_lr is specified
-        args.lr = args.blr * eff_batch_size / 256
+    if cfg.lr is None:  # only base_lr is specified
+        cfg.lr = cfg.blr * eff_batch_size / 256
 
-    print("base lr: %.2e" % (args.lr * 256 / eff_batch_size))
-    print("actual lr: %.2e" % args.lr)
+    print("base lr: %.2e" % (cfg.lr * 256 / eff_batch_size))
+    print("actual lr: %.2e" % cfg.lr)
 
-    print("accumulate grad iterations: %d" % args.accum_iter)
+    print("accumulate grad iterations: %d" % cfg.accum_iter)
     print("effective batch size: %d" % eff_batch_size)
 
-    if args.distributed:
+    if cfg.distributed:
         model = torch.nn.parallel.DistributedDataParallel(
-            model, device_ids=[args.gpu], find_unused_parameters=True
+            model, device_ids=[cfg.gpu], find_unused_parameters=True
         )
         model_without_ddp = model.module
 
     # following timm: set wd as 0 for bias and norm layers
-    param_groups = optim_factory.add_weight_decay(model_without_ddp, args.weight_decay)
-    optimizer = torch.optim.AdamW(param_groups, lr=args.lr, betas=(0.9, 0.95))
+    param_groups = optim_factory.add_weight_decay(model_without_ddp, cfg.weight_decay)
+    optimizer = torch.optim.AdamW(param_groups, lr=cfg.lr, betas=(0.9, 0.95))
     print(optimizer)
     loss_scaler = NativeScaler()
 
     misc.load_model(
-        args=args,
+        args=cfg,
         model_without_ddp=model_without_ddp,
         optimizer=optimizer,
         loss_scaler=loss_scaler,
     )
 
-    args.epochs = args.epochs // args.repeated_sampling
-    args.warmup_epochs = args.warmup_epochs // args.repeated_sampling
+    cfg.epochs = cfg.epochs // cfg.repeated_sampling
+    cfg.warmup_epochs = cfg.warmup_epochs // cfg.repeated_sampling
 
-    print(f"Start training for {args.epochs} epochs")
+    print(f"Start training for {cfg.epochs} epochs")
     start_time = time.time()
-    for epoch in range(args.start_epoch, args.epochs):
-        if args.distributed:
+    for epoch in range(cfg.start_epoch, cfg.epochs):
+        if cfg.distributed:
             data_loader_train.sampler.set_epoch(epoch)
         train_stats = train_one_epoch(
             model,
@@ -139,11 +139,11 @@ def main(cfg: DictConfig):
             epoch,
             loss_scaler,
             log_writer=log_writer,
-            args=args,
+            args=cfg,
         )
-        if args.output_dir and (epoch % 10 == 0 or epoch in [args.epochs - 2, args.epochs - 1, args.epochs]):
+        if cfg.output_dir and (epoch % 10 == 0 or epoch in [cfg.epochs - 2, cfg.epochs - 1, cfg.epochs]):
             misc.save_model(
-                args=args,
+                args=cfg,
                 model=model,
                 model_without_ddp=model_without_ddp,
                 optimizer=optimizer,
@@ -156,11 +156,11 @@ def main(cfg: DictConfig):
             "epoch": epoch,
         }
 
-        if args.output_dir and misc.is_main_process():
+        if cfg.output_dir and misc.is_main_process():
             if log_writer is not None:
                 log_writer.flush()
             with open(
-                os.path.join(args.output_dir, "log.txt"), mode="a", encoding="utf-8"
+                os.path.join(cfg.output_dir, "log.txt"), mode="a", encoding="utf-8"
             ) as f:
                 f.write(json.dumps(log_stats) + "\n")
 
@@ -170,4 +170,4 @@ def main(cfg: DictConfig):
 
 
 if __name__ == "__main__":
-    main(args)
+    main()
