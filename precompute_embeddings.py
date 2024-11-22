@@ -9,7 +9,7 @@ from DeBERTa import deberta
 class CaptionDataset(Dataset):
     def __init__(self, caption_data, tokenizer, max_seq_len=512):
         # Sort results by video_idx and pair_idx
-        self.results = sorted(caption_data['results'], 
+        self.results = sorted(caption_data['results'][:100], 
                             key=lambda x: (x['video_idx'], x['pair_idx']))
         self.tokenizer = tokenizer
         self.max_seq_len = max_seq_len
@@ -48,18 +48,18 @@ def precompute_embeddings(json_path, output_dir, batch_size=32):
     output_dir.mkdir(parents=True, exist_ok=True)
     
     dataset = CaptionDataset(caption_data, tokenizer)
-    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=4)
+    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False)
     
-    embeddings = {}
+    embeddings = []
     
     for batch_input_ids, batch_masks, sample_indices in tqdm(dataloader):
         with torch.no_grad():
+            print(batch_input_ids[0][:30])
             batch_input = batch_input_ids.to(device)
             batch_output = lm_model(batch_input)['hidden_states'][-1] # last hidden state
             batch_embeddings = batch_output[:, 0, :] 
-            
-            for idx, sample_idx in enumerate(sample_indices):
-                embeddings[sample_idx.item()] = batch_embeddings[idx].cpu()
+            embeddings.extend(batch_embeddings.cpu())
+    print(embeddings[0][:30])
     
     output_path = output_dir / 'deberta_embeddings.pt'
     torch.save(embeddings, output_path)

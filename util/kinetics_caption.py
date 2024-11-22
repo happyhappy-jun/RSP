@@ -66,7 +66,8 @@ class PairedKineticsWithCaption(Dataset):
             data = json.load(f)
     
         # Sort results first by video_idx
-        sorted_results = sorted(data['results'], key=lambda x: x['video_idx'])
+        sorted_results = sorted(data['results'][:100], key=lambda x: (x['video_idx'], x["pair_idx"]))
+        print(sorted_results[0])
         
         self.videos = defaultdict(list)
         for i, pair in enumerate(sorted_results):
@@ -126,6 +127,7 @@ class PairedKineticsWithCaption(Dataset):
             
             src_images.append(src_image)
             tgt_images.append(tgt_image)
+            print(pair['video_idx'], pair_idx)
             embeddings.append(self.embeddings[pair['video_idx']* len(pair_infos) + pair_idx])
             
 
