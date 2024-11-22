@@ -30,7 +30,7 @@ def create_jsonl_for_embedding(json_path, output_file="embeddings.jsonl"):
                     "input": result['analysis'].strip(),
                     "model": "text-embedding-3-small",
                     "encoding_format": "float",
-                    "max_tokens": 8192
+                    "max_tokens": 1000
                 }
             }
             f.write(json.dumps(request, ensure_ascii=False) + '\n')
