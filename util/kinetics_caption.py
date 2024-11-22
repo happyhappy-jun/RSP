@@ -57,6 +57,7 @@ class PairedKineticsWithCaption(Dataset):
     def __init__(
         self,
         data_path,           # Path to preprocessed JSON file
+        embeddings_path,     # Path to precomputed embeddings
         repeated_sampling=2  # Number of augmented samples per pair
     ):
         super().__init__()
@@ -67,8 +68,11 @@ class PairedKineticsWithCaption(Dataset):
         self.videos = defaultdict(list)
         for i, pair in enumerate(data['results']):
             self.videos[pair["video_idx"]].append(pair)
-        self.videos = list(self.videos.values())
-        print(self.videos[0])
+        self.video_indices = list(self.videos.keys())
+        
+        # Load precomputed embeddings
+        print(f"Loading precomputed embeddings from {embeddings_path}")
+        self.embeddings = torch.load(embeddings_path)
         
         self.repeated_sampling = repeated_sampling
         
@@ -80,16 +84,11 @@ class PairedKineticsWithCaption(Dataset):
                               std=[0.229, 0.224, 0.225])
         ])
         
-        # self.tokenizer = AutoTokenizer.from_pretrained("microsoft/deberta-base", use_fast=True)
-        vocab_path, vocab_type = deberta.load_vocab(pretrained_id='base')
-        self.tokenizer = deberta.tokenizers[vocab_type](vocab_path)
-
-        
-        print(f"Loaded {len(self.videos)} video")
-        print(f"Total samples with repeated sampling: {len(self.videos) * repeated_sampling}")
+        print(f"Loaded {len(self.video_indices)} videos")
+        print(f"Total samples with repeated sampling: {len(self.video_indices) * repeated_sampling}")
 
     def __len__(self):
-        return len(self.videos)
+        return len(self.video_indices)
 
     def load_frame(self, frame_path):
         """Load and convert frame to RGB"""
@@ -98,57 +97,40 @@ class PairedKineticsWithCaption(Dataset):
             raise ValueError(f"Failed to load frame: {frame_path}")
         return cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
     
-    def tokenize_caption(self, caption):
-        max_seq_len = 512
-        tokens = self.tokenizer.tokenize(caption)
-        tokens = tokens[:max_seq_len - 2]
-        input_ids = self.tokenizer.convert_tokens_to_ids(tokens)
-        input_ids = [self.tokenizer.cls_token_id] + input_ids + [self.tokenizer.sep_token_id]
-        input_masks = [1] * len(input_ids)
-        paddings = max_seq_len - len(input_ids)
-        input_ids = input_ids + [0] * paddings
-        input_masks = input_masks + [0] * paddings
-        return torch.tensor(input_ids, dtype=torch.int)
-
     def __getitem__(self, index):
-        pair_infos = self.videos[index]
-        assert len(pair_infos) == self.repeated_sampling
+        video_idx = self.video_indices[index]
+        pair_infos = self.videos[video_idx]
 
         src_images = []
         tgt_images = []
-        captions = []
         
         for pair_idx, pair in enumerate(pair_infos):
             frame_cur = self.load_frame(pair['frame_cur_path'])
             frame_fut = self.load_frame(pair['frame_fut_path'])
                 
-                # Apply transforms
+            # Apply transforms
             src_image, tgt_image = self.transforms(frame_cur, frame_fut)
             src_image = self.basic_transform(src_image)
             tgt_image = self.basic_transform(tgt_image)
-                
             
             src_images.append(src_image)
             tgt_images.append(tgt_image)
-            
-            caption = self.tokenize_caption(pair['analysis'])
-            captions.append(caption)
+
+        # Get precomputed embedding and repeat for each sample
+        embedding = self.embeddings[video_idx]
+        embedding = embedding.repeat(self.repeated_sampling, 1)
             
         return {
             "src_images": torch.stack(src_images, dim=0),
             "tgt_images": torch.stack(tgt_images, dim=0),
-            "input_ids": torch.stack(captions, dim=0)
+            "input_ids": embedding,
+            "video_idx": video_idx
         }
             
 def collate_fn(batch):
-    src_images = torch.stack([x['src_images'] for x in batch], dim=0)
-    tgt_images = torch.stack([x['tgt_images'] for x in batch], dim=0)
-    input_ids = torch.stack([x['input_ids'] for x in batch], dim=0)
-    # token_type_ids = torch.stack([x['token_type_ids'] for x in batch], dim=0)
-    
     return {
-        "src_images": src_images,
-        "tgt_images": tgt_images,
-        "input_ids": input_ids,
-        # "token_type_ids": token_type_ids
+        "src_images": torch.stack([x['src_images'] for x in batch], dim=0),
+        "tgt_images": torch.stack([x['tgt_images'] for x in batch], dim=0),
+        "input_ids": torch.stack([x['input_ids'] for x in batch], dim=0),
+        "video_idx": [x['video_idx'] for x in batch]
     }
