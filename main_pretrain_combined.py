@@ -21,20 +21,10 @@ import hydra
 from omegaconf import DictConfig, OmegaConf
 from hydra.utils import instantiate
 from util.misc import NativeScalerWithGradNormCount as NativeScaler
-from util.kinetics import PairedKinetics
-from util.kinetics_caption import PairedKineticsWithCaption
 
 import models_rsp
 
-from engine_pretrain_repsamp import train_one_epoch as train_one_epoch_rsp
-from engine_pretrain_repsamp_llm import train_one_epoch as train_one_epoch_llm
-
-def get_train_one_epoch(cfg):
-    if cfg.get('training_mode', 'rsp') == 'rsp':
-        return train_one_epoch_rsp
-    return train_one_epoch_llm
-
-@hydra.main(config_path="config", config_name="main")
+@hydra.main(config_path="config", config_name="main", version_base="1.2")
 def main(cfg: DictConfig):
     misc.init_distributed_mode(cfg)
 
@@ -94,9 +84,7 @@ def main(cfg: DictConfig):
     )
 
     model.to(device)
-
     model_without_ddp = model
-    print("Model = %s" % str(model_without_ddp))
 
     eff_batch_size = cfg.batch_size * cfg.accum_iter * misc.get_world_size()
 
@@ -133,11 +121,12 @@ def main(cfg: DictConfig):
 
     print(f"Start training for {cfg.epochs} epochs")
     start_time = time.time()
+    train_loop = hydra.utils.instantiate(cfg.train_loop)
     for epoch in range(cfg.start_epoch, cfg.epochs):
         if cfg.distributed:
             data_loader_train.sampler.set_epoch(epoch)
-        train_one_epoch = get_train_one_epoch(cfg)
-        train_stats = train_one_epoch(
+
+        train_stats = train_loop(
             model,
             data_loader_train,
             optimizer,
