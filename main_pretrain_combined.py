@@ -29,7 +29,7 @@ import models_rsp
 from engine_pretrain_repsamp import train_one_epoch as train_one_epoch_rsp
 from engine_pretrain_repsamp_llm import train_one_epoch as train_one_epoch_llm
 
-@hydra.main(config_path="config", config_name="config_combined")
+@hydra.main(config_path="config", config_name="main")
 def main(cfg: DictConfig):
     misc.init_distributed_mode(args)
 
@@ -170,6 +170,4 @@ def main(cfg: DictConfig):
 
 
 if __name__ == "__main__":
-    parser = get_args_parser()
-    args = parser.parse_args()
     main(args)

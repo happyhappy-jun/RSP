@@ -56,12 +56,12 @@ class PairedKineticsWithCaption(Dataset):
     """PairedKinetics dataset that loads from preprocessed JSON"""
     def __init__(
         self,
-        json_path,           # Path to preprocessed JSON file
+        data_path,           # Path to preprocessed JSON file
         repeated_sampling=2  # Number of augmented samples per pair
     ):
         super().__init__()
         # Load preprocessed data
-        with open(json_path, 'r') as f:
+        with open(data_path, 'r') as f:
             data = json.load(f)
     
         self.videos = defaultdict(list)
@@ -140,8 +140,6 @@ class PairedKineticsWithCaption(Dataset):
             "input_ids": torch.stack(captions, dim=0)
         }
             
-        
-    
 def collate_fn(batch):
     src_images = torch.stack([x['src_images'] for x in batch], dim=0)
     tgt_images = torch.stack([x['tgt_images'] for x in batch], dim=0)
@@ -154,16 +152,3 @@ def collate_fn(batch):
         "input_ids": input_ids,
         # "token_type_ids": token_type_ids
     }
-    
-if __name__ == "__main__":
-    print("Initializing dataset...")
-    dataset = PairedKineticsWithCaption(
-        json_path="/home/byungjun/RSP/artifacts/results/frame_analysis_results_complete.json",
-        repeated_sampling=2
-    )
-    
-    for x in range(len(dataset)):
-        b = dataset[x]
-        
-    print("done")
-    
