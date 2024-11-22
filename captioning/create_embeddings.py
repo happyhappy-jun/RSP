@@ -22,9 +22,12 @@ def create_jsonl_for_embedding(json_path, output_file="embeddings.jsonl"):
     # Write the JSONL file
     with open(output_file, 'w', encoding='utf-8') as f:
         for result in results:
-            body = {"input": result['analysis'].strip(), "model": "text-embedding-3-small", "encoding_format": "float", }
-            
-            f.write(json.dumps(json_line, ensure_ascii=False) + '\n')
+            request = {
+                "input": result['analysis'].strip(),
+                "model": "text-embedding-3-small",
+                "encoding_format": "float"
+            }
+            f.write(json.dumps(request, ensure_ascii=False) + '\n')
     
     print(f"Created JSONL file with {len(results)} entries at {output_file}")
 
