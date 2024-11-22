@@ -73,6 +73,7 @@ class PairedKineticsWithCaption(Dataset):
         # Load precomputed embeddings
         print(f"Loading precomputed embeddings from {embeddings_path}")
         self.embeddings = torch.load(embeddings_path)
+        print(f"Loaded {len(self.embeddings)} embeddings")
         
         self.repeated_sampling = repeated_sampling
         
@@ -103,6 +104,7 @@ class PairedKineticsWithCaption(Dataset):
 
         src_images = []
         tgt_images = []
+        embeddings = []
         
         for pair_idx, pair in enumerate(pair_infos):
             frame_cur = self.load_frame(pair['frame_cur_path'])
@@ -115,15 +117,14 @@ class PairedKineticsWithCaption(Dataset):
             
             src_images.append(src_image)
             tgt_images.append(tgt_image)
+            embeddings.append(self.embeddings[pair['video_idx']* len(pair_infos) + pair_idx])
+            
 
         # Get precomputed embedding and repeat for each sample
-        embedding = self.embeddings[video_idx]
-        embedding = embedding.repeat(self.repeated_sampling, 1)
-            
         return {
             "src_images": torch.stack(src_images, dim=0),
             "tgt_images": torch.stack(tgt_images, dim=0),
-            "input_ids": embedding,
+            "input_ids": torch.stack(embeddings, dim=0),
             "video_idx": video_idx
         }
             
@@ -134,3 +135,11 @@ def collate_fn(batch):
         "input_ids": torch.stack([x['input_ids'] for x in batch], dim=0),
         "video_idx": [x['video_idx'] for x in batch]
     }
+
+
+if __name__ == "__main__":
+    dataset = PairedKineticsWithCaption(
+        data_path="/home/junyoon/rsp-llm/artifacts/results/frame_analysis_results_complete.json",
+        embeddings_path="/home/junyoon/rsp-llm/artifacts/deberta_embeddings.pt"
+    )
+    print(dataset[0])
