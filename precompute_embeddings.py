@@ -32,7 +32,7 @@ def precompute_embeddings(json_path, output_dir, batch_size=32):
     # Process captions in batches
     embeddings = {}
     captions = []
-    video_indices = []
+    sample_indices = []
     
     print("Tokenizing and computing embeddings...")
     for result in tqdm(caption_data['results']):
@@ -48,7 +48,7 @@ def precompute_embeddings(json_path, output_dir, batch_size=32):
         input_masks = input_masks + [0] * paddings
         
         captions.append(torch.tensor(input_ids))
-        video_indices.append(result['video_idx'])
+        sample_indices.append(result['video_idx']*2 + result['pair_idx'])
         
         # Process in batches
         if len(captions) == batch_size:
@@ -58,11 +58,11 @@ def precompute_embeddings(json_path, output_dir, batch_size=32):
                 batch_embeddings = batch_output[:, -1, :]  # Get last token embeddings
                 
                 # Store embeddings
-                for idx, video_idx in enumerate(video_indices):
-                    embeddings[video_idx] = batch_embeddings[idx].cpu()
+                for idx, sample_idx in enumerate(sample_indices):
+                    embeddings[sample_idx] = batch_embeddings[idx].cpu()
             
             captions = []
-            video_indices = []
+            sample_indices = []
     
     # Process remaining captions
     if captions:
@@ -71,8 +71,8 @@ def precompute_embeddings(json_path, output_dir, batch_size=32):
             batch_output = lm_model(batch_input)['embeddings']
             batch_embeddings = batch_output[:, -1, :]
             
-            for idx, video_idx in enumerate(video_indices):
-                embeddings[video_idx] = batch_embeddings[idx].cpu()
+            for idx, sample_idx in enumerate(sample_indices):
+                embeddings[sample_idx] = batch_embeddings[idx].cpu()
     
     # Save embeddings
     output_path = output_dir / 'deberta_embeddings.pt'
