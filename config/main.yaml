@@ -1,6 +1,11 @@
 defaults:
   - _self_
 
+# Experiment naming
+exp_name: default
+timestamp: ${now:%Y-%m-%d_%H-%M-%S}
+exp_dir: experiments/${exp_name}/${timestamp}
+
 dataset:
   _target_: utils.kinetics_caption
   data_path: /home/junyoon/rsp-llm/artifacts/results/frame_analysis_results_complete.json
@@ -20,8 +25,8 @@ device: "cuda"
 seed: 0
 resume: false
 start_epoch: 0
-output_dir: "./output_dir"
-log_dir: "./output_dir"
+output_dir: ${exp_dir}/checkpoints
+log_dir: ${exp_dir}/logs
 
 # Model parameters
 model: "rsp_vit_small_patch16"
