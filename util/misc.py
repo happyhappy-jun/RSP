@@ -247,6 +247,7 @@ def init_distributed_mode(args):
 
     args.distributed = True
 
+    print("rank: %s, world_size: %s, gpu: %s" % (args.rank, args.world_size, args.gpu))
     torch.cuda.set_device(args.gpu)
     args.dist_backend = "nccl"
     print(
@@ -269,7 +270,7 @@ class NativeScalerWithGradNormCount:
     state_dict_key = "amp_scaler"
 
     def __init__(self):
-        self._scaler = torch.cuda.amp.GradScaler()
+        self._scaler = torch.amp.GradScaler("cuda")
 
     def __call__(
         self,
