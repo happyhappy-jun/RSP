@@ -17,6 +17,9 @@ assert timm.__version__ == "0.3.2"  # version check
 import timm.optim.optim_factory as optim_factory
 
 import util.misc as misc
+import hydra
+from omegaconf import DictConfig, OmegaConf
+from hydra.utils import instantiate
 from util.misc import NativeScalerWithGradNormCount as NativeScaler
 from util.kinetics import PairedKinetics
 from util.kinetics_caption import PairedKineticsWithCaption
@@ -33,7 +36,8 @@ def get_args_parser():
     # Add other arguments here as needed
     return parser
 
-def main(args):
+@hydra.main(config_path="config", config_name="config_combined")
+def main(cfg: DictConfig):
     misc.init_distributed_mode(args)
 
     print("job dir: {}".format(os.path.dirname(os.path.realpath(__file__))))
@@ -48,18 +52,11 @@ def main(args):
 
     cudnn.benchmark = True
 
-    if args.mode == "rsp":
-        dataset_train = PairedKinetics(
-            args.data_path,
-            max_distance=args.max_distance,
-            repeated_sampling=args.repeated_sampling
-        )
+    if cfg.mode == "rsp":
+        dataset_train = instantiate(cfg.dataset_rsp)
         train_one_epoch = train_one_epoch_rsp
     else:
-        dataset_train = PairedKineticsWithCaption(
-            args.data_path,
-            repeated_sampling=args.repeated_sampling
-        )
+        dataset_train = instantiate(cfg.dataset_llm)
         train_one_epoch = train_one_epoch_llm
 
     print(dataset_train)
