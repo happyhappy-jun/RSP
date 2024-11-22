@@ -373,7 +373,7 @@ def load_model(args, model_without_ddp, optimizer, loss_scaler):
 def all_reduce_mean(x):
     world_size = get_world_size()
     if world_size > 1:
-        x_reduce = torch.tensor(x).cuda()
+        x_reduce = torch.tensor(x, device='cuda')
         dist.all_reduce(x_reduce)
         x_reduce /= world_size
         return x_reduce.item()

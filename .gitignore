@@ -4,3 +4,4 @@ logs/
 outputs/
 .env
 artifacts/
+.aider*

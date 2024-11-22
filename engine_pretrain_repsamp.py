@@ -26,7 +26,7 @@ def train_one_epoch(
     print_freq = 20
 
     accum_iter = args.accum_iter
-    optimizer.zero_grad()
+    optimizer.zero_grad(set_to_none=True)
 
     if log_writer is not None:
         print("log_dir: {}".format(log_writer.log_dir))
@@ -67,7 +67,7 @@ def train_one_epoch(
             update_grad=(data_iter_step + 1) % accum_iter == 0,
         )
         if (data_iter_step + 1) % accum_iter == 0:
-            optimizer.zero_grad()
+            optimizer.zero_grad(set_to_none=True)
 
         torch.cuda.synchronize()
 
