@@ -4,7 +4,7 @@ defaults:
 # Experiment naming
 exp_name: default
 timestamp: ${now:%Y-%m-%d_%H-%M-%S}
-exp_dir: experiments/${exp_name}/${timestamp}
+run_name: ${exp_name}_${timestamp}
 
 dataset:
   _target_: utils.kinetics_caption
@@ -25,8 +25,8 @@ device: "cuda"
 seed: 0
 resume: false
 start_epoch: 0
-output_dir: ${exp_dir}/checkpoints
-log_dir: ${exp_dir}/logs
+output_dir: outputs/${run_name}
+log_dir: logs/${run_name}
 
 # Model parameters
 model: "rsp_vit_small_patch16"
