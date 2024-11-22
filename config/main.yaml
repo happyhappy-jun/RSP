@@ -29,6 +29,7 @@ log_dir: logs/${run_name}
 model: "rsp_vit_small_patch16"
 input_size: 224
 norm_pix_loss: true
+dtype: "float32"  # Options: float32, float16, bfloat16
 mask_ratio: 0.75
 noise_scale: 0.5
 kl_scale: 0.01

@@ -82,6 +82,10 @@ def main(cfg: DictConfig):
         mask_ratio=cfg.mask_ratio,
         noise_scale=cfg.noise_scale
     )
+    
+    # Set model dtype
+    dtype = getattr(torch, cfg.dtype)
+    model = model.to(dtype=dtype)
 
     model.to(device)
     model_without_ddp = model
