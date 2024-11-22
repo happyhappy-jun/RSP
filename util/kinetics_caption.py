@@ -1,5 +1,6 @@
 import os
 import random
+import numpy as np
 from typing import Dict, List, Union
 import cv2
 import json
@@ -52,15 +53,26 @@ class PairedRandomResizedCrop:
 
         return cropped_img_1, cropped_img_2
 
+def set_seed(seed=42):
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed(seed)
+        torch.cuda.manual_seed_all(seed)
+        torch.backends.cudnn.deterministic = True
+
 class PairedKineticsWithCaption(Dataset):
     """PairedKinetics dataset that loads from preprocessed JSON"""
     def __init__(
         self,
         data_path,           # Path to preprocessed JSON file
         embeddings_path,     # Path to precomputed embeddings
-        repeated_sampling=2  # Number of augmented samples per pair
+        repeated_sampling=2, # Number of augmented samples per pair
+        seed=42             # Random seed for reproducibility
     ):
         super().__init__()
+        set_seed(seed)
         # Load preprocessed data
         with open(data_path, 'r') as f:
             data = json.load(f)
@@ -151,6 +163,7 @@ def collate_fn(batch):
 if __name__ == "__main__":
     dataset = PairedKineticsWithCaption(
         data_path="/home/junyoon/rsp-llm/artifacts/results/frame_analysis_results_complete.json",
-        embeddings_path="/home/junyoon/rsp-llm/artifacts/deberta_embeddings.pt"
+        embeddings_path="/home/junyoon/rsp-llm/artifacts/deberta_embeddings.pt",
+        seed=42
     )
     print(dataset[0])

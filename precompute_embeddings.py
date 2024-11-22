@@ -1,6 +1,8 @@
 import os
 import json
 import torch
+import random
+import numpy as np
 from torch.utils.data import Dataset, DataLoader
 from tqdm import tqdm
 from pathlib import Path
@@ -31,7 +33,17 @@ class CaptionDataset(Dataset):
         sample_idx = result['video_idx']*2 + result['pair_idx']
         return torch.tensor(input_ids), torch.tensor(input_masks), sample_idx
 
-def precompute_embeddings(json_path, output_dir, batch_size=32):
+def set_seed(seed=42):
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed(seed)
+        torch.cuda.manual_seed_all(seed)
+        torch.backends.cudnn.deterministic = True
+
+def precompute_embeddings(json_path, output_dir, batch_size=32, seed=42):
+    set_seed(seed)
     with open(json_path, 'r') as f:
         caption_data = json.load(f)
     
@@ -73,6 +85,7 @@ if __name__ == "__main__":
     parser.add_argument('--json_path', type=str, required=True)
     parser.add_argument('--output_dir', type=str, required=True)
     parser.add_argument('--batch_size', type=int, default=32)
+    parser.add_argument('--seed', type=int, default=42)
     
     args = parser.parse_args()
-    precompute_embeddings(args.json_path, args.output_dir, args.batch_size)
+    precompute_embeddings(args.json_path, args.output_dir, args.batch_size, args.seed)
