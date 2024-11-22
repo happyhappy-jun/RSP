@@ -65,10 +65,19 @@ class PairedKineticsWithCaption(Dataset):
         with open(data_path, 'r') as f:
             data = json.load(f)
     
+        # Sort results first by video_idx
+        sorted_results = sorted(data['results'], key=lambda x: x['video_idx'])
+        
         self.videos = defaultdict(list)
-        for i, pair in enumerate(data['results']):
+        for i, pair in enumerate(sorted_results):
+            # Within each video, sort by pair_idx if it exists
             self.videos[pair["video_idx"]].append(pair)
-        self.video_indices = list(self.videos.keys())
+        
+        # Sort pairs within each video
+        for video_idx in self.videos:
+            self.videos[video_idx].sort(key=lambda x: x.get('pair_idx', 0))
+            
+        self.video_indices = sorted(self.videos.keys())
         
         # Load precomputed embeddings
         print(f"Loading precomputed embeddings from {embeddings_path}")
