@@ -31,15 +31,15 @@ from engine_pretrain_repsamp_llm import train_one_epoch as train_one_epoch_llm
 
 @hydra.main(config_path="config", config_name="main")
 def main(cfg: DictConfig):
-    misc.init_distributed_mode(args)
+    misc.init_distributed_mode(cfg)
 
     print("job dir: {}".format(os.path.dirname(os.path.realpath(__file__))))
-    print("{}".format(args).replace(", ", ",\n"))
+    print("{}".format(cfg).replace(", ", ",\n"))
 
-    device = torch.device(args.device)
+    device = torch.device(cfg.device)
 
     # fix the seed for reproducibility
-    seed = args.seed + misc.get_rank()
+    seed = cfg.seed + misc.get_rank()
     torch.manual_seed(seed)
     np.random.seed(seed)
 
@@ -49,7 +49,7 @@ def main(cfg: DictConfig):
 
     print(dataset_train)
 
-    if args.distributed:
+    if cfg.distributed:
         num_tasks = misc.get_world_size()
         global_rank = misc.get_rank()
         sampler_train = torch.utils.data.DistributedSampler(
