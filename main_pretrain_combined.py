@@ -29,13 +29,6 @@ import models_rsp
 from engine_pretrain_repsamp import train_one_epoch as train_one_epoch_rsp
 from engine_pretrain_repsamp_llm import train_one_epoch as train_one_epoch_llm
 
-def get_args_parser():
-    parser = argparse.ArgumentParser("MAE pre-training", add_help=False)
-    parser.add_argument("--mode", default="rsp", type=str, choices=["rsp", "llm"],
-                        help="Mode of operation: rsp or llm")
-    # Add other arguments here as needed
-    return parser
-
 @hydra.main(config_path="config", config_name="config_combined")
 def main(cfg: DictConfig):
     misc.init_distributed_mode(args)
@@ -52,12 +45,7 @@ def main(cfg: DictConfig):
 
     cudnn.benchmark = True
 
-    if cfg.mode == "rsp":
-        dataset_train = instantiate(cfg.dataset_rsp)
-        train_one_epoch = train_one_epoch_rsp
-    else:
-        dataset_train = instantiate(cfg.dataset_llm)
-        train_one_epoch = train_one_epoch_llm
+    dataset_train = instantiate(cfg.dataset)
 
     print(dataset_train)
 

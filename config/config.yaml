@@ -1,6 +1,10 @@
 defaults:
   - _self_
 
+dataset:
+  _target_: utils.kinetics_caption
+  data_path: 
+
 # Training parameters
 batch_size: 64
 epochs: 400
@@ -32,7 +36,6 @@ min_lr: 0.0
 warmup_epochs: 40
 
 # Dataset parameters
-data_path: "/data/kinetics400"
 max_distance: 48
 repeated_sampling: 2
 num_workers: 6
