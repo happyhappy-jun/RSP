@@ -8,7 +8,9 @@ from DeBERTa import deberta
 
 class CaptionDataset(Dataset):
     def __init__(self, caption_data, tokenizer, max_seq_len=512):
-        self.results = caption_data['results']
+        # Sort results by video_idx and pair_idx
+        self.results = sorted(caption_data['results'], 
+                            key=lambda x: (x['video_idx'], x['pair_idx']))
         self.tokenizer = tokenizer
         self.max_seq_len = max_seq_len
 
