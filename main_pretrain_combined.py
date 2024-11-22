@@ -29,6 +29,11 @@ import models_rsp
 from engine_pretrain_repsamp import train_one_epoch as train_one_epoch_rsp
 from engine_pretrain_repsamp_llm import train_one_epoch as train_one_epoch_llm
 
+def get_train_one_epoch(cfg):
+    if cfg.get('training_mode', 'rsp') == 'rsp':
+        return train_one_epoch_rsp
+    return train_one_epoch_llm
+
 @hydra.main(config_path="config", config_name="main")
 def main(cfg: DictConfig):
     misc.init_distributed_mode(cfg)
@@ -131,6 +136,7 @@ def main(cfg: DictConfig):
     for epoch in range(cfg.start_epoch, cfg.epochs):
         if cfg.distributed:
             data_loader_train.sampler.set_epoch(epoch)
+        train_one_epoch = get_train_one_epoch(cfg)
         train_stats = train_one_epoch(
             model,
             data_loader_train,
