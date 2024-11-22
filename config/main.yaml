@@ -1,0 +1,56 @@
+defaults:
+  - _self_
+
+dataset:
+  _target_: utils.kinetics_caption
+  data_path: /home/junyoon/rsp-llm/artifacts/results/frame_analysis_results_complete.json
+
+train_loop:
+  _target_: engine_pretrain_repsamp.train_one_epoch_llm
+  _partial_: true
+
+gpu: [0, 1, 2, 3]
+
+
+# Training parameters
+batch_size: 32
+epochs: 400
+accum_iter: 12
+device: "cuda"
+seed: 0
+resume: false
+start_epoch: 0
+output_dir: "./output_dir"
+log_dir: "./output_dir"
+
+# Model parameters
+model: "rsp_vit_small_patch16"
+input_size: 224
+norm_pix_loss: true
+mask_ratio: 0.75
+noise_scale: 0.5
+kl_scale: 0.01
+kl_balance: 0.2
+kl_freebit: 0.1
+stoch: 32
+discrete: 32
+
+# Optimizer parameters
+weight_decay: 0.05
+lr: null
+blr: 1.5e-4
+min_lr: 0.0
+warmup_epochs: 40
+
+# Dataset parameters
+max_distance: 48
+repeated_sampling: 2
+num_workers: 6
+pin_mem: true
+prefetch_factor: 2
+
+# Distributed training parameters
+world_size: 1
+local_rank: -1
+dist_on_itp: false
+dist_url: "env://"
