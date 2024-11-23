@@ -1,10 +1,16 @@
 defaults:
   - _self_
 
-# Experiment naming
+# Experiment naming and logging
 exp_name: default
 timestamp: ${now:%Y-%m-%d_%H-%M-%S}
 run_name: ${exp_name}_${timestamp}
+
+# Weights & Biases settings
+wandb:
+  project: "rsp-training"
+  entity: null  # Set to your wandb username or team name
+  mode: "online"  # Set to "disabled" to turn off wandb logging
 
 dataset:
   _target_: util.kinetics_caption.PairedKineticsWithCaption

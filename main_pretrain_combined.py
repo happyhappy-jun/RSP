@@ -3,6 +3,7 @@ import time
 import json
 import datetime
 import argparse
+import wandb
 
 from pathlib import Path
 
@@ -54,9 +55,19 @@ def main(cfg: DictConfig):
     else:
         sampler_train = torch.utils.data.RandomSampler(dataset_train)
 
-    if global_rank == 0 and cfg.log_dir is not None:
-        os.makedirs(cfg.log_dir, exist_ok=True)
-        log_writer = SummaryWriter(log_dir=cfg.log_dir)
+    if global_rank == 0:
+        if cfg.log_dir is not None:
+            os.makedirs(cfg.log_dir, exist_ok=True)
+            log_writer = SummaryWriter(log_dir=cfg.log_dir)
+        else:
+            log_writer = None
+            
+        # Initialize wandb
+        wandb.init(
+            project="rsp-training",
+            name=cfg.run_name,
+            config=OmegaConf.to_container(cfg, resolve=True),
+        )
     else:
         log_writer = None
 
@@ -159,10 +170,16 @@ def main(cfg: DictConfig):
                 os.path.join(cfg.output_dir, "log.txt"), mode="a", encoding="utf-8"
             ) as f:
                 f.write(json.dumps(log_stats) + "\n")
+            
+            # Log metrics to wandb
+            wandb.log(log_stats)
 
     total_time = time.time() - start_time
     total_time_str = str(datetime.timedelta(seconds=int(total_time)))
     print("Training time {}".format(total_time_str))
+    
+    if misc.is_main_process():
+        wandb.finish()
 
 
 if __name__ == "__main__":
