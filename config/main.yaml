@@ -8,8 +8,8 @@ run_name: ${exp_name}_${timestamp}
 
 dataset:
   _target_: util.kinetics_caption.PairedKineticsWithCaption
-  data_path: /home/junyoon/rsp-llm/artifacts/results/frame_analysis_results_complete.json
-  embeddings_path: /home/junyoon/rsp-llm/artifacts/combined_output.jsonl
+  data_path: /home/bjyoon/rsp-llm/artifacts/results/frame_analysis_results_complete.json
+  embeddings_path: /home/bjyoon/rsp-llm/artifacts/combined_output.jsonl
 
 train_loop:
   _target_: engine_pretrain_repsamp.train_one_epoch_llm
