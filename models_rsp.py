@@ -156,9 +156,9 @@ class RSP(nn.Module):
         )
         
         self.to_language_prior = nn.Sequential(
-            nn.Linear(embed_dim, embed_dim * 2),
+            nn.Linear(decoder_embed_dim, decoder_embed_dim * 2),
             nn.ReLU(),
-            nn.Linear(embed_dim * 2, decoder_embed_dim),
+            nn.Linear(decoder_embed_dim * 2, decoder_embed_dim),
         )
         
         self.decoder_embed_mae = nn.Linear(embed_dim, decoder_embed_dim, bias=True)
@@ -468,7 +468,7 @@ class RSP(nn.Module):
         prior_z = prior_dist.rsample()
 
         h_context = self.forward_embedding(embedding)
-        h_context_prime = self.to_language_prior(h_context)
+        h_context_prime = self.to_language_prior(h_context.squeeze(1))  # Remove sequence dimension before projection
         
         tgt_pred = self.forward_decoder_fut(src_h, h_context, post_z)
         loss_post = self.forward_loss(tgt_imgs, tgt_pred)
