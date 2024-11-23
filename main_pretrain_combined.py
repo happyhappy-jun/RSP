@@ -32,6 +32,11 @@ def main(cfg: DictConfig):
     print("job dir: {}".format(os.path.dirname(os.path.realpath(__file__))))
     print("{}".format(cfg).replace(", ", ",\n"))
 
+    # Create output and log directories
+    if cfg.output_dir:
+        os.makedirs(cfg.output_dir, exist_ok=True)
+        print(f"Created output directory: {cfg.output_dir}")
+    
     device = torch.device(cfg.device)
 
     # fix the seed for reproducibility
