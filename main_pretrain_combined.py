@@ -148,6 +148,14 @@ def main(cfg: DictConfig):
             log_writer=log_writer,
             args=cfg,
         )
+        
+        # Log training stats for this epoch
+        if misc.is_main_process():
+            log_stats = {
+                **{f"train_{k}": v for k, v in train_stats.items()},
+                "epoch": epoch,
+            }
+            wandb.log(log_stats)
         if cfg.output_dir and (epoch % 10 == 0 or epoch in [cfg.epochs - 2, cfg.epochs - 1, cfg.epochs]):
             misc.save_model(
                 args=cfg,
