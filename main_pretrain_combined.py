@@ -73,6 +73,7 @@ def main(cfg: DictConfig):
 
     # define the model
     model = models_rsp.__dict__[cfg.model](
+        context_emb_dim=cfg.context_emb_dim,
         norm_pix_loss=cfg.norm_pix_loss,
         kl_scale=cfg.kl_scale,
         kl_balance=cfg.kl_balance,
