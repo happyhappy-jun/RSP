@@ -150,6 +150,13 @@ class RSP(nn.Module):
             nn.ReLU(),
             nn.Linear(embed_dim * 2, stoch_size),
         )
+        
+        self.to_language_prior = nn.Sequential(
+            nn.Linear(embed_dim, embed_dim * 2),
+            nn.ReLU(),
+            nn.Linear(embed_dim * 2, self.decoder_embed_dim),
+        )
+        
         self.decoder_embed_mae = nn.Linear(embed_dim, decoder_embed_dim, bias=True)
         self.decoder_embed_deter = nn.Linear(embed_dim, decoder_embed_dim, bias=True)
         self.decoder_embed_stoch = nn.Linear(stoch_size, decoder_embed_dim, bias=True)
@@ -317,8 +324,8 @@ class RSP(nn.Module):
         x = self.norm(x)
         return x, mask, ids_restore
 
-    def forward_decoder_fut(self, h, h_context_processed, z):
-        kvx_h = self.get_feat(h, h_context_processed, z)
+    def forward_decoder_fut(self, h, h_context, z):
+        kvx_h = self.get_feat(h, h_context, z)
 
         mask_tokens = self.mask_token.repeat(h.shape[0], h.shape[1], 1)
         x = mask_tokens + self.decoder_pos_embed
@@ -377,7 +384,7 @@ class RSP(nn.Module):
 
         return recon_loss
 
-    def process_context_embedding(self, h_context):
+    def forward_embedding(self, h_context):
         """Process context embedding by reshaping, adding noise if training, and projecting to decoder dim"""
         h_context = h_context.reshape(-1, h_context.size(-1))
         
@@ -393,7 +400,7 @@ class RSP(nn.Module):
         return h_context
 
     def get_feat(self, h, h_context, z):
-        h_context = self.process_context_embedding(h_context)
+        h_context = self.forward_embedding(h_context)
     
         h = self.decoder_embed_deter(h)
         h = h + self.decoder_pos_embed
@@ -449,8 +456,10 @@ class RSP(nn.Module):
         prior_dist = self.make_dist(prior_logits)
         prior_z = prior_dist.rsample()
 
-        h_context_processed = self.process_context_embedding(embedding)
-        tgt_pred = self.forward_decoder_fut(src_h, h_context_processed, post_z)
+        h_context = self.forward_embedding(embedding)
+        h_context_prime = self.to_language_prior(h_context)
+        
+        tgt_pred = self.forward_decoder_fut(src_h, h_context, post_z)
         loss_post = self.forward_loss(tgt_imgs, tgt_pred)
         kl_loss, kl_value = self.kl_loss(post_logits, prior_logits)
 
@@ -460,7 +469,7 @@ class RSP(nn.Module):
         mae_loss = self.forward_loss(tgt_imgs, pred_masked, mask)
 
         with torch.no_grad():
-            tgt_pred_prior = self.forward_decoder_fut(src_h, h_context_processed, prior_z)
+            tgt_pred_prior = self.forward_decoder_fut(src_h, h_context, prior_z)
             loss_prior = self.forward_loss(tgt_imgs, tgt_pred_prior)
 
         loss = loss_post + self.kl_scale * kl_loss + mae_loss
