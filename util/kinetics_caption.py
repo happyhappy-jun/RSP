@@ -78,7 +78,7 @@ class PairedKineticsWithCaption(Dataset):
             data = json.load(f)
     
         # Sort results first by video_idx
-        sorted_results = sorted(data['results'][:100], key=lambda x: (x['video_idx'], x["pair_idx"]))
+        sorted_results = sorted(data['results'], key=lambda x: (x['video_idx'], x["pair_idx"]))
         print(sorted_results[0])
         
         self.videos = defaultdict(list)
@@ -166,4 +166,14 @@ if __name__ == "__main__":
         embeddings_path="/home/junyoon/rsp-llm/artifacts/deberta_embeddings.pt",
         seed=42
     )
-    print(dataset[0])
+    a = dataset[0]['input_ids'][0]
+    b = dataset[0]['input_ids'][1]
+    c = dataset[1]['input_ids'][0]
+    d = dataset[1]['input_ids'][1]
+    
+    print(a.shape, b.shape)
+    
+    
+    print(torch.nn.functional.cosine_similarity(a, b, dim=0))
+    print(torch.nn.functional.cosine_similarity(c, d, dim=0))
+    print(torch.nn.functional.cosine_similarity(a, c, dim=0))
