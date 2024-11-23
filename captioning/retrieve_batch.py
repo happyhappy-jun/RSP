@@ -2,8 +2,11 @@
 from openai import OpenAI
 import os
 import questionary
+import json
+import tempfile
 from datetime import datetime
 from collections import deque
+from pathlib import Path
 #Setting the openAI key in the environement for creating the client
 
 def batch2str(batch):
@@ -132,7 +135,53 @@ start_id = get_batch_id(first_batch_choice)
 end_id = get_batch_id(last_batch_choice)
 selected_batches = get_all_batches_between(start_id, end_id)
 
+def process_jsonl_file(file_path):
+    """Process a JSONL file and return list of records"""
+    records = []
+    with open(file_path, 'r') as f:
+        for line in f:
+            records.append(json.loads(line))
+    return records
+
+def combine_and_sort_outputs(batches):
+    """Retrieve, combine and sort outputs from multiple batches"""
+    all_records = []
+    
+    for batch in batches:
+        # Retrieve detailed batch info
+        batch_detail = client.batches.retrieve(batch.id)
+        
+        # Create temp directory for downloading files
+        with tempfile.TemporaryDirectory() as temp_dir:
+            # Download output file
+            output_file = Path(temp_dir) / "output.jsonl"
+            
+            # Get the output file URL from the batch
+            if hasattr(batch_detail, 'output_file'):
+                with open(output_file, 'wb') as f:
+                    response = client.files.retrieve_content(batch_detail.output_file.id)
+                    f.write(response.encode())
+                
+                # Process the JSONL file
+                records = process_jsonl_file(output_file)
+                all_records.extend(records)
+    
+    # Sort all records by custom_id
+    return sorted(all_records, key=lambda x: x.get('custom_id', ''))
+
 # Print selected batches
 print("\nSelected batches:")
 for batch in selected_batches:
     print(batch2str(batch))
+
+# Combine and sort all outputs
+print("\nRetrieving and combining batch outputs...")
+sorted_records = combine_and_sort_outputs(selected_batches)
+
+# Save combined output
+output_file = "combined_output.jsonl"
+print(f"\nSaving combined and sorted output to {output_file}")
+with open(output_file, 'w') as f:
+    for record in sorted_records:
+        json.dump(record, f)
+        f.write('\n')
