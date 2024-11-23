@@ -18,29 +18,48 @@ def get_batch_id(choice):
 
 def get_all_batches_between(start_id, end_id):
     print(f"Getting batches between {start_id} and {end_id}")
-    batches = []
+    all_batches = []
     current_page = None
-    found_start = False
+    start_index = None
+    end_index = None
     
+    # Collect all relevant batches
     while True:
         page_batches = get_batch_page(after=current_page)
         if not page_batches:
             break
             
-        for batch in page_batches:
-            print(batch.id)
-            if batch.id == start_id:
-                found_start = True
+        all_batches.extend(page_batches)
+        
+        # Check if we have both IDs
+        if start_index is None:
+            try:
+                start_index = next(i for i, b in enumerate(all_batches) if b.id == start_id)
+            except StopIteration:
+                pass
+                
+        if end_index is None:
+            try:
+                end_index = next(i for i, b in enumerate(all_batches) if b.id == end_id)
+            except StopIteration:
+                pass
+        
+        # If we found both IDs, we can stop collecting
+        if start_index is not None and end_index is not None:
+            break
             
-            if found_start:
-                batches.append(batch)
-                
-            if batch.id == end_id:
-                return batches
-                
         current_page = page_batches[-1].id
     
-    return batches
+    # If we didn't find both IDs
+    if start_index is None or end_index is None:
+        print("Warning: Could not find one or both batch IDs")
+        return []
+        
+    # Return batches in correct order
+    if start_index <= end_index:
+        return all_batches[start_index:end_index + 1]
+    else:
+        return list(reversed(all_batches[end_index:start_index + 1]))
 
 client = OpenAI()
 
