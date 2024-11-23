@@ -136,7 +136,7 @@ def train_one_epoch_llm(
         tgt_samples = tgt_samples.reshape(-1, *tgt_samples.shape[2:])
 
         with torch.amp.autocast("cuda"):
-            loss, _, (loss_post, loss_prior, loss_kl, value_kl, loss_mae) = model(
+            loss, _, (loss_post, loss_prior, loss_kl, value_kl, loss_mae, context_kl_loss) = model(
                 src_samples, tgt_samples, lm_logits,
                 data_iter_step / len(data_loader) + epoch
             )
