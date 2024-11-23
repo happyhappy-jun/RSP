@@ -110,7 +110,10 @@ class RSP(nn.Module):
         self.pos_embed = nn.Parameter(
             torch.zeros(1, num_patches + 1, embed_dim), requires_grad=False
         )  # fixed sin-cos embedding
-        self.type_embed = nn.Parameter(
+        self.image_type_embed = nn.Parameter(
+            torch.zeros(1, 1, embed_dim), requires_grad=True
+        )
+        self.language_type_embed = nn.Parameter(
             torch.zeros(1, 1, decoder_embed_dim), requires_grad=True
         )
 
@@ -155,7 +158,7 @@ class RSP(nn.Module):
         self.to_language_prior = nn.Sequential(
             nn.Linear(embed_dim, embed_dim * 2),
             nn.ReLU(),
-            nn.Linear(embed_dim * 2, self.decoder_embed_dim),
+            nn.Linear(embed_dim * 2, decoder_embed_dim),
         )
         
         self.decoder_embed_mae = nn.Linear(embed_dim, decoder_embed_dim, bias=True)
@@ -398,14 +401,13 @@ class RSP(nn.Module):
             
         h_context = self.context_proj(h_context)
         h_context = h_context.reshape(-1, 1, h_context.size(-1))  # [16, 1, 512]
+        h_context = h_context + self.language_type_embed  # Add type embedding
+        
         return h_context
 
     def get_feat(self, h, h_context, z):
-        h_context = self.forward_embedding(h_context)
-    
         h = self.decoder_embed_deter(h)
-        h = h + self.decoder_pos_embed
-        h_context = h_context + self.type_embed  # Add type embedding
+        h = h + self.decoder_pos_embed + self.image_type_embed  # Add type embedding
         
         # Concatenate along sequence dimension
         h_concat = torch.cat([h, h_context], dim=1)  # [B, L+1, decoder_embed_dim]
@@ -439,6 +441,14 @@ class RSP(nn.Module):
         ).mean()
         kl_loss = torch.maximum(kl_value, torch.ones_like(kl_value) * freebit)
         return kl_loss, kl_value
+    
+    def context_kl_loss(self, h_context, h_context_prime):
+        context_kl = nn.KLDivLoss(
+            F.log_softmax(h_context_prime, dim=-1),
+            F.softmax(h_context, dim=-1),
+            reduction='batchmean'
+        )
+        return context_kl
 
     def forward(self, src_imgs, tgt_imgs, embedding, epoch):
         # Extract embeddings
@@ -463,13 +473,7 @@ class RSP(nn.Module):
         tgt_pred = self.forward_decoder_fut(src_h, h_context, post_z)
         loss_post = self.forward_loss(tgt_imgs, tgt_pred)
         kl_loss, kl_value = self.compute_kl_loss(post_logits, prior_logits)
-        
-        # Calculate KL divergence between context embeddings
-        context_kl = torch.nn.functional.kl_div(
-            F.log_softmax(h_context_prime, dim=-1),
-            F.softmax(h_context, dim=-1),
-            reduction='batchmean'
-        )
+        context_kl = self.context_kl_loss(h_context, h_context_prime)
 
         # MAE
         img_h, mask, ids_restore = self.forward_encoder(tgt_imgs, mask_ratio=self.mask_ratio)
@@ -480,7 +484,7 @@ class RSP(nn.Module):
             tgt_pred_prior = self.forward_decoder_fut(src_h, h_context, prior_z)
             loss_prior = self.forward_loss(tgt_imgs, tgt_pred_prior)
 
-        loss = loss_post + self.kl_scale * kl_loss + mae_loss + self.kl_scale * context_kl
+        loss = loss_post + self.kl_scale * kl_loss + self.kl_scale * context_kl + mae_loss
 
         return loss, tgt_pred, (loss_post, loss_prior, kl_loss, kl_value, mae_loss, context_kl)
 
