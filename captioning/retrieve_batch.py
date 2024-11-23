@@ -17,6 +17,7 @@ def get_batch_id(choice):
     return choice.split()[0]
 
 def get_all_batches_between(start_id, end_id):
+    print(f"Getting batches between {start_id} and {end_id}")
     batches = []
     current_page = None
     found_start = False
@@ -27,6 +28,7 @@ def get_all_batches_between(start_id, end_id):
             break
             
         for batch in page_batches:
+            print(batch.id)
             if batch.id == start_id:
                 found_start = True
             
