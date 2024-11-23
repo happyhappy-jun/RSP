@@ -405,15 +405,24 @@ class RSP(nn.Module):
         return h_context
 
     def get_feat(self, h, h_context, z):
-        h = self.decoder_embed_deter(h)
-        h = h + self.decoder_pos_embed + self.image_type_embed  # Add type embedding
+        # Process deterministic path
+        h = self.decoder_embed_deter(h)  # [B, L, decoder_embed_dim]
+        h = h + self.decoder_pos_embed  # Add positional embedding
+        h = h + self.image_type_embed.squeeze(1)  # Add type embedding, removing extra dim
         
+        # Ensure h_context has correct shape [B, 1, decoder_embed_dim]
+        if h_context.dim() == 4:
+            h_context = h_context.squeeze(1)  # Remove extra dimension if present
+            
         # Concatenate along sequence dimension
         h_concat = torch.cat([h, h_context], dim=1)  # [B, L+1, decoder_embed_dim]
     
+        # Process stochastic path
         if self.discrete != 0:
             z = z.reshape(*z.shape[:-2], 1, self.stoch * self.discrete)
         z = self.decoder_embed_stoch(z)
+        
+        # Final concatenation
         feat = torch.cat([z, h_concat], dim=1)
         return feat
 
