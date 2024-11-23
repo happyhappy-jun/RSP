@@ -377,8 +377,8 @@ class RSP(nn.Module):
 
         return recon_loss
 
-    def get_feat(self, h, h_context, z):
-        # h = self.decoder_embed_deter(h) + self.decoder_pos_embed
+    def process_context_embedding(self, h_context):
+        """Process context embedding by reshaping, adding noise if training, and projecting to decoder dim"""
         h_context = h_context.reshape(-1, h_context.size(-1))
         
         # Apply NEFTune noise to context embeddings
@@ -390,6 +390,10 @@ class RSP(nn.Module):
             
         h_context = self.context_proj(h_context)
         h_context = h_context.reshape(-1, 1, h_context.size(-1))  # [16, 1, 512]
+        return h_context
+
+    def get_feat(self, h, h_context, z):
+        h_context = self.process_context_embedding(h_context)
     
         h = self.decoder_embed_deter(h)
         h = h + self.decoder_pos_embed
