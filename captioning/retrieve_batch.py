@@ -160,10 +160,9 @@ def combine_and_sort_outputs(batches):
             # Get the output file URL from the batch
             if hasattr(batch_detail, 'output_file_id'):
                 with open(output_file, 'wb') as f:
-                    print(batch_detail.output_file_id)
+                    print(f"Downloading output file {batch_detail.output_file_id}")
                     response = client.files.content(batch_detail.output_file_id)
-                    
-                    
+                    f.write(response.read())
                 
                 # Process the JSONL file
                 records = process_jsonl_file(output_file)
