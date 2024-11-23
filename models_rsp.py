@@ -102,6 +102,7 @@ class RSP(nn.Module):
         super().__init__()
         self.patch_embed = PatchEmbed(img_size, patch_size, in_chans, embed_dim)
         num_patches = self.patch_embed.num_patches
+        self.neftune_noise_alpha = neftune_noise_alpha
         self.context_patch_length = 1
 
         self.cls_token = nn.Parameter(torch.zeros(1, 1, embed_dim))
@@ -427,7 +428,7 @@ class RSP(nn.Module):
         kl_loss = torch.maximum(kl_value, torch.ones_like(kl_value) * freebit)
         return kl_loss, kl_value
 
-    def forward(self, src_imgs, tgt_imgs, context, epoch):
+    def forward(self, src_imgs, tgt_imgs, embedding, epoch):
         # Extract embeddings
         src_h, _, _ = self.forward_encoder(src_imgs, mask_ratio=0)
         tgt_h, _, _ = self.forward_encoder(self.perturb(tgt_imgs), mask_ratio=0)
@@ -444,7 +445,7 @@ class RSP(nn.Module):
         prior_dist = self.make_dist(prior_logits)
         prior_z = prior_dist.rsample()
 
-        tgt_pred = self.forward_decoder_fut(src_h, context, post_z)
+        tgt_pred = self.forward_decoder_fut(src_h, embedding, post_z)
         loss_post = self.forward_loss(tgt_imgs, tgt_pred)
         kl_loss, kl_value = self.kl_loss(post_logits, prior_logits)
 
@@ -454,7 +455,7 @@ class RSP(nn.Module):
         mae_loss = self.forward_loss(tgt_imgs, pred_masked, mask)
 
         with torch.no_grad():
-            tgt_pred_prior = self.forward_decoder_fut(src_h, context, prior_z)
+            tgt_pred_prior = self.forward_decoder_fut(src_h, embedding, prior_z)
             loss_prior = self.forward_loss(tgt_imgs, tgt_pred_prior)
 
         loss = loss_post + self.kl_scale * kl_loss + mae_loss
