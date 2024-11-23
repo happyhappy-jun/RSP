@@ -3,6 +3,7 @@ from openai import OpenAI
 import os
 import questionary
 from datetime import datetime
+from collections import deque
 #Setting the openAI key in the environement for creating the client
 
 def batch2str(batch):
@@ -44,40 +45,64 @@ client = OpenAI()
 # Select first batch
 first_batch_choice = None
 current_page = None
+page_history = deque([None])  # Start with None as first page
 print("Select the first batch:")
 while True:
     batches = get_batch_page(after=current_page)
     batch_list = [batch2str(batch) for batch in batches]
     
-    if batch_list:
-        current_page = batches[-1].id
+    choices = []
+    if len(page_history) > 1:  # If we have previous pages
+        choices.append("Previous Page")
+    if batch_list:  # If we have more pages ahead
+        choices.append("Next Page")
+    choices.extend(batch_list)
     
     choice = questionary.select(
-        "Select starting batch (or Next Page to see more):",
-        choices=["Next Page"] + batch_list
+        "Select starting batch (use Previous/Next Page to navigate):",
+        choices=choices
     ).ask()
     
-    if choice != "Next Page":
+    if choice == "Next Page":
+        if batch_list:
+            current_page = batches[-1].id
+            page_history.append(current_page)
+    elif choice == "Previous Page":
+        page_history.pop()  # Remove current page
+        current_page = page_history[-1]  # Go back to previous page
+    else:
         first_batch_choice = choice
         break
 
 # Select last batch
 last_batch_choice = None
 current_page = None
+page_history = deque([None])  # Start with None as first page
 print("\nSelect the last batch:")
 while True:
     batches = get_batch_page(after=current_page)
     batch_list = [batch2str(batch) for batch in batches]
     
-    if batch_list:
-        current_page = batches[-1].id
+    choices = []
+    if len(page_history) > 1:  # If we have previous pages
+        choices.append("Previous Page")
+    if batch_list:  # If we have more pages ahead
+        choices.append("Next Page")
+    choices.extend(batch_list)
     
     choice = questionary.select(
-        "Select ending batch (or Next Page to see more):",
-        choices=["Next Page"] + batch_list
+        "Select ending batch (use Previous/Next Page to navigate):",
+        choices=choices
     ).ask()
     
-    if choice != "Next Page":
+    if choice == "Next Page":
+        if batch_list:
+            current_page = batches[-1].id
+            page_history.append(current_page)
+    elif choice == "Previous Page":
+        page_history.pop()  # Remove current page
+        current_page = page_history[-1]  # Go back to previous page
+    else:
         last_batch_choice = choice
         break
 
