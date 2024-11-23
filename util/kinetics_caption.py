@@ -70,20 +70,25 @@ class PairedKineticsWithCaption(Dataset):
             results = json.load(f)["results"]
 
         # Load embeddings data
-        embeddings_data = []
+        embeddings_data = {}
         with open(embeddings_path, 'r') as f:
             for line in f:
                 record = json.loads(line)
+                video_idx, pair_idx = map(int, record['custom_id'].split('-'))
                 embedding = BatchOutput(**record).response.body.data[0].embedding
-                embeddings_data.append(embedding)
+                embeddings_data[(video_idx, pair_idx)] = torch.tensor(embedding)
 
         # Sort results by video_idx and pair_idx
         sorted_results = sorted(results, key=lambda x: (x['video_idx'], x['pair_idx']))
-        # join sorted_results with embeddings_data
-        # TODO 
+        
+        # Store embeddings in class variable
+        self.embeddings = embeddings_data
         
         if sorted_results:
             print("First frame data result:", sorted_results[0])
+            first_key = (sorted_results[0]['video_idx'], sorted_results[0].get('pair_idx', 0))
+            if first_key in self.embeddings:
+                print(f"First embedding shape: {self.embeddings[first_key].shape}")
         
         self.videos = defaultdict(list)
         for i, pair in enumerate(sorted_results):
