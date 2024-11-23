@@ -111,7 +111,7 @@ class RSP(nn.Module):
             torch.zeros(1, num_patches + 1, embed_dim), requires_grad=False
         )  # fixed sin-cos embedding
         self.image_type_embed = nn.Parameter(
-            torch.zeros(1, 1, num_patches + 1, decoder_embed_dim), requires_grad=True
+            torch.zeros(1, num_patches + 1, decoder_embed_dim), requires_grad=True
         )
         self.language_type_embed = nn.Parameter(
             torch.zeros(1, 1, decoder_embed_dim), requires_grad=True
@@ -408,12 +408,8 @@ class RSP(nn.Module):
         # Process deterministic path
         h = self.decoder_embed_deter(h)  # [B, L, decoder_embed_dim]
         h = h + self.decoder_pos_embed  # Add positional embedding
-        h = h + self.image_type_embed.squeeze(1)  # Add type embedding, removing extra dim
+        h = h + self.image_type_embed
         
-        # Ensure h_context has correct shape [B, 1, decoder_embed_dim]
-        if h_context.dim() == 4:
-            h_context = h_context.squeeze(1)  # Remove extra dimension if present
-            
         # Concatenate along sequence dimension
         h_concat = torch.cat([h, h_context], dim=1)  # [B, L+1, decoder_embed_dim]
     
@@ -479,10 +475,10 @@ class RSP(nn.Module):
         prior_dist = self.make_dist(prior_logits)
         prior_z = prior_dist.rsample()
 
+        embedding = embedding.view(-1, 1, embedding.size(-1))
         h_context = self.forward_embedding(embedding)
         # Project context to prior space
-        h_context_flat = h_context.view(-1, self.decoder_embed_dim)
-        h_context_prime = self.to_language_prior(h_context_flat)
+        h_context_prime = self.to_language_prior(h_context)
         
         tgt_pred = self.forward_decoder_fut(src_h, h_context, post_z)
         loss_post = self.forward_loss(tgt_imgs, tgt_pred)
