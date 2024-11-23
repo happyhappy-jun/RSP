@@ -441,12 +441,16 @@ class RSP(nn.Module):
         return kl_loss, kl_value
     
     def context_kl_loss(self, h_context, h_context_prime):
-        context_kl = nn.KLDivLoss(
-            F.log_softmax(h_context_prime, dim=-1),
-            F.softmax(h_context, dim=-1),
-            reduction='batchmean'
+        # Ensure inputs are properly shaped and normalized
+        log_prob_prime = F.log_softmax(h_context_prime, dim=-1)
+        prob_context = F.softmax(h_context.squeeze(1), dim=-1)
+        
+        return F.kl_div(
+            log_prob_prime,
+            prob_context,
+            reduction='batchmean',
+            log_target=False
         )
-        return context_kl
 
     def forward(self, src_imgs, tgt_imgs, embedding, epoch):
         # Extract embeddings
@@ -466,7 +470,9 @@ class RSP(nn.Module):
         prior_z = prior_dist.rsample()
 
         h_context = self.forward_embedding(embedding)
-        h_context_prime = self.to_language_prior(h_context.squeeze(1))  # Remove sequence dimension before projection
+        # Project context to prior space
+        h_context_flat = h_context.view(-1, self.decoder_embed_dim)
+        h_context_prime = self.to_language_prior(h_context_flat)
         
         tgt_pred = self.forward_decoder_fut(src_h, h_context, post_z)
         loss_post = self.forward_loss(tgt_imgs, tgt_pred)
