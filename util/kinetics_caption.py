@@ -65,26 +65,35 @@ class PairedKineticsWithCaption(Dataset):
         seed=42             # Random seed for reproducibility
     ):
         super().__init__()
-        # Load preprocessed data from JSONL
+        # Load video frame data
         results = []
+        with open(data_path, 'r') as f:
+            for line in f:
+                record = json.loads(line)
+                results.append({
+                    'video_idx': int(record['custom_id'].split('-')[0]),
+                    'pair_idx': int(record['custom_id'].split('-')[1]),
+                    'frame_cur_path': record.get('frame_cur_path', ''),
+                    'frame_fut_path': record.get('frame_fut_path', '')
+                })
+
+        # Load embeddings data
+        embeddings_data = []
         with open(embeddings_path, 'r') as f:
             for line in f:
                 record = json.loads(line)
-                # Extract embedding from the OpenAI API response
                 embedding = BatchOutput(**record).response.body.data[0].embedding
                 if embedding:
-                    results.append({
+                    embeddings_data.append({
                         'video_idx': int(record['custom_id'].split('-')[0]),
                         'pair_idx': int(record['custom_id'].split('-')[1]),
-                        'frame_cur_path': record.get('frame_cur_path', ''),
-                        'frame_fut_path': record.get('frame_fut_path', ''),
                         'embedding': embedding
                     })
-        
-        # Sort results first by video_idx
+
+        # Sort results by video_idx and pair_idx
         sorted_results = sorted(results, key=lambda x: (x['video_idx'], x['pair_idx']))
         if sorted_results:
-            print("First result:", sorted_results[0])
+            print("First frame data result:", sorted_results[0])
         
         self.videos = defaultdict(list)
         for i, pair in enumerate(sorted_results):
@@ -98,8 +107,8 @@ class PairedKineticsWithCaption(Dataset):
         self.video_indices = sorted(self.videos.keys())
         
         # Convert embeddings to tensors
-        self.embeddings = {(result['video_idx'], result['pair_idx']): torch.tensor(result['embedding']) 
-                          for result in sorted_results}
+        self.embeddings = {(data['video_idx'], data['pair_idx']): torch.tensor(data['embedding']) 
+                          for data in embeddings_data}
         print(f"Loaded {len(self.embeddings)} embeddings")
         
         self.repeated_sampling = repeated_sampling
