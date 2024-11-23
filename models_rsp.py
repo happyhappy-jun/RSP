@@ -111,7 +111,7 @@ class RSP(nn.Module):
             torch.zeros(1, num_patches + 1, embed_dim), requires_grad=False
         )  # fixed sin-cos embedding
         self.image_type_embed = nn.Parameter(
-            torch.zeros(1, 1, embed_dim), requires_grad=True
+            torch.zeros(1, 1, num_patches + 1, decoder_embed_dim), requires_grad=True
         )
         self.language_type_embed = nn.Parameter(
             torch.zeros(1, 1, decoder_embed_dim), requires_grad=True
@@ -155,10 +155,11 @@ class RSP(nn.Module):
             nn.Linear(embed_dim * 2, stoch_size),
         )
         
+        self.decoder_embed_dim = decoder_embed_dim
         self.to_language_prior = nn.Sequential(
-            nn.Linear(decoder_embed_dim, decoder_embed_dim * 2),
+            nn.Linear(self.decoder_embed_dim, self.decoder_embed_dim * 2),
             nn.ReLU(),
-            nn.Linear(decoder_embed_dim * 2, decoder_embed_dim),
+            nn.Linear(self.decoder_embed_dim * 2, self.decoder_embed_dim),
         )
         
         self.decoder_embed_mae = nn.Linear(embed_dim, decoder_embed_dim, bias=True)
