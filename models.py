@@ -28,5 +28,5 @@ if __name__ == "__main__":
     for line in lines[:10]:
         record = json.loads(line)
         print(record.keys())
-        response = BatchOutput(**record).response
+        response = BatchOutput(**record).response.body.data[0].embedding
         print(response)

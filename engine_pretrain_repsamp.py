@@ -130,14 +130,14 @@ def train_one_epoch_llm(
 
         src_samples = batch["src_images"].to(device, non_blocking=True)
         tgt_samples = batch["tgt_images"].to(device, non_blocking=True)
-        lm_logits = batch["input_ids"].to(device, non_blocking=True)
+        lm_logits = batch["embeddings"].to(device, non_blocking=True)
         
         src_samples = src_samples.reshape(-1, *src_samples.shape[2:])
         tgt_samples = tgt_samples.reshape(-1, *tgt_samples.shape[2:])
 
         with torch.amp.autocast("cuda"):
             loss, _, (loss_post, loss_prior, loss_kl, value_kl, loss_mae) = model(
-                src_samples, tgt_samples, lm_logits, 
+                src_samples, tgt_samples, lm_logits,
                 data_iter_step / len(data_loader) + epoch
             )
 

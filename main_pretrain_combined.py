@@ -64,9 +64,9 @@ def main(cfg: DictConfig):
         dataset_train,
         sampler=sampler_train,
         batch_size=cfg.batch_size,
-        num_workers=2,  # Reduced from cfg.num_workers
-        pin_memory=True,
-        prefetch_factor=2,  # Reduced from cfg.prefetch_factor
+        num_workers=cfg.num_workers,
+        pin_memory=cfg.pin_mem,
+        prefetch_factor=cfg.prefetch_factor,
         drop_last=True,
         multiprocessing_context=torch.multiprocessing.get_context("spawn"),
     )
@@ -83,10 +83,6 @@ def main(cfg: DictConfig):
         mask_ratio=cfg.mask_ratio,
         noise_scale=cfg.noise_scale
     )
-    
-    # Set model dtype
-    dtype = getattr(torch, cfg.dtype)
-    model = model.to(dtype=dtype)
 
     model.to(device)
     model_without_ddp = model

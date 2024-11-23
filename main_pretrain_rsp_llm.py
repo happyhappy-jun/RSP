@@ -13,7 +13,7 @@ import torch.backends.cudnn as cudnn
 from torch.utils.tensorboard import SummaryWriter
 
 from DeBERTa import deberta
-from util.kinetics_caption import PairedKineticsWithCaption
+from util.kinetics_caption import PairedKineticsWithCaption, collate_fn
 import timm
 assert timm.__version__ == "0.3.2"  # version check
 import timm.optim.optim_factory as optim_factory
@@ -24,7 +24,7 @@ from util.kinetics import PairedKinetics
 
 import models_rsp
 
-from engine_pretrain_repsamp import train_one_epoch
+from engine_pretrain_repsamp import train_one_epoch_llm
 
 
 def get_args_parser():
@@ -71,6 +71,7 @@ def get_args_parser():
 
     # Dataset parameters
     parser.add_argument("--data_path", default="/data/kinetics400", type=str)
+    parser.add_argument("--embedding_path", type=str)
     parser.add_argument("--max_distance", default=48, type=int)
     parser.add_argument("--repeated_sampling", type=int, default=2)
     parser.add_argument("--num_workers", default=6, type=int)
@@ -105,6 +106,7 @@ def main(args):
 
     dataset_train = PairedKineticsWithCaption(
         args.data_path, 
+        args.embedding_path,
         repeated_sampling=args.repeated_sampling
     )
 
@@ -113,6 +115,7 @@ def main(args):
     if True:  # args.distributed:
         num_tasks = misc.get_world_size()
         global_rank = misc.get_rank()
+        print(num_tasks, global_rank)
         sampler_train = torch.utils.data.DistributedSampler(
             dataset_train, num_replicas=num_tasks, rank=global_rank, shuffle=True
         )
@@ -134,7 +137,8 @@ def main(args):
         pin_memory=args.pin_mem,
         prefetch_factor=args.prefetch_factor,
         drop_last=True,
-        multiprocessing_context=torch.multiprocessing.get_context("spawn"),
+        persistent_workers=True,  # Add this
+        multiprocessing_context='fork',  # Change to fork
     )
 
     # define the model
@@ -148,16 +152,11 @@ def main(args):
         mask_ratio=args.mask_ratio,
         noise_scale=args.noise_scale
     )
-    lm_model = deberta.DeBERTa(pre_trained='base')
-    lm_model.apply_state()
 
     model.to(device)
-    lm_model.to(device)
 
     model_without_ddp = model
-    lm_model_without_ddp = lm_model
     print("Model = %s" % str(model_without_ddp))
-    print("LM Model = %s" % str(lm_model_without_ddp))
 
     eff_batch_size = args.batch_size * args.accum_iter * misc.get_world_size()
 
@@ -175,10 +174,6 @@ def main(args):
             model, device_ids=[args.gpu], find_unused_parameters=True
         )
         model_without_ddp = model.module
-        lm_model = torch.nn.parallel.DistributedDataParallel(
-            lm_model, device_ids=[args.gpu], find_unused_parameters=True
-        )   
-        lm_model_without_ddp = lm_model.module
 
     # following timm: set wd as 0 for bias and norm layers
     param_groups = optim_factory.add_weight_decay(model_without_ddp, args.weight_decay)
@@ -201,9 +196,8 @@ def main(args):
     for epoch in range(args.start_epoch, args.epochs):
         if args.distributed:
             data_loader_train.sampler.set_epoch(epoch)
-        train_stats = train_one_epoch(
+        train_stats = train_one_epoch_llm(
             model,
-            lm_model,
             data_loader_train,
             optimizer,
             device,
@@ -241,4 +235,6 @@ def main(args):
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser("RSP pre-training", parents=[get_args_parser()])
+    args = parser.parse_args()
+    main(args)

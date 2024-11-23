@@ -159,7 +159,7 @@ class PairedKineticsWithCaption(Dataset):
             src_images.append(src_image)
             tgt_images.append(tgt_image)
             # Convert numpy array to tensor here
-            embeddings.append(torch.from_numpy(self.embeddings[(pair['video_idx'], pair_idx)]))
+            embeddings.append(torch.from_numpy(self.embeddings[(video_idx, pair_idx)]))
 
         return {
             "src_images": torch.stack(src_images, dim=0),

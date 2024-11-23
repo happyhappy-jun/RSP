@@ -80,6 +80,7 @@ class RSP(nn.Module):
         img_size=224,
         patch_size=16,
         in_chans=3,
+        context_emb_dim=1536,
         embed_dim=1024,
         depth=24,
         num_heads=16,
@@ -151,7 +152,7 @@ class RSP(nn.Module):
         self.decoder_embed_deter = nn.Linear(embed_dim, decoder_embed_dim, bias=True)
         self.decoder_embed_stoch = nn.Linear(stoch_size, decoder_embed_dim, bias=True)
         self.mask_token = nn.Parameter(torch.zeros(1, 1, decoder_embed_dim))
-        self.context_proj = nn.Linear(768, decoder_embed_dim, bias=True)
+        self.context_proj = nn.Linear(context_emb_dim, decoder_embed_dim, bias=True)
 
         self.decoder_pos_embed = nn.Parameter(
             torch.zeros(1, num_patches + 1, decoder_embed_dim),

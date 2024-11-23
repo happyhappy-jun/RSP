@@ -9,6 +9,7 @@ run_name: ${exp_name}_${timestamp}
 dataset:
   _target_: util.kinetics_caption.PairedKineticsWithCaption
   data_path: /home/junyoon/rsp-llm/artifacts/results/frame_analysis_results_complete.json
+  embeddings_path: /home/junyoon/rsp-llm/artifacts/combined_output.jsonl
 
 train_loop:
   _target_: engine_pretrain_repsamp.train_one_epoch_llm
@@ -28,6 +29,7 @@ log_dir: logs/${run_name}
 # Model parameters
 model: "rsp_vit_small_patch16"
 input_size: 224
+context_emb_dim: 1536
 norm_pix_loss: true
 dtype: "float32"  # Options: float32, float16, bfloat16
 mask_ratio: 0.75
