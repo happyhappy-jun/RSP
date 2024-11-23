@@ -14,6 +14,8 @@ from PIL import Image
 
 from DeBERTa import deberta
 
+from RSP.models import BatchOutput
+
 class PairedRandomResizedCrop:
     def __init__(
         self,
@@ -53,15 +55,6 @@ class PairedRandomResizedCrop:
 
         return cropped_img_1, cropped_img_2
 
-def set_seed(seed=42):
-    random.seed(seed)
-    np.random.seed(seed)
-    torch.manual_seed(seed)
-    if torch.cuda.is_available():
-        torch.cuda.manual_seed(seed)
-        torch.cuda.manual_seed_all(seed)
-        torch.backends.cudnn.deterministic = True
-
 class PairedKineticsWithCaption(Dataset):
     """PairedKinetics dataset that loads from preprocessed JSON"""
     def __init__(
@@ -72,14 +65,13 @@ class PairedKineticsWithCaption(Dataset):
         seed=42             # Random seed for reproducibility
     ):
         super().__init__()
-        set_seed(seed)
         # Load preprocessed data from JSONL
         results = []
-        with open(data_path, 'r') as f:
+        with open(embeddings_path, 'r') as f:
             for line in f:
                 record = json.loads(line)
                 # Extract embedding from the OpenAI API response
-                embedding = record['response'].get('body', {}).get('data', [{}])[0].get('embedding', [])
+                embedding = BatchOutput(**record).response.body.data[0].embedding
                 if embedding:
                     results.append({
                         'video_idx': int(record['custom_id'].split('-')[0]),
