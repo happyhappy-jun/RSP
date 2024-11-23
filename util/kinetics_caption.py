@@ -1,3 +1,4 @@
+from itertools import combinations
 import os
 import random
 import numpy as np
@@ -74,31 +75,28 @@ class PairedKineticsWithCaption(Dataset):
         with open(embeddings_path, 'r') as f:
             for line in f:
                 record = json.loads(line)
-                video_idx, pair_idx = map(int, record['custom_id'].split('-'))
+                id = int(record['custom_id'].split('-')[-1]) - 1
+                video_idx, pair_idx = id // 2, id % 2
                 embedding = BatchOutput(**record).response.body.data[0].embedding
                 embeddings_data[(video_idx, pair_idx)] = torch.tensor(embedding)
-
+        print(list(embeddings_data.keys())[:10])
         # Sort results by video_idx and pair_idx
         sorted_results = sorted(results, key=lambda x: (x['video_idx'], x['pair_idx']))
         
         # Store embeddings in class variable
         self.embeddings = embeddings_data
         
-        if sorted_results:
-            print("First frame data result:", sorted_results[0])
-            first_key = (sorted_results[0]['video_idx'], sorted_results[0].get('pair_idx', 0))
-            if first_key in self.embeddings:
-                print(f"First embedding shape: {self.embeddings[first_key].shape}")
+        print("First frame data result:", sorted_results[0])
+        first_key = (sorted_results[0]['video_idx'], sorted_results[0].get('pair_idx', 0))
+        if first_key in self.embeddings:
+            print(f"First embedding shape: {self.embeddings[first_key].shape}")
         
         self.videos = defaultdict(list)
         for i, pair in enumerate(sorted_results):
             # Within each video, sort by pair_idx if it exists
             self.videos[pair["video_idx"]].append(pair)
+            self.videos[pair["video_idx"]].sort(key=lambda x: x.get('pair_idx', 0))
         
-        # Sort pairs within each video
-        for video_idx in self.videos:
-            self.videos[video_idx].sort(key=lambda x: x.get('pair_idx', 0))
-            
         self.video_indices = sorted(self.videos.keys())
         
         print(f"Loaded {len(self.embeddings)} embeddings")
@@ -176,10 +174,7 @@ if __name__ == "__main__":
     b = dataset[0]['input_ids'][1]
     c = dataset[1]['input_ids'][0]
     d = dataset[1]['input_ids'][1]
+    e = dataset[3]['input_ids'][0]
+    f = dataset[3]['input_ids'][1]
     
-    print(a.shape, b.shape)
-    
-    
-    print(torch.nn.functional.cosine_similarity(a, b, dim=0))
-    print(torch.nn.functional.cosine_similarity(c, d, dim=0))
-    print(torch.nn.functional.cosine_similarity(a, c, dim=0))
+    # TODO 
