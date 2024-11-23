@@ -317,8 +317,8 @@ class RSP(nn.Module):
         x = self.norm(x)
         return x, mask, ids_restore
 
-    def forward_decoder_fut(self, h, h_context, z):
-        kvx_h = self.get_feat(h, h_context, z)
+    def forward_decoder_fut(self, h, h_context_processed, z):
+        kvx_h = self.get_feat(h, h_context_processed, z)
 
         mask_tokens = self.mask_token.repeat(h.shape[0], h.shape[1], 1)
         x = mask_tokens + self.decoder_pos_embed
@@ -449,7 +449,8 @@ class RSP(nn.Module):
         prior_dist = self.make_dist(prior_logits)
         prior_z = prior_dist.rsample()
 
-        tgt_pred = self.forward_decoder_fut(src_h, embedding, post_z)
+        h_context_processed = self.process_context_embedding(embedding)
+        tgt_pred = self.forward_decoder_fut(src_h, h_context_processed, post_z)
         loss_post = self.forward_loss(tgt_imgs, tgt_pred)
         kl_loss, kl_value = self.kl_loss(post_logits, prior_logits)
 
@@ -459,7 +460,7 @@ class RSP(nn.Module):
         mae_loss = self.forward_loss(tgt_imgs, pred_masked, mask)
 
         with torch.no_grad():
-            tgt_pred_prior = self.forward_decoder_fut(src_h, embedding, prior_z)
+            tgt_pred_prior = self.forward_decoder_fut(src_h, h_context_processed, prior_z)
             loss_prior = self.forward_loss(tgt_imgs, tgt_pred_prior)
 
         loss = loss_post + self.kl_scale * kl_loss + mae_loss
