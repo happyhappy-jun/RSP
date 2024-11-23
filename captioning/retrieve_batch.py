@@ -9,7 +9,8 @@ def batch2str(batch):
     return f'{batch.id} {batch.status} {datetime.fromtimestamp(batch.created_at).strftime("%Y-%m-%d %H:%M:%S")}'
 
 def get_batch_page(after=None, limit=20):
-    return client.batches.list(limit=limit, after=after)
+    page = client.batches.list(limit=limit, after=after)
+    return list(page.data)
 
 def get_batch_id(choice):
     return choice.split()[0]
