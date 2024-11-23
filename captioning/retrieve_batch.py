@@ -187,3 +187,11 @@ with open(output_file, 'w') as f:
     for record in sorted_records:
         json.dump(record, f)
         f.write('\n')
+
+# Print first 10 lines of the output file
+print("\nFirst 10 lines of combined output:")
+with open(output_file, 'r') as f:
+    for i, line in enumerate(f):
+        if i >= 10:
+            break
+        print(f"{i+1}: {line.strip()}")
