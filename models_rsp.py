@@ -4,6 +4,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.distributions as td
+import torch.nn.functional as F
 
 from timm.models.vision_transformer import PatchEmbed, Block
 from timm.models.vision_transformer import CrossAttention, Attention, DropPath, Mlp
@@ -424,7 +425,7 @@ class RSP(nn.Module):
             dist = td.Normal(mean, std)
         return dist
 
-    def kl_loss(self, post_logits, prior_logits):
+    def compute_kl_loss(self, post_logits, prior_logits):
         balance = self.kl_balance
         freebit = self.kl_freebit
         post_to_prior_kl = td.kl_divergence(
@@ -461,7 +462,14 @@ class RSP(nn.Module):
         
         tgt_pred = self.forward_decoder_fut(src_h, h_context, post_z)
         loss_post = self.forward_loss(tgt_imgs, tgt_pred)
-        kl_loss, kl_value = self.kl_loss(post_logits, prior_logits)
+        kl_loss, kl_value = self.compute_kl_loss(post_logits, prior_logits)
+        
+        # Calculate KL divergence between context embeddings
+        context_kl = torch.nn.functional.kl_div(
+            F.log_softmax(h_context_prime, dim=-1),
+            F.softmax(h_context, dim=-1),
+            reduction='batchmean'
+        )
 
         # MAE
         img_h, mask, ids_restore = self.forward_encoder(tgt_imgs, mask_ratio=self.mask_ratio)
@@ -472,9 +480,9 @@ class RSP(nn.Module):
             tgt_pred_prior = self.forward_decoder_fut(src_h, h_context, prior_z)
             loss_prior = self.forward_loss(tgt_imgs, tgt_pred_prior)
 
-        loss = loss_post + self.kl_scale * kl_loss + mae_loss
+        loss = loss_post + self.kl_scale * kl_loss + mae_loss + self.kl_scale * context_kl
 
-        return loss, tgt_pred, (loss_post, loss_prior, kl_loss, kl_value, mae_loss)
+        return loss, tgt_pred, (loss_post, loss_prior, kl_loss, kl_value, mae_loss, context_kl)
 
 
 def rsp_vit_small_patch8_dec512d8b(**kwargs):
