@@ -177,4 +177,16 @@ if __name__ == "__main__":
     e = dataset[3]['input_ids'][0]
     f = dataset[3]['input_ids'][1]
     
-    # TODO 
+    # Print cosine similarities between embeddings
+    print("\nComputing cosine similarities between embeddings:")
+    
+    # List of embeddings to compare
+    embeddings = [a, b, c, d, e, f]
+    embedding_names = ['0-0', '0-1', '1-0', '1-1', '3-0', '3-1']
+    
+    # Compute cosine similarity for all pairs
+    for (e1, n1), (e2, n2) in combinations(zip(embeddings, embedding_names), 2):
+        sim = torch.nn.functional.cosine_similarity(e1.unsqueeze(0), e2.unsqueeze(0))
+        print(f"Cosine similarity between {n1} and {n2}: {sim.item():.4f}")
+        
+    print(dataset[0])
