@@ -111,11 +111,13 @@ class RSP(nn.Module):
             torch.zeros(1, num_patches + 1, embed_dim), requires_grad=False
         )  # fixed sin-cos embedding
         self.image_type_embed = nn.Parameter(
-            torch.zeros(1, num_patches + 1, decoder_embed_dim), requires_grad=True
+            torch.zeros(1, num_patches + 1, decoder_embed_dim),
         )
+        nn.init.normal_(self.image_type_embed, std=0.02)
         self.language_type_embed = nn.Parameter(
             torch.zeros(1, 1, decoder_embed_dim), requires_grad=True
         )
+        nn.init.normal_(self.language_type_embed, std=0.02)
 
         self.blocks = nn.ModuleList(
             [
