@@ -169,7 +169,7 @@ def combine_and_sort_outputs(batches):
                 all_records.extend(records)
     
     # Sort all records by custom_id
-    return sorted(all_records, key=lambda x: x.get('custom_id', ''))
+    return sorted(all_records, key=lambda x: int(x.get('custom_id', '').split("-")[-1]))
 
 # Print selected batches
 print("\nSelected batches:")
