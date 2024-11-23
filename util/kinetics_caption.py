@@ -14,7 +14,7 @@ from PIL import Image
 
 from DeBERTa import deberta
 
-from RSP.models import BatchOutput
+from models import BatchOutput
 
 class PairedRandomResizedCrop:
     def __init__(
@@ -66,16 +66,8 @@ class PairedKineticsWithCaption(Dataset):
     ):
         super().__init__()
         # Load video frame data
-        results = []
         with open(data_path, 'r') as f:
-            for line in f:
-                record = json.loads(line)
-                results.append({
-                    'video_idx': int(record['custom_id'].split('-')[0]),
-                    'pair_idx': int(record['custom_id'].split('-')[1]),
-                    'frame_cur_path': record.get('frame_cur_path', ''),
-                    'frame_fut_path': record.get('frame_fut_path', '')
-                })
+            results = json.load(f)["results"]
 
         # Load embeddings data
         embeddings_data = []
@@ -83,15 +75,13 @@ class PairedKineticsWithCaption(Dataset):
             for line in f:
                 record = json.loads(line)
                 embedding = BatchOutput(**record).response.body.data[0].embedding
-                if embedding:
-                    embeddings_data.append({
-                        'video_idx': int(record['custom_id'].split('-')[0]),
-                        'pair_idx': int(record['custom_id'].split('-')[1]),
-                        'embedding': embedding
-                    })
+                embeddings_data.append(embedding)
 
         # Sort results by video_idx and pair_idx
         sorted_results = sorted(results, key=lambda x: (x['video_idx'], x['pair_idx']))
+        # join sorted_results with embeddings_data
+        # TODO 
+        
         if sorted_results:
             print("First frame data result:", sorted_results[0])
         
@@ -106,9 +96,6 @@ class PairedKineticsWithCaption(Dataset):
             
         self.video_indices = sorted(self.videos.keys())
         
-        # Convert embeddings to tensors
-        self.embeddings = {(data['video_idx'], data['pair_idx']): torch.tensor(data['embedding']) 
-                          for data in embeddings_data}
         print(f"Loaded {len(self.embeddings)} embeddings")
         
         self.repeated_sampling = repeated_sampling
@@ -177,7 +164,7 @@ def collate_fn(batch):
 if __name__ == "__main__":
     dataset = PairedKineticsWithCaption(
         data_path="/home/junyoon/rsp-llm/artifacts/results/frame_analysis_results_complete.json",
-        embeddings_path="/home/junyoon/rsp-llm/artifacts/deberta_embeddings.pt",
+        embeddings_path="/home/junyoon/rsp-llm/artifacts/combined_output.jsonl",
         seed=42
     )
     a = dataset[0]['input_ids'][0]
