@@ -91,16 +91,27 @@ class PairedKineticsWithCaption(Dataset):
             self.videos[pair["video_idx"]].append(pair)
             self.videos[pair["video_idx"]].sort(key=lambda x: x.get('pair_idx', 0))
         
+        # Get original indices and find gaps
+        orig_indices = sorted(self.videos.keys())
+        min_idx = min(orig_indices)
+        max_idx = max(orig_indices)
+        
+        # Create mapping to fill gaps
+        new_idx = 0
+        self.idx_mapping = {}
+        for idx in range(min_idx, max_idx + 1):
+            if idx in self.videos:
+                self.idx_mapping[idx] = new_idx
+                new_idx += 1
+                
+        # Remap videos to new continuous indices
+        remapped_videos = defaultdict(list)
+        for old_idx, pairs in self.videos.items():
+            new_idx = self.idx_mapping[old_idx]
+            remapped_videos[new_idx] = pairs
+            
+        self.videos = remapped_videos
         self.video_indices = sorted(self.videos.keys())
-        
-        # Check for missing indices
-        min_idx = min(self.video_indices)
-        max_idx = max(self.video_indices)
-        missing_indices = set(range(min_idx, max_idx + 1)) - set(self.video_indices)
-        if missing_indices:
-            print(f"Warning: Missing video indices: {sorted(missing_indices)}")
-            print(f"Total gaps: {len(missing_indices)}")
-        
         self.repeated_sampling = repeated_sampling
         
         # Setup transforms
@@ -156,15 +167,13 @@ def collate_fn(batch):
 
 
 if __name__ == "__main__":
-    # Test dataset loading and index checking
-    print("\nInitializing dataset and checking for missing indices...")
+    print("\nInitializing dataset...")
     dataset = PairedKineticsWithCaption(
         data_path="/home/junyoon/rsp-llm/artifacts/results/frame_analysis_results_complete.json",
         embeddings_path="/home/junyoon/rsp-llm/artifacts/combined_output.jsonl",
     )
     
-    print(f"\nTotal number of videos: {len(dataset)}")
-    print(f"Index range: {min(dataset.video_indices)} to {max(dataset.video_indices)}")
+    print(f"Total number of videos: {len(dataset)}")
     a = dataset[0]['embeddings'][0]
     b = dataset[0]['embeddings'][1]
     c = dataset[1]['embeddings'][0]
