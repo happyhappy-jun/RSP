@@ -92,7 +92,6 @@ def train_one_epoch(
             log_writer.add_scalar("loss_mae", loss_mae.item(), epoch_1000x)
             log_writer.add_scalar("kl", value_kl.item(), epoch_1000x)
             log_writer.add_scalar("context_kl", context_kl_loss.item(), epoch_1000x)
-            log_writer.add_scalar("context_kl", context_kl.item(), epoch_1000x)
 
     metric_logger.synchronize_between_processes()
     print("Averaged stats:", metric_logger)
@@ -168,7 +167,7 @@ def train_one_epoch_llm(
         metric_logger.update(loss_kl=loss_kl.item())
         metric_logger.update(kl=value_kl.item())
         metric_logger.update(loss_mae=loss_mae.item())
-        metric_logger.update(context_kl=context_kl.item())
+        metric_logger.update(context_kl=context_kl_loss.item())
         lr = optimizer.param_groups[0]["lr"]
         metric_logger.update(lr=lr)
 
