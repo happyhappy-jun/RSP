@@ -112,6 +112,15 @@ class PairedKineticsWithCaption(Dataset):
             
         self.videos = remapped_videos
         self.video_indices = sorted(self.videos.keys())
+        
+        # Verify no gaps after remapping
+        expected_indices = set(range(len(self.video_indices)))
+        actual_indices = set(self.video_indices)
+        if expected_indices != actual_indices:
+            missing = expected_indices - actual_indices
+            extra = actual_indices - expected_indices
+            raise ValueError(f"Index continuity error after remapping. Missing: {missing}, Extra: {extra}")
+            
         self.repeated_sampling = repeated_sampling
         
         # Setup transforms
