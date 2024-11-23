@@ -92,6 +92,15 @@ class PairedKineticsWithCaption(Dataset):
             self.videos[pair["video_idx"]].sort(key=lambda x: x.get('pair_idx', 0))
         
         self.video_indices = sorted(self.videos.keys())
+        
+        # Check for missing indices
+        min_idx = min(self.video_indices)
+        max_idx = max(self.video_indices)
+        missing_indices = set(range(min_idx, max_idx + 1)) - set(self.video_indices)
+        if missing_indices:
+            print(f"Warning: Missing video indices: {sorted(missing_indices)}")
+            print(f"Total gaps: {len(missing_indices)}")
+        
         self.repeated_sampling = repeated_sampling
         
         # Setup transforms
@@ -147,10 +156,15 @@ def collate_fn(batch):
 
 
 if __name__ == "__main__":
+    # Test dataset loading and index checking
+    print("\nInitializing dataset and checking for missing indices...")
     dataset = PairedKineticsWithCaption(
         data_path="/home/junyoon/rsp-llm/artifacts/results/frame_analysis_results_complete.json",
         embeddings_path="/home/junyoon/rsp-llm/artifacts/combined_output.jsonl",
     )
+    
+    print(f"\nTotal number of videos: {len(dataset)}")
+    print(f"Index range: {min(dataset.video_indices)} to {max(dataset.video_indices)}")
     a = dataset[0]['embeddings'][0]
     b = dataset[0]['embeddings'][1]
     c = dataset[1]['embeddings'][0]
