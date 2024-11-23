@@ -48,7 +48,7 @@ def train_one_epoch(
         tgt_samples = tgt_samples.reshape(-1, *tgt_samples.shape[2:])
 
         with torch.amp.autocast("cuda"):
-            loss, _, (loss_post, loss_prior, loss_kl, value_kl, loss_mae) = model(
+            loss, _, (loss_post, loss_prior, loss_kl, value_kl, loss_mae, context_kl) = model(
                 src_samples, tgt_samples, lm_logits, 
                 data_iter_step / len(data_loader) + epoch
             )
@@ -91,6 +91,7 @@ def train_one_epoch(
             log_writer.add_scalar("loss_kl", loss_kl.item(), epoch_1000x)
             log_writer.add_scalar("loss_mae", loss_mae.item(), epoch_1000x)
             log_writer.add_scalar("kl", value_kl.item(), epoch_1000x)
+            log_writer.add_scalar("context_kl", context_kl.item(), epoch_1000x)
             log_writer.add_scalar("context_kl", context_kl.item(), epoch_1000x)
 
     metric_logger.synchronize_between_processes()
@@ -167,6 +168,7 @@ def train_one_epoch_llm(
         metric_logger.update(loss_kl=loss_kl.item())
         metric_logger.update(kl=value_kl.item())
         metric_logger.update(loss_mae=loss_mae.item())
+        metric_logger.update(context_kl=context_kl.item())
         lr = optimizer.param_groups[0]["lr"]
         metric_logger.update(lr=lr)
 
