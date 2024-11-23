@@ -151,7 +151,7 @@ class PairedKineticsWithCaption(Dataset):
         return {
             "src_images": torch.stack(src_images, dim=0),
             "tgt_images": torch.stack(tgt_images, dim=0),
-            "input_ids": torch.stack(embeddings, dim=0),
+            "embeddings": torch.stack(embeddings, dim=0),
             "video_idx": video_idx
         }
             
@@ -159,7 +159,7 @@ def collate_fn(batch):
     return {
         "src_images": torch.stack([x['src_images'] for x in batch], dim=0),
         "tgt_images": torch.stack([x['tgt_images'] for x in batch], dim=0),
-        "input_ids": torch.stack([x['input_ids'] for x in batch], dim=0),
+        "embeddings": torch.stack([x['embeddings'] for x in batch], dim=0),
         "video_idx": [x['video_idx'] for x in batch]
     }
 
