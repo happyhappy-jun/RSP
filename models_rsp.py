@@ -97,6 +97,7 @@ class RSP(nn.Module):
         kl_freebit=0.1,
         mask_ratio=0.75,
         noise_scale=0.5,
+        neftune_noise_alpha=5.0,
     ):
         super().__init__()
         self.patch_embed = PatchEmbed(img_size, patch_size, in_chans, embed_dim)
@@ -378,6 +379,14 @@ class RSP(nn.Module):
     def get_feat(self, h, h_context, z):
         # h = self.decoder_embed_deter(h) + self.decoder_pos_embed
         h_context = h_context.reshape(-1, h_context.size(-1))
+        
+        # Apply NEFTune noise to context embeddings
+        if self.training:
+            dims = torch.tensor(h_context.size(-1), device=h_context.device)
+            mag_norm = self.neftune_noise_alpha / torch.sqrt(dims)
+            noise = torch.zeros_like(h_context).uniform_(-mag_norm, mag_norm)
+            h_context = h_context + noise.detach()
+            
         h_context = self.context_proj(h_context)
         h_context = h_context.reshape(-1, 1, h_context.size(-1))  # [16, 1, 512]
     
