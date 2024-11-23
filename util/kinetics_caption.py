@@ -73,13 +73,26 @@ class PairedKineticsWithCaption(Dataset):
     ):
         super().__init__()
         set_seed(seed)
-        # Load preprocessed data
+        # Load preprocessed data from JSONL
+        results = []
         with open(data_path, 'r') as f:
-            data = json.load(f)
-    
+            for line in f:
+                record = json.loads(line)
+                # Extract embedding from the OpenAI API response
+                embedding = record['response'].get('body', {}).get('data', [{}])[0].get('embedding', [])
+                if embedding:
+                    results.append({
+                        'video_idx': int(record['custom_id'].split('-')[0]),
+                        'pair_idx': int(record['custom_id'].split('-')[1]),
+                        'frame_cur_path': record.get('frame_cur_path', ''),
+                        'frame_fut_path': record.get('frame_fut_path', ''),
+                        'embedding': embedding
+                    })
+        
         # Sort results first by video_idx
-        sorted_results = sorted(data['results'], key=lambda x: (x['video_idx'], x["pair_idx"]))
-        print(sorted_results[0])
+        sorted_results = sorted(results, key=lambda x: (x['video_idx'], x['pair_idx']))
+        if sorted_results:
+            print("First result:", sorted_results[0])
         
         self.videos = defaultdict(list)
         for i, pair in enumerate(sorted_results):
@@ -92,9 +105,9 @@ class PairedKineticsWithCaption(Dataset):
             
         self.video_indices = sorted(self.videos.keys())
         
-        # Load precomputed embeddings
-        print(f"Loading precomputed embeddings from {embeddings_path}")
-        self.embeddings = torch.load(embeddings_path)
+        # Convert embeddings to tensors
+        self.embeddings = {(result['video_idx'], result['pair_idx']): torch.tensor(result['embedding']) 
+                          for result in sorted_results}
         print(f"Loaded {len(self.embeddings)} embeddings")
         
         self.repeated_sampling = repeated_sampling
@@ -140,7 +153,7 @@ class PairedKineticsWithCaption(Dataset):
             src_images.append(src_image)
             tgt_images.append(tgt_image)
             print(pair['video_idx'], pair_idx)
-            embeddings.append(self.embeddings[pair['video_idx']* len(pair_infos) + pair_idx])
+            embeddings.append(self.embeddings[(pair['video_idx'], pair_idx)])
             
 
         # Get precomputed embedding and repeat for each sample
