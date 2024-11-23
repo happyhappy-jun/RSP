@@ -1,10 +1,9 @@
-from dataclasses import dataclass
+from pydantic import BaseModel
 import json
-from typing import List
+from typing import List, Optional
 from openai.types.create_embedding_response import CreateEmbeddingResponse, Usage
 
-@dataclass
-class Response:
+class Response(BaseModel):
     """
     Response class is used to store the response of the API
     """
@@ -12,15 +11,14 @@ class Response:
     request_id: str
     body: CreateEmbeddingResponse
 
-@dataclass
-class BatchOutput:
+class BatchOutput(BaseModel):
     """
     BatchOutput class is used to store the output of the batch processing
     """
     id: str
     custom_id: str
     response: Response
-    error: str
+    error: Optional[str] = None
     
 if __name__ == "__main__":
     with open("/home/junyoon/rsp-llm/artifacts/combined_output.jsonl", "r") as f:
