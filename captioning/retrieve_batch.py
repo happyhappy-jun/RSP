@@ -7,6 +7,7 @@ import tempfile
 from datetime import datetime
 from collections import deque
 from pathlib import Path
+from tqdm import tqdm
 #Setting the openAI key in the environement for creating the client
 
 def batch2str(batch):
@@ -147,7 +148,7 @@ def combine_and_sort_outputs(batches):
     """Retrieve, combine and sort outputs from multiple batches"""
     all_records = []
     
-    for batch in batches:
+    for batch in tqdm(batches, desc="Processing batches", unit="batch"):
         # Retrieve detailed batch info
         batch_detail = client.batches.retrieve(batch.id)
         
