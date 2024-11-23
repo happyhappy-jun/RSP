@@ -390,7 +390,8 @@ class RSP(nn.Module):
 
     def forward_embedding(self, h_context):
         """Process context embedding by reshaping, adding noise if training, and projecting to decoder dim"""
-        h_context = h_context.reshape(-1, h_context.size(-1))
+        batch_size = h_context.size(0)
+        h_context = h_context.view(batch_size, -1, h_context.size(-1))  # [B, 1, context_emb_dim]
         
         # Apply NEFTune noise to context embeddings
         if self.training:
@@ -399,8 +400,7 @@ class RSP(nn.Module):
             noise = torch.zeros_like(h_context).uniform_(-mag_norm, mag_norm)
             h_context = h_context + noise.detach()
             
-        h_context = self.context_proj(h_context)
-        h_context = h_context.reshape(-1, 1, h_context.size(-1))  # [16, 1, 512]
+        h_context = self.context_proj(h_context)  # [B, 1, decoder_embed_dim]
         h_context = h_context + self.language_type_embed  # Add type embedding
         
         return h_context
