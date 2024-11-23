@@ -1,10 +1,8 @@
 import sys
 import math
-
+import wandb
 from typing import Iterable
-
 import torch
-
 import util.misc as misc
 import util.lr_sched as lr_sched
 
@@ -82,22 +80,6 @@ def train_one_epoch(
         metric_logger.update(lr=lr)
 
         loss_value_reduce = misc.all_reduce_mean(loss_value)
-        
-        # Log metrics every iteration if main process
-        if misc.is_main_process():
-            wandb.log({
-                'iter_loss': loss_value_reduce,
-                'iter_loss_post': loss_post.item(),
-                'iter_loss_prior': loss_prior.item(),
-                'iter_loss_kl': loss_kl.item(),
-                'iter_kl': value_kl.item(),
-                'iter_loss_mae': loss_mae.item(),
-                'iter_context_kl': context_kl_loss.item(),
-                'iter_lr': lr,
-                'iter': data_iter_step,
-                'epoch': epoch,
-                'progress': data_iter_step / len(data_loader) + epoch,
-            })
         
         # Log metrics every iteration if main process
         if misc.is_main_process():
