@@ -26,3 +26,7 @@ typing_extensions
 urllib3 
 Werkzeug==3.0.3
 zipp==3.19.2
+hydra-core
+pydantic
+opencv-python
+openai

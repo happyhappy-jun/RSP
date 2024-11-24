@@ -56,3 +56,18 @@ python captioning/extract_frames.py \
     --output_dir ./output \
     --batch_size 64 \
     --repeated_sampling 2
+
+
+
+  CUDA_VISIBLE_DEVICES=4 python eval_video_segmentation_davis.py \
+    --finetune /home/bjyoon/RSP/outputs/fixed-gpt_emb_small-paired-type_embedding-noise_2024-11-23_22-59-40/checkpoint-180.pth \
+    --output_dir /home/bjyoon/RSP/logs/fixed-gpt_emb_small-paired-type_embedding-noise_2024-11-23_22-59-40/davis_seg \
+    --data_path /data/DAVIS_480_880 \
+    --topk 7 --size_mask_neighborhood 30 --n_last_frames 30 \
+    --model vit_small
+
+
+  CUDA_VISIBLE_DEVICES=4 python ./davis2017-evaluation/evaluation_method.py \
+    --task semi-supervised \
+    --results_path /home/bjyoon/RSP/logs/fixed-gpt_emb_small-paired-type_embedding-noise_2024-11-23_22-59-40/davis_seg \
+    --davis_path /data/DAVIS_480_880

@@ -24,7 +24,7 @@ def eval_video_tracking_davis(
     Evaluate tracking on a video given first frame & segmentation
     """
     video_folder = os.path.join(args.output_dir, video_dir.split("/")[-1])
-    os.makedirs(video_folder)
+    os.makedirs(video_folder, exist_ok=True)
 
     # The queue stores the n preceeding frames
     que = queue.Queue(args.n_last_frames)

@@ -159,9 +159,9 @@ class RSP(nn.Module):
         
         self.decoder_embed_dim = decoder_embed_dim
         self.to_language_prior = nn.Sequential(
-            nn.Linear(self.decoder_embed_dim, self.decoder_embed_dim * 2),
+            nn.Linear(embed_dim, embed_dim * 2),
             nn.ReLU(),
-            nn.Linear(self.decoder_embed_dim * 2, self.decoder_embed_dim),
+            nn.Linear(embed_dim * 2, self.decoder_embed_dim),
         )
         
         self.decoder_embed_mae = nn.Linear(embed_dim, decoder_embed_dim, bias=True)
@@ -480,7 +480,7 @@ class RSP(nn.Module):
         embedding = embedding.view(-1, 1, embedding.size(-1))
         h_context = self.forward_embedding(embedding)
         # Project context to prior space
-        h_context_prime = self.to_language_prior(h_context)
+        h_context_prime = self.to_language_prior(src_h[:, 0])
         
         tgt_pred = self.forward_decoder_fut(src_h, h_context, post_z)
         loss_post = self.forward_loss(tgt_imgs, tgt_pred)

@@ -11,10 +11,6 @@ from torch.utils.data import Dataset
 from torchvision import transforms
 import torchvision.transforms.functional as F
 from collections import defaultdict
-from PIL import Image
-
-from DeBERTa import deberta
-
 from models import BatchOutput
 
 class PairedRandomResizedCrop:
