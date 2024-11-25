@@ -10,5 +10,5 @@ dataset:
   repeated_sampling: ${repeated_sampling}
 
 train_loop:
-  _target_: engine_pretrain_repsamp.train_one_epoch
+  _target_: engine_pretrain_repsamp.train_one_epoch_fixed
   _partial_: true
