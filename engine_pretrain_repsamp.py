@@ -39,13 +39,19 @@ def train_one_epoch(
             )
 
         src_samples, tgt_samples, _ = batch
+        
         src_samples = src_samples.to(device, non_blocking=True)
         tgt_samples = tgt_samples.to(device, non_blocking=True)
+        
+        src_samples = src_samples.reshape(-1, *src_samples.shape[2:])
+        tgt_samples = tgt_samples.reshape(-1, *tgt_samples.shape[2:])
 
-        loss, _, (loss_post, loss_prior, loss_kl, value_kl, loss_mae) = model(
-            src_samples, tgt_samples, 
-            data_iter_step / len(data_loader) + epoch
-        )
+
+        with torch.cuda.amp.autocast():
+            loss, _, (loss_post, loss_prior, loss_kl, value_kl, loss_mae) = model(
+                src_samples, tgt_samples, 
+                data_iter_step / len(data_loader) + epoch
+            )
 
         loss_value = loss.item()
 

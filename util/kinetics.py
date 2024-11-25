@@ -8,7 +8,8 @@ import torch
 from torch.utils.data import Dataset
 from torchvision import transforms
 import torchvision.transforms.functional as F
-from util.misc import PairedRandomResizedCrop
+
+from util.kinetics_caption import PairedRandomResizedCrop
 
 
 class PairedKinetics(Dataset):
