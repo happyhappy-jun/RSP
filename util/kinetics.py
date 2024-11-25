@@ -74,3 +74,32 @@ class PairedKinetics(Dataset):
         tgt_image = self.basic_transform(tgt_image)
         return src_image, tgt_image
 
+
+class PairedKineticsFixed(PairedKinetics):
+    def __init__(
+        self,
+        root,
+        max_distance=48,
+        repeated_sampling=2
+    ):
+        super().__init__(root, max_distance, repeated_sampling)
+
+    def __getitem__(self, index):
+        sample = os.path.join(self.root, self.samples[index][1])
+        vr = VideoReader(sample, num_threads=1, ctx=cpu(0))
+        
+        # Load frames once
+        src_image, tgt_image = self.load_frames(vr)
+        
+        # Apply same transformation multiple times
+        src_images = []
+        tgt_images = []
+        for i in range(self.repeated_sampling):
+            src_transformed, tgt_transformed = self.transform(src_image.copy(), tgt_image.copy())
+            src_images.append(src_transformed)
+            tgt_images.append(tgt_transformed)
+            
+        src_images = torch.stack(src_images, dim=0)
+        tgt_images = torch.stack(tgt_images, dim=0)
+        return src_images, tgt_images, 0
+
