@@ -413,9 +413,22 @@ class RSP(nn.Module):
         return kl_loss, kl_value
 
     def forward(self, src_imgs, tgt_imgs, epoch):
+        # Handle repeated samples by reshaping
+        B, R, C, H, W = src_imgs.shape  # B: batch, R: repeats, C: channels, H: height, W: width
+        src_imgs = src_imgs.view(-1, C, H, W)
+        tgt_imgs = tgt_imgs.view(-1, C, H, W)
+        
         # Extract embeddings
         src_h, _, _ = self.forward_encoder(src_imgs, mask_ratio=0)
         tgt_h, _, _ = self.forward_encoder(self.perturb(tgt_imgs), mask_ratio=0)
+        
+        # Reshape embeddings back to include repeat dimension
+        src_h = src_h.view(B, R, *src_h.shape[1:])
+        tgt_h = tgt_h.view(B, R, *tgt_h.shape[1:])
+        
+        # Average over repeats
+        src_h = src_h.mean(dim=1)
+        tgt_h = tgt_h.mean(dim=1)
 
         # Posterior distribution from both images
         post_h = torch.cat([src_h[:, 0], tgt_h[:, 0]], -1)
