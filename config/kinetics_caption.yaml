@@ -8,7 +8,6 @@ dataset:
   _target_: util.kinetics_caption.PairedKineticsWithCaption
   data_path: ${oc.env:HOME}/RSP/artifacts/frame_analysis_results_complete.json
   embeddings_path: ${oc.env:HOME}/RSP/artifacts/combined_output.jsonl
-  max_distance: ${max_distance}
   repeated_sampling: ${repeated_sampling}
 
 train_loop:
