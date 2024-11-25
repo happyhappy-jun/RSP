@@ -1,0 +1,17 @@
+defaults:
+  - main
+
+exp_name: rsp_caption
+
+model: rsp_vit_small_patch16
+
+dataset:
+  _target_: util.kinetics_caption.PairedKineticsWithCaption
+  data_path: ${oc.env:HOME}/RSP/artifacts/frame_analysis_results_complete.json
+  embeddings_path: ${oc.env:HOME}/RSP/artifacts/combined_output.jsonl
+
+train_loop:
+  _target_: engine_pretrain_repsamp.train_one_epoch_llm
+  _partial_: true
+
+
