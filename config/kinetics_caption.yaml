@@ -10,6 +10,8 @@ dataset:
   embeddings_path: ${oc.env:HOME}/RSP/artifacts/combined_output.jsonl
   repeated_sampling: ${repeated_sampling}
 
+model: "rsp_vit_small_patch16_caption"
+
 train_loop:
   _target_: engine_pretrain_repsamp.train_one_epoch_llm
   _partial_: true

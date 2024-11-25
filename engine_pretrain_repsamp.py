@@ -45,9 +45,8 @@ def train_one_epoch(
         src_samples = src_samples.reshape(-1, *src_samples.shape[2:])
         tgt_samples = tgt_samples.reshape(-1, *tgt_samples.shape[2:])
 
-        loss, _, (loss_post, loss_prior, loss_kl, value_kl, loss_mae, context_kl_loss) = model(
-            src_samples, tgt_samples, lm_logits, 
-            data_iter_step / len(data_loader) + epoch
+        loss, _, (loss_post, loss_prior, loss_kl, value_kl, loss_mae) = model(
+            src_samples, tgt_samples, data_iter_step / len(data_loader) + epoch
         )
 
         loss_value = loss.item()
@@ -74,7 +73,6 @@ def train_one_epoch(
         metric_logger.update(loss_kl=loss_kl.item())
         metric_logger.update(kl=value_kl.item())
         metric_logger.update(loss_mae=loss_mae.item())
-        metric_logger.update(context_kl=context_kl_loss.item())
         lr = optimizer.param_groups[0]["lr"]
         metric_logger.update(lr=lr)
 
@@ -89,7 +87,6 @@ def train_one_epoch(
                 'iter_loss_kl': loss_kl.item(),
                 'iter_kl': value_kl.item(),
                 'iter_loss_mae': loss_mae.item(),
-                'iter_context_kl': context_kl_loss.item(),
                 'iter_lr': lr,
                 'iter': data_iter_step,
                 'epoch': epoch,
@@ -104,7 +101,6 @@ def train_one_epoch(
             log_writer.add_scalar("loss_kl", loss_kl.item(), epoch_1000x)
             log_writer.add_scalar("loss_mae", loss_mae.item(), epoch_1000x)
             log_writer.add_scalar("kl", value_kl.item(), epoch_1000x)
-            log_writer.add_scalar("context_kl", context_kl_loss.item(), epoch_1000x)
 
     metric_logger.synchronize_between_processes()
     print("Averaged stats:", metric_logger)
