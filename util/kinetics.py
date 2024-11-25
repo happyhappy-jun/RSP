@@ -83,15 +83,39 @@ class PairedKineticsFixed(PairedKinetics):
         repeated_sampling=2
     ):
         super().__init__(root, max_distance, repeated_sampling)
+        self.presampled_indices = {}
+        # Presample indices for all videos
+        for idx in range(len(self.samples)):
+            sample = os.path.join(self.root, self.samples[idx][1])
+            vr = VideoReader(sample, num_threads=1, ctx=cpu(0))
+            seg_len = len(vr)
+            least_frames_num = self.max_distance + 1
+            
+            if seg_len >= least_frames_num:
+                idx_cur = random.randint(0, seg_len - least_frames_num)
+                interval = random.randint(4, self.max_distance)
+                idx_fut = idx_cur + interval
+            else:
+                indices = random.sample(range(seg_len), 2)
+                indices.sort()
+                idx_cur, idx_fut = indices
+                
+            self.presampled_indices[idx] = (idx_cur, idx_fut)
+
+    def load_frames(self, vr, index):
+        idx_cur, idx_fut = self.presampled_indices[index]
+        frame_cur = vr[idx_cur].asnumpy()
+        frame_fut = vr[idx_fut].asnumpy()
+        return frame_cur, frame_fut
 
     def __getitem__(self, index):
         sample = os.path.join(self.root, self.samples[index][1])
         vr = VideoReader(sample, num_threads=1, ctx=cpu(0))
         
-        # Load frames once
-        src_image, tgt_image = self.load_frames(vr)
+        # Load frames using presampled indices
+        src_image, tgt_image = self.load_frames(vr, index)
         
-        # Apply same transformation multiple times
+        # Apply different transformations to the same frames
         src_images = []
         tgt_images = []
         for i in range(self.repeated_sampling):
