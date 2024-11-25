@@ -81,7 +81,6 @@ class RSP(nn.Module):
         img_size=224,
         patch_size=16,
         in_chans=3,
-        context_emb_dim=1536,
         embed_dim=1024,
         depth=24,
         num_heads=16,
@@ -98,26 +97,15 @@ class RSP(nn.Module):
         kl_freebit=0.1,
         mask_ratio=0.75,
         noise_scale=0.5,
-        neftune_noise_alpha=5.0,
     ):
         super().__init__()
         self.patch_embed = PatchEmbed(img_size, patch_size, in_chans, embed_dim)
         num_patches = self.patch_embed.num_patches
-        self.neftune_noise_alpha = neftune_noise_alpha
-        self.context_patch_length = 1
 
         self.cls_token = nn.Parameter(torch.zeros(1, 1, embed_dim))
         self.pos_embed = nn.Parameter(
             torch.zeros(1, num_patches + 1, embed_dim), requires_grad=False
         )  # fixed sin-cos embedding
-        self.image_type_embed = nn.Parameter(
-            torch.zeros(1, num_patches + 1, decoder_embed_dim),
-        )
-        nn.init.normal_(self.image_type_embed, std=0.02)
-        self.language_type_embed = nn.Parameter(
-            torch.zeros(1, 1, decoder_embed_dim), requires_grad=True
-        )
-        nn.init.normal_(self.language_type_embed, std=0.02)
 
         self.blocks = nn.ModuleList(
             [
@@ -158,17 +146,12 @@ class RSP(nn.Module):
         )
         
         self.decoder_embed_dim = decoder_embed_dim
-        self.to_language_prior = nn.Sequential(
-            nn.Linear(embed_dim, embed_dim * 2),
-            nn.ReLU(),
-            nn.Linear(embed_dim * 2, self.decoder_embed_dim),
-        )
+
         
         self.decoder_embed_mae = nn.Linear(embed_dim, decoder_embed_dim, bias=True)
         self.decoder_embed_deter = nn.Linear(embed_dim, decoder_embed_dim, bias=True)
         self.decoder_embed_stoch = nn.Linear(stoch_size, decoder_embed_dim, bias=True)
         self.mask_token = nn.Parameter(torch.zeros(1, 1, decoder_embed_dim))
-        self.context_proj = nn.Linear(context_emb_dim, decoder_embed_dim, bias=True)
 
         self.decoder_pos_embed = nn.Parameter(
             torch.zeros(1, num_patches + 1, decoder_embed_dim),
@@ -329,8 +312,8 @@ class RSP(nn.Module):
         x = self.norm(x)
         return x, mask, ids_restore
 
-    def forward_decoder_fut(self, h, h_context, z):
-        kvx_h = self.get_feat(h, h_context, z)
+    def forward_decoder_fut(self, h, z):
+        kvx_h = self.get_feat(h, z)
 
         mask_tokens = self.mask_token.repeat(h.shape[0], h.shape[1], 1)
         x = mask_tokens + self.decoder_pos_embed
@@ -389,39 +372,20 @@ class RSP(nn.Module):
 
         return recon_loss
 
-    def forward_embedding(self, h_context):
-        """Process context embedding by reshaping, adding noise if training, and projecting to decoder dim"""
-        batch_size = h_context.size(0)
-        h_context = h_context.view(batch_size, -1, h_context.size(-1))  # [B, 1, context_emb_dim]
-        
-        # Apply NEFTune noise to context embeddings
-        if self.training:
-            dims = torch.tensor(h_context.size(-1), device=h_context.device)
-            mag_norm = self.neftune_noise_alpha / torch.sqrt(dims)
-            noise = torch.zeros_like(h_context).uniform_(-mag_norm, mag_norm)
-            h_context = h_context + noise.detach()
-            
-        h_context = self.context_proj(h_context)  # [B, 1, decoder_embed_dim]
-        h_context = h_context + self.language_type_embed  # Add type embedding
-        
-        return h_context
-
-    def get_feat(self, h, h_context, z):
+    def get_feat(self, h, z):
         # Process deterministic path
         h = self.decoder_embed_deter(h)  # [B, L, decoder_embed_dim]
         h = h + self.decoder_pos_embed  # Add positional embedding
-        h = h + self.image_type_embed
         
         # Concatenate along sequence dimension
-        h_concat = torch.cat([h, h_context], dim=1)  # [B, L+1, decoder_embed_dim]
-    
+
         # Process stochastic path
         if self.discrete != 0:
             z = z.reshape(*z.shape[:-2], 1, self.stoch * self.discrete)
         z = self.decoder_embed_stoch(z)
         
         # Final concatenation
-        feat = torch.cat([z, h_concat], dim=1)
+        feat = torch.cat([z, h], dim=1)
         return feat
 
     def make_dist(self, logits):
@@ -447,20 +411,8 @@ class RSP(nn.Module):
         ).mean()
         kl_loss = torch.maximum(kl_value, torch.ones_like(kl_value) * freebit)
         return kl_loss, kl_value
-    
-    def context_kl_loss(self, h_context, h_context_prime):
-        # Ensure inputs are properly shaped and normalized
-        log_prob_prime = F.log_softmax(h_context_prime, dim=-1)
-        prob_context = F.softmax(h_context.squeeze(1), dim=-1)
-        
-        return F.kl_div(
-            log_prob_prime,
-            prob_context,
-            reduction='batchmean',
-            log_target=False
-        )
 
-    def forward(self, src_imgs, tgt_imgs, embedding, epoch):
+    def forward(self, src_imgs, tgt_imgs, epoch):
         # Extract embeddings
         src_h, _, _ = self.forward_encoder(src_imgs, mask_ratio=0)
         tgt_h, _, _ = self.forward_encoder(self.perturb(tgt_imgs), mask_ratio=0)
@@ -477,15 +429,9 @@ class RSP(nn.Module):
         prior_dist = self.make_dist(prior_logits)
         prior_z = prior_dist.rsample()
 
-        embedding = embedding.view(-1, 1, embedding.size(-1))
-        h_context = self.forward_embedding(embedding)
-        # Project context to prior space
-        h_context_prime = self.to_language_prior(src_h[:, 0])
-        
-        tgt_pred = self.forward_decoder_fut(src_h, h_context, post_z)
+        tgt_pred = self.forward_decoder_fut(src_h, post_z)
         loss_post = self.forward_loss(tgt_imgs, tgt_pred)
         kl_loss, kl_value = self.compute_kl_loss(post_logits, prior_logits)
-        context_kl = self.context_kl_loss(h_context, h_context_prime)
 
         # MAE
         img_h, mask, ids_restore = self.forward_encoder(tgt_imgs, mask_ratio=self.mask_ratio)
@@ -493,12 +439,12 @@ class RSP(nn.Module):
         mae_loss = self.forward_loss(tgt_imgs, pred_masked, mask)
 
         with torch.no_grad():
-            tgt_pred_prior = self.forward_decoder_fut(src_h, h_context, prior_z)
+            tgt_pred_prior = self.forward_decoder_fut(src_h, prior_z)
             loss_prior = self.forward_loss(tgt_imgs, tgt_pred_prior)
 
-        loss = loss_post + self.kl_scale * kl_loss + self.kl_scale * context_kl + mae_loss
+        loss = loss_post + self.kl_scale * kl_loss + mae_loss
 
-        return loss, tgt_pred, (loss_post, loss_prior, kl_loss, kl_value, mae_loss, context_kl)
+        return loss, tgt_pred, (loss_post, loss_prior, kl_loss, kl_value, mae_loss)
 
 
 def rsp_vit_small_patch8_dec512d8b(**kwargs):
@@ -563,6 +509,6 @@ def rsp_vit_large_patch16_dec512d8b(**kwargs):
     return model
 
 rsp_vit_small_patch8 = rsp_vit_small_patch8_dec512d8b  # decoder: 512 dim, 8 blocks
-rsp_vit_small_patch16 = rsp_vit_small_patch16_dec512d8b  # decoder: 512 dim, 8 blocks
+rsp_vit_small_patch16= rsp_vit_small_patch16_dec512d8b  # decoder: 512 dim, 8 blocks
 rsp_vit_base_patch16 = rsp_vit_base_patch16_dec512d8b  # decoder: 512 dim, 8 blocks
 rsp_vit_large_patch16 = rsp_vit_large_patch16_dec512d8b  # decoder: 512 dim, 8 blocks
