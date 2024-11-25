@@ -38,11 +38,9 @@ def train_one_epoch(
                 optimizer, data_iter_step / len(data_loader) + epoch, args
             )
 
-        src_samples = batch["src_images"].to(device, non_blocking=True)
-        tgt_samples = batch["tgt_images"].to(device, non_blocking=True)
-        
-        src_samples = src_samples.reshape(-1, *src_samples.shape[2:])
-        tgt_samples = tgt_samples.reshape(-1, *tgt_samples.shape[2:])
+        src_samples, tgt_samples, _ = batch
+        src_samples = src_samples.to(device, non_blocking=True)
+        tgt_samples = tgt_samples.to(device, non_blocking=True)
 
         loss, _, (loss_post, loss_prior, loss_kl, value_kl, loss_mae) = model(
             src_samples, tgt_samples, 
@@ -139,12 +137,10 @@ def train_one_epoch_llm(
                 optimizer, data_iter_step / len(data_loader) + epoch, args
             )
 
-        src_samples = batch["src_images"].to(device, non_blocking=True)
-        tgt_samples = batch["tgt_images"].to(device, non_blocking=True)
-        lm_logits = batch["embeddings"].to(device, non_blocking=True)
-        
-        src_samples = src_samples.reshape(-1, *src_samples.shape[2:])
-        tgt_samples = tgt_samples.reshape(-1, *tgt_samples.shape[2:])
+        src_samples, tgt_samples, lm_logits = batch
+        src_samples = src_samples.to(device, non_blocking=True)
+        tgt_samples = tgt_samples.to(device, non_blocking=True)
+        lm_logits = lm_logits.to(device, non_blocking=True)
 
         loss, _, (loss_post, loss_prior, loss_kl, value_kl, loss_mae, context_kl_loss) = model(
             src_samples, tgt_samples, lm_logits,
