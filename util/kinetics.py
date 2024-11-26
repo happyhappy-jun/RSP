@@ -52,6 +52,30 @@ class PairedKinetics(Dataset):
         tgt_images = torch.stack(tgt_images, dim=0)
         return src_images, tgt_images, 0
 
+
+if __name__ == "__main__":
+    # Test to verify PairedKineticsFixed uses fixed frame numbers
+    root = "path/to/kinetics/dataset"  # Replace with actual path
+    
+    # Create two instances of PairedKineticsFixed
+    dataset1 = PairedKineticsFixed(root)
+    dataset2 = PairedKineticsFixed(root)
+    
+    # Check if presampled indices are the same for both instances
+    print("Testing if frame indices are fixed across dataset instances...")
+    
+    # Compare presampled indices for first 5 videos
+    for idx in range(min(5, len(dataset1))):
+        indices1 = dataset1.presampled_indices[idx]
+        indices2 = dataset2.presampled_indices[idx]
+        
+        print(f"Video {idx}:")
+        print(f"Dataset1 indices: {indices1}")
+        print(f"Dataset2 indices: {indices2}")
+        assert indices1 == indices2, f"Frame indices differ for video {idx}"
+    
+    print("Test passed! Frame indices are fixed across dataset instances.")
+
     def load_frames(self, vr):
         # handle temporal segments
         seg_len = len(vr)
