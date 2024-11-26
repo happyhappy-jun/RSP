@@ -21,10 +21,16 @@ RUN git clone https://github.com/happyhappy-jun/RSP.git /workspace && \
     cd /workspace && \
     git checkout master
 
-# Create conda environment
-RUN conda create -n rsp python=3.9.12 -y && \
-    conda run -n rsp conda install pytorch==1.13.1 torchvision==0.14.1 torchaudio==0.13.1 pytorch-cuda=11.7 -c pytorch -c nvidia && \
-    conda run -n rsp pip install -r /workspace/requirements.txt
+# Copy environment files
+COPY environment.yml /workspace/
+COPY setup.py /workspace/
+
+# Create conda environment from environment.yml
+RUN conda env create -f /workspace/environment.yml && \
+    conda clean -afy
+
+# Install package in development mode
+RUN conda run -n rsp pip install -e ".[dev]"
 
 # Set up working directory
 WORKDIR /workspace
