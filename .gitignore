@@ -6,3 +6,4 @@ outputs/
 artifacts/
 .aider*
 wandb/
+.secrets/

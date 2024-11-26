@@ -1,0 +1,16 @@
+version: '3.8'
+services:
+  rsp:
+    build: .
+    runtime: nvidia
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+    volumes:
+      - .:/workspace
+      - ./.secrets:/workspace/.secrets
+    env_file:
+      - .secrets/secrets.env
+    shm_size: '8gb'
+    ulimits:
+      memlock: -1
+      stack: 67108864
