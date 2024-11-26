@@ -23,7 +23,7 @@ from omegaconf import DictConfig, OmegaConf
 from hydra.utils import instantiate
 from util.misc import NativeScalerWithGradNormCount as NativeScaler
 
-import models_rsp
+import modeling
 
 @hydra.main(config_path="config", config_name="main", version_base="1.2")
 def main(cfg: DictConfig):
@@ -60,7 +60,7 @@ def main(cfg: DictConfig):
     else:
         sampler_train = torch.utils.data.RandomSampler(dataset_train)
 
-    if global_rank == 0:
+    if not cfg.distributed or global_rank == 0:
         if cfg.log_dir is not None:
             os.makedirs(cfg.log_dir, exist_ok=True)
             log_writer = SummaryWriter(log_dir=cfg.log_dir)
@@ -72,6 +72,8 @@ def main(cfg: DictConfig):
             project="rsp-training",
             name=cfg.run_name,
             config=OmegaConf.to_container(cfg, resolve=True),
+            resume=cfg.wandb.resume,
+            id=cfg.wandb.id,
         )
     else:
         log_writer = None
@@ -88,7 +90,7 @@ def main(cfg: DictConfig):
     )
 
     # define the model
-    model = models_rsp.__dict__[cfg.model](
+    model = modeling.__dict__[cfg.model](
         norm_pix_loss=cfg.norm_pix_loss,
         kl_scale=cfg.kl_scale,
         kl_balance=cfg.kl_balance,

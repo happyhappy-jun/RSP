@@ -462,6 +462,9 @@ class RSP(nn.Module):
 
     def forward(self, src_imgs, tgt_imgs, embedding, epoch):
         # Extract embeddings
+        src_imgs = src_imgs.reshape(-1, *src_imgs.shape[2:])
+        tgt_imgs = tgt_imgs.reshape(-1, *tgt_imgs.shape[2:])
+        
         src_h, _, _ = self.forward_encoder(src_imgs, mask_ratio=0)
         tgt_h, _, _ = self.forward_encoder(self.perturb(tgt_imgs), mask_ratio=0)
 
@@ -561,8 +564,3 @@ def rsp_vit_large_patch16_dec512d8b(**kwargs):
         **kwargs
     )
     return model
-
-rsp_vit_small_patch8 = rsp_vit_small_patch8_dec512d8b  # decoder: 512 dim, 8 blocks
-rsp_vit_small_patch16 = rsp_vit_small_patch16_dec512d8b  # decoder: 512 dim, 8 blocks
-rsp_vit_base_patch16 = rsp_vit_base_patch16_dec512d8b  # decoder: 512 dim, 8 blocks
-rsp_vit_large_patch16 = rsp_vit_large_patch16_dec512d8b  # decoder: 512 dim, 8 blocks

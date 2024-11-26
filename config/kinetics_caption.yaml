@@ -3,7 +3,7 @@ defaults:
 
 exp_name: rsp_caption
 
-model: rsp_vit_small_patch16
+model: rsp_vit_small_patch16_caption
 
 dataset:
   _target_: util.kinetics_caption.PairedKineticsWithCaption

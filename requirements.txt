@@ -30,3 +30,4 @@ hydra-core
 pydantic
 opencv-python
 openai
+aider-chat
