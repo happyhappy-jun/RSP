@@ -86,26 +86,30 @@ class PairedKineticsFixed(PairedKinetics):
     ):
         super().__init__(root, max_distance, repeated_sampling)
         self.presampled_indices = {}
-        # Presample indices for all videos
+        # Presample multiple pairs of indices for all videos
         for idx in range(len(self.samples)):
             sample = os.path.join(self.root, self.samples[idx][1])
             vr = VideoReader(sample, num_threads=1, ctx=cpu(0))
             seg_len = len(vr)
             least_frames_num = self.max_distance + 1
             
-            if seg_len >= least_frames_num:
-                idx_cur = random.randint(0, seg_len - least_frames_num)
-                interval = random.randint(4, self.max_distance)
-                idx_fut = idx_cur + interval
-            else:
-                indices = random.sample(range(seg_len), 2)
-                indices.sort()
-                idx_cur, idx_fut = indices
+            # Sample repeated_sampling pairs of frames
+            pairs = []
+            for _ in range(self.repeated_sampling):
+                if seg_len >= least_frames_num:
+                    idx_cur = random.randint(0, seg_len - least_frames_num)
+                    interval = random.randint(4, self.max_distance)
+                    idx_fut = idx_cur + interval
+                else:
+                    indices = random.sample(range(seg_len), 2)
+                    indices.sort()
+                    idx_cur, idx_fut = indices
+                pairs.append((idx_cur, idx_fut))
                 
-            self.presampled_indices[idx] = (idx_cur, idx_fut)
+            self.presampled_indices[idx] = pairs
 
-    def load_frames(self, vr, index):
-        idx_cur, idx_fut = self.presampled_indices[index]
+    def load_frames(self, vr, index, pair_idx):
+        idx_cur, idx_fut = self.presampled_indices[index][pair_idx]
         frame_cur = vr[idx_cur].asnumpy()
         frame_fut = vr[idx_fut].asnumpy()
         return frame_cur, frame_fut
@@ -114,14 +118,12 @@ class PairedKineticsFixed(PairedKinetics):
         sample = os.path.join(self.root, self.samples[index][1])
         vr = VideoReader(sample, num_threads=1, ctx=cpu(0))
         
-        # Load frames using presampled indices
-        src_image, tgt_image = self.load_frames(vr, index)
-        
-        # Apply different transformations to the same frames
+        # Load and transform each pair of presampled frames
         src_images = []
         tgt_images = []
-        for i in range(self.repeated_sampling):
-            src_transformed, tgt_transformed = self.transform(src_image.copy(), tgt_image.copy())
+        for pair_idx in range(self.repeated_sampling):
+            src_image, tgt_image = self.load_frames(vr, index, pair_idx)
+            src_transformed, tgt_transformed = self.transform(src_image, tgt_image)
             src_images.append(src_transformed)
             tgt_images.append(tgt_transformed)
             
