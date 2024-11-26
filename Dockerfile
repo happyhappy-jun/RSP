@@ -16,20 +16,21 @@ RUN wget --quiet https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86
     /bin/bash ~/miniconda.sh -b -p $CONDA_DIR && \
     rm ~/miniconda.sh
 
+# Clone repository
+RUN git clone https://github.com/happyhappy-jun/RSP.git /workspace && \
+    cd /workspace && \
+    git checkout master
+
 # Create conda environment
-COPY requirements.txt /tmp/requirements.txt
 RUN conda create -n rsp python=3.9.12 -y && \
     conda run -n rsp conda install pytorch==1.13.1 torchvision==0.14.1 torchaudio==0.13.1 pytorch-cuda=11.7 -c pytorch -c nvidia && \
-    conda run -n rsp pip install -r /tmp/requirements.txt
+    conda run -n rsp pip install -r /workspace/requirements.txt
 
 # Set up working directory
 WORKDIR /workspace
 
 # Create directory for secrets
 RUN mkdir -p /workspace/.secrets
-
-# Copy project files
-COPY . /workspace/
 
 # Activate conda environment by default
 SHELL ["conda", "run", "-n", "rsp", "/bin/bash", "-c"]
