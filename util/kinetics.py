@@ -1,6 +1,8 @@
 import os
 import random
 import pickle
+import torch
+import numpy as np
 
 from decord import VideoReader, cpu
 
@@ -12,14 +14,22 @@ import torchvision.transforms.functional as F
 from util.kinetics_caption import PairedRandomResizedCrop
 
 
+def seed_everything(seed):
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+
 class PairedKinetics(Dataset):
     def __init__(
         self,
         root,
         max_distance=48,
-        repeated_sampling=2
+        repeated_sampling=2,
+        seed=42
     ):
         super().__init__()
+        seed_everything(seed)
         self.root = root
         with open(
             os.path.join(self.root, "labels", f"label_full_1.0.pickle"), "rb"
@@ -82,9 +92,10 @@ class PairedKineticsFixed(PairedKinetics):
         self,
         root,
         max_distance=48,
-        repeated_sampling=2
+        repeated_sampling=2,
+        seed=42
     ):
-        super().__init__(root, max_distance, repeated_sampling)
+        super().__init__(root, max_distance, repeated_sampling, seed)
         self.presampled_indices = {}
         # Presample multiple pairs of indices for all videos
         for idx in range(len(self.samples)):
@@ -138,8 +149,8 @@ if __name__ == "__main__":
     root = "/data/kinetics400"  # Replace with actual path
     
     # Create two instances of PairedKineticsFixed
-    dataset1 = PairedKineticsFixed(root)
-    dataset2 = PairedKineticsFixed(root)
+    dataset1 = PairedKineticsFixed(root, seed=42)
+    dataset2 = PairedKineticsFixed(root, seed=42)
     
     # Check if presampled indices are the same for both instances
     print("Testing if frame indices are fixed across dataset instances...")
