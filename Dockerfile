@@ -16,14 +16,11 @@ RUN wget --quiet https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86
     /bin/bash ~/miniconda.sh -b -p $CONDA_DIR && \
     rm ~/miniconda.sh
 
-# Clone repository
-RUN git clone https://github.com/happyhappy-jun/RSP.git /workspace && \
-    cd /workspace && \
-    git checkout master
+# Set up working directory
+WORKDIR /workspace
 
-# Copy environment files
-COPY environment.yml /workspace/
-COPY setup.py /workspace/
+# Copy local files
+COPY . /workspace/
 
 # Create conda environment from environment.yml
 RUN conda env create -f /workspace/environment.yml && \
