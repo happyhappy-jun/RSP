@@ -448,17 +448,10 @@ class RSP(nn.Module):
         kl_loss = torch.maximum(kl_value, torch.ones_like(kl_value) * freebit)
         return kl_loss, kl_value
     
-    def context_kl_loss(self, h_context, h_context_prime):
-        # Ensure inputs are properly shaped and normalized
-        log_prob_prime = F.log_softmax(h_context_prime, dim=-1)
-        prob_context = F.softmax(h_context.squeeze(1), dim=-1)
-        
-        return F.kl_div(
-            log_prob_prime,
-            prob_context,
-            reduction='batchmean',
-            log_target=False
-        )
+    def context_normalized_l2_loss(self, h_context, h_context_prime):
+        h_context = F.normalize(h_context.squeeze(1), dim=-1)
+        h_context_prime = F.normalize(h_context_prime, dim=-1)
+        return F.mse_loss(h_context, h_context_prime)
 
     def forward(self, src_imgs, tgt_imgs, embedding, epoch):
         # Extract embeddings
@@ -488,7 +481,7 @@ class RSP(nn.Module):
         tgt_pred = self.forward_decoder_fut(src_h, h_context, post_z)
         loss_post = self.forward_loss(tgt_imgs, tgt_pred)
         kl_loss, kl_value = self.compute_kl_loss(post_logits, prior_logits)
-        context_kl = self.context_kl_loss(h_context, h_context_prime)
+        context_loss = self.context_normalized_l2_loss(h_context, h_context_prime)
 
         # MAE
         img_h, mask, ids_restore = self.forward_encoder(tgt_imgs, mask_ratio=self.mask_ratio)
@@ -499,9 +492,9 @@ class RSP(nn.Module):
             tgt_pred_prior = self.forward_decoder_fut(src_h, h_context, prior_z)
             loss_prior = self.forward_loss(tgt_imgs, tgt_pred_prior)
 
-        loss = loss_post + self.kl_scale * kl_loss + self.kl_scale * context_kl + mae_loss
+        loss = loss_post + self.kl_scale * kl_loss + self.kl_scale * context_loss + mae_loss
 
-        return loss, tgt_pred, (loss_post, loss_prior, kl_loss, kl_value, mae_loss, context_kl)
+        return loss, tgt_pred, (loss_post, loss_prior, kl_loss, kl_value, mae_loss, context_loss)
 
 
 def rsp_vit_small_patch8_dec512d8b(**kwargs):
