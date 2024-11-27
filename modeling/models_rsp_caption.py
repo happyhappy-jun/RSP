@@ -477,6 +477,11 @@ class RSP(nn.Module):
         h_context = self.forward_embedding(embedding)
         # Project context to prior space
         h_context_prime = self.to_language_prior(src_h[:, 0])
+        h_context_debug = h_context.squeeze(1)
+        print(h_context_debug.shape, h_context_prime.shape)
+        print(h_context_debug[0])
+        print(h_context_prime[0])
+        exit()
         
         tgt_pred = self.forward_decoder_fut(src_h, h_context, post_z)
         loss_post = self.forward_loss(tgt_imgs, tgt_pred)
