@@ -2,6 +2,7 @@ from functools import partial
 
 import numpy as np
 import torch
+import torch
 import torch.nn as nn
 import torch.distributions as td
 import torch.nn.functional as F
@@ -543,6 +544,21 @@ def rsp_vit_base_patch16_dec512d8b(**kwargs):
         **kwargs
     )
     return model
+
+def normalize_l2(x):
+    """
+    Normalize tensor along last dimension using L2 norm.
+    Args:
+        x: Input tensor
+    Returns:
+        Normalized tensor where each vector has unit L2 norm
+    """
+    if x.dim() == 1:
+        norm = torch.norm(x)
+        return x if norm == 0 else x / norm
+    else:
+        norm = torch.norm(x, p=2, dim=-1, keepdim=True)
+        return torch.where(norm == 0, x, x / norm)
 
 def rsp_vit_large_patch16_dec512d8b(**kwargs):
     model = RSP(
