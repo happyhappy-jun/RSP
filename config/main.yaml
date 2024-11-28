@@ -12,7 +12,6 @@ wandb:
   entity: happyhappy  # Set to your wandb username or team name
   mode: "online"  # Set to "disabled" to turn off wandb logging
   resume: allow
-  id: ???
 
 dataset: ???
 

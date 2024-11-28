@@ -105,6 +105,7 @@ class RSP(nn.Module):
         self.patch_embed = PatchEmbed(img_size, patch_size, in_chans, embed_dim)
         num_patches = self.patch_embed.num_patches
         self.neftune_noise_alpha = neftune_noise_alpha
+        self.embed_dim = embed_dim
         self.context_patch_length = 1
 
         self.cls_token = nn.Parameter(torch.zeros(1, 1, embed_dim))
@@ -145,9 +146,9 @@ class RSP(nn.Module):
         # Posterior takes both src_h and tgt_h
         # Thus it has embed_dim * 2 as an input dimension
         self.to_posterior = nn.Sequential(
-            nn.Linear(embed_dim * 2, embed_dim * 2),
+            nn.Linear(embed_dim * 3, embed_dim * 3),
             nn.ReLU(),
-            nn.Linear(embed_dim * 2, stoch_size),
+            nn.Linear(embed_dim * 3, stoch_size),
         )
 
         # Prior only takes src_h
@@ -330,8 +331,8 @@ class RSP(nn.Module):
         x = self.norm(x)
         return x, mask, ids_restore
 
-    def forward_decoder_fut(self, h, h_context, z):
-        kvx_h = self.get_feat(h, h_context, z)
+    def forward_decoder_fut(self, h, z):
+        kvx_h = self.get_feat(h, z)
 
         mask_tokens = self.mask_token.repeat(h.shape[0], h.shape[1], 1)
         x = mask_tokens + self.decoder_pos_embed
@@ -390,31 +391,35 @@ class RSP(nn.Module):
 
         return recon_loss
 
+    def add_noise(self, x):
+        dims = torch.tensor(x.size(-1), device=x.device)
+        mag_norm = self.neftune_noise_alpha / torch.sqrt(dims)
+        noise = torch.zeros_like(x).uniform_(-mag_norm, mag_norm)
+        x = x + noise.detach()
+        return x
+    
+
     def forward_embedding(self, h_context):
         """Process context embedding by reshaping, adding noise if training, and projecting to decoder dim"""
         batch_size = h_context.size(0)
         h_context = h_context.view(batch_size, -1, h_context.size(-1))  # [B, 1, context_emb_dim]
-        
-        # Apply NEFTune noise to context embeddings
         if self.training:
-            dims = torch.tensor(h_context.size(-1), device=h_context.device)
-            mag_norm = self.neftune_noise_alpha / torch.sqrt(dims)
-            noise = torch.zeros_like(h_context).uniform_(-mag_norm, mag_norm)
-            h_context = h_context + noise.detach()
-            
-        h_context = self.context_proj(h_context)  # [B, 1, decoder_embed_dim]
+            h_context = self.add_noise(h_context)
+        
+        # h_context = self.context_proj(h_context)  # [B, 1, decoder_embed_dim]
+        h_context = self.resize_embed(h_context, self.decoder_embed_dim)
         h_context = h_context + self.language_type_embed  # Add type embedding
         
         return h_context
 
-    def get_feat(self, h, h_context, z):
+    def get_feat(self, h, z):
         # Process deterministic path
         h = self.decoder_embed_deter(h)  # [B, L, decoder_embed_dim]
         h = h + self.decoder_pos_embed  # Add positional embedding
-        h = h + self.image_type_embed
+        # h = h + self.image_type_embed
         
         # Concatenate along sequence dimension
-        h_concat = torch.cat([h, h_context], dim=1)  # [B, L+1, decoder_embed_dim]
+        h_concat = torch.cat([h], dim=1)  # [B, L+1, decoder_embed_dim]
     
         # Process stochastic path
         if self.discrete != 0:
@@ -453,17 +458,48 @@ class RSP(nn.Module):
         h_context = h_context.squeeze(1)
         h_context_prime = h_context_prime
         return F.mse_loss(h_context, h_context_prime)
+    
+    def normalize_l2(self, x):
+        """
+        Normalize tensor along last dimension using L2 norm.
+        Args:
+            x: Input tensor
+        Returns:
+            Normalized tensor where each vector has unit L2 norm
+        """
+        if x.dim() == 1:
+            norm = torch.norm(x)
+            return x if norm == 0 else x / norm
+        else:
+            norm = torch.norm(x, p=2, dim=-1, keepdim=True)
+            return torch.where(norm == 0, x, x / norm)
+    
+    def resize_embed(self, embed, tgt_size):
+        """
+        Resize embedding to target size using L2 normalization.
+        Args:
+            embed: Input embedding (int)
+            tgt_size: Target size (int)
+        Returns:
+            Resized embedding
+        
+        """
+        # embed: [B, 1, D]
+        # retur: [B, 1, tgt_size]
+        return self.normalize_l2(embed)[:, :tgt_size]
 
     def forward(self, src_imgs, tgt_imgs, embedding, epoch):
         # Extract embeddings
         src_imgs = src_imgs.reshape(-1, *src_imgs.shape[2:])
         tgt_imgs = tgt_imgs.reshape(-1, *tgt_imgs.shape[2:])
+        embedding = embedding.reshape(-1, embedding.size(-1))
         
         src_h, _, _ = self.forward_encoder(src_imgs, mask_ratio=0)
         tgt_h, _, _ = self.forward_encoder(self.perturb(tgt_imgs), mask_ratio=0)
 
         # Posterior distribution from both images
-        post_h = torch.cat([src_h[:, 0], tgt_h[:, 0]], -1)
+        h_context = self.resize_embed(embedding, self.embed_dim)
+        post_h = torch.cat([src_h[:, 0], tgt_h[:, 0], h_context], -1)
         post_logits = self.to_posterior(post_h)
         post_dist = self.make_dist(post_logits)
         post_z = post_dist.rsample()
@@ -475,15 +511,11 @@ class RSP(nn.Module):
         prior_z = prior_dist.rsample()
 
         embedding = embedding.view(-1, 1, embedding.size(-1))
-        h_context = self.forward_embedding(embedding)
-        # Project context to prior space
-        h_context_prime = self.to_language_prior(src_h[:, 0])
-        h_context_debug = h_context.squeeze(1)
         
-        tgt_pred = self.forward_decoder_fut(src_h, h_context, post_z)
+        tgt_pred = self.forward_decoder_fut(src_h, post_z)
         loss_post = self.forward_loss(tgt_imgs, tgt_pred)
         kl_loss, kl_value = self.compute_kl_loss(post_logits, prior_logits)
-        context_loss = self.context_normalized_l2_loss(h_context, h_context_prime)
+        # context_loss = self.context_normalized_l2_loss(h_context, h_context_prime)
 
         # MAE
         img_h, mask, ids_restore = self.forward_encoder(tgt_imgs, mask_ratio=self.mask_ratio)
@@ -491,12 +523,12 @@ class RSP(nn.Module):
         mae_loss = self.forward_loss(tgt_imgs, pred_masked, mask)
 
         with torch.no_grad():
-            tgt_pred_prior = self.forward_decoder_fut(src_h, h_context, prior_z)
+            tgt_pred_prior = self.forward_decoder_fut(src_h, prior_z)
             loss_prior = self.forward_loss(tgt_imgs, tgt_pred_prior)
 
-        loss = loss_post + self.kl_scale * kl_loss + context_loss + mae_loss
+        loss = loss_post + self.kl_scale * kl_loss + mae_loss
 
-        return loss, tgt_pred, (loss_post, loss_prior, kl_loss, kl_value, mae_loss, context_loss)
+        return loss, tgt_pred, (loss_post, loss_prior, kl_loss, kl_value, mae_loss)
 
 
 def rsp_vit_small_patch8_dec512d8b(**kwargs):
@@ -545,20 +577,7 @@ def rsp_vit_base_patch16_dec512d8b(**kwargs):
     )
     return model
 
-def normalize_l2(x):
-    """
-    Normalize tensor along last dimension using L2 norm.
-    Args:
-        x: Input tensor
-    Returns:
-        Normalized tensor where each vector has unit L2 norm
-    """
-    if x.dim() == 1:
-        norm = torch.norm(x)
-        return x if norm == 0 else x / norm
-    else:
-        norm = torch.norm(x, p=2, dim=-1, keepdim=True)
-        return torch.where(norm == 0, x, x / norm)
+
 
 def rsp_vit_large_patch16_dec512d8b(**kwargs):
     model = RSP(

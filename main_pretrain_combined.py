@@ -69,11 +69,9 @@ def main(cfg: DictConfig):
             
         # Initialize wandb
         wandb.init(
-            project="rsp-training",
             name=cfg.run_name,
             config=OmegaConf.to_container(cfg, resolve=True),
-            resume=cfg.wandb.resume,
-            id=cfg.wandb.id,
+            **cfg.wandb
         )
     else:
         log_writer = None

@@ -1,4 +1,23 @@
 Metadata-Version: 2.1
 Name: RSP-LLM
 Version: 0.1.0
+Requires-Python: >=3.9.12
 License-File: LICENSE
+Requires-Dist: absl-py==2.1.0
+Requires-Dist: decord==0.6.0
+Requires-Dist: grpcio==1.64.1
+Requires-Dist: hydra-core
+Requires-Dist: markdown==3.6
+Requires-Dist: numpy==1.26.4
+Requires-Dist: opencv-python
+Requires-Dist: openai
+Requires-Dist: pydantic
+Requires-Dist: tensorboard==2.17.0
+Requires-Dist: timm==0.3.2
+Requires-Dist: wandb
+Requires-Dist: torch==1.13.1
+Requires-Dist: torchvision==0.14.1
+Requires-Dist: torchaudio==0.13.1
+Provides-Extra: dev
+Requires-Dist: pytest; extra == "dev"
+Requires-Dist: flake8; extra == "dev"

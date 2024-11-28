@@ -1,5 +1,4 @@
 from itertools import combinations
-import os
 import random
 import numpy as np
 from typing import Dict, List, Union
@@ -11,6 +10,7 @@ from torch.utils.data import Dataset
 from torchvision import transforms
 import torchvision.transforms.functional as F
 from collections import defaultdict
+
 from models import BatchOutput
 
 class PairedRandomResizedCrop:
@@ -174,8 +174,8 @@ def collate_fn(batch):
 if __name__ == "__main__":
     print("\nInitializing dataset...")
     dataset = PairedKineticsWithCaption(
-        data_path="/home/junyoon/rsp-llm/artifacts/results/frame_analysis_results_complete.json",
-        embeddings_path="/home/junyoon/rsp-llm/artifacts/combined_output.jsonl",
+        data_path="/home/junyoon/RSP/artifacts/frame_analysis_results_complete.json",
+        embeddings_path="/home/junyoon/RSP/artifacts/combined_output.jsonl",
     )
     
     print(f"Total number of videos: {len(dataset)}")
