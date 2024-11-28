@@ -449,8 +449,8 @@ class RSP(nn.Module):
         return kl_loss, kl_value
     
     def context_normalized_l2_loss(self, h_context, h_context_prime):
-        h_context = F.normalize(h_context.squeeze(1), dim=-1)
-        h_context_prime = F.normalize(h_context_prime, dim=-1)
+        h_context = h_context.squeeze(1)
+        h_context_prime = h_context_prime
         return F.mse_loss(h_context, h_context_prime)
 
     def forward(self, src_imgs, tgt_imgs, embedding, epoch):
@@ -478,10 +478,6 @@ class RSP(nn.Module):
         # Project context to prior space
         h_context_prime = self.to_language_prior(src_h[:, 0])
         h_context_debug = h_context.squeeze(1)
-        print(h_context_debug.shape, h_context_prime.shape)
-        print(h_context_debug[0])
-        print(h_context_prime[0])
-        exit()
         
         tgt_pred = self.forward_decoder_fut(src_h, h_context, post_z)
         loss_post = self.forward_loss(tgt_imgs, tgt_pred)
@@ -497,7 +493,7 @@ class RSP(nn.Module):
             tgt_pred_prior = self.forward_decoder_fut(src_h, h_context, prior_z)
             loss_prior = self.forward_loss(tgt_imgs, tgt_pred_prior)
 
-        loss = loss_post + self.kl_scale * kl_loss + self.kl_scale * context_loss + mae_loss
+        loss = loss_post + self.kl_scale * kl_loss + context_loss + mae_loss
 
         return loss, tgt_pred, (loss_post, loss_prior, kl_loss, kl_value, mae_loss, context_loss)
 
