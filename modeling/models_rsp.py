@@ -397,7 +397,7 @@ class RSP(nn.Module):
             dist = td.Normal(mean, std)
         return dist
 
-    def compute_kl_loss(self, post_logits, prior_logits):
+    def context_loss(self, post_logits, prior_logits):
         balance = self.kl_balance
         freebit = self.kl_freebit
         post_to_prior_kl = td.kl_divergence(
@@ -410,7 +410,7 @@ class RSP(nn.Module):
             post_to_prior_kl * balance + prior_to_post_kl * (1.0 - balance)
         ).mean()
         kl_loss = torch.maximum(kl_value, torch.ones_like(kl_value) * freebit)
-        return kl_loss, kl_value
+        return kl_loss
 
     def forward(self, src_imgs, tgt_imgs, epoch):
         # Extract embeddings
@@ -431,7 +431,7 @@ class RSP(nn.Module):
 
         tgt_pred = self.forward_decoder_fut(src_h, post_z)
         loss_post = self.forward_loss(tgt_imgs, tgt_pred)
-        kl_loss, kl_value = self.compute_kl_loss(post_logits, prior_logits)
+        kl_loss, kl_value = self.context_loss(post_logits, prior_logits)
 
         # MAE
         img_h, mask, ids_restore = self.forward_encoder(tgt_imgs, mask_ratio=self.mask_ratio)

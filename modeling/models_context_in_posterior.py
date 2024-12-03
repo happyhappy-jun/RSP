@@ -5,10 +5,15 @@ from modeling.models_rsp import RSP
 from modeling.models_rsp_caption import RspCaption
 
 
-class RspCaptionMse(RspCaption):
+class RspContextInPosterior(RspCaption):
     """RSP model variant that uses MSE loss instead of KL divergence"""
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.to_posterior = nn.Sequential(
+            nn.Linear(self.embed_dim * 3, self.embed_dim * 3),
+            nn.ReLU(),
+            nn.Linear(self.embed_dim * 3, self.stoch_size),
+        )
 
     def forward(self, src_imgs, tgt_imgs, embedding, epoch):
         # Extract embeddings
@@ -32,15 +37,9 @@ class RspCaptionMse(RspCaption):
         prior_dist = self.make_dist(prior_logits)
         prior_z = prior_dist.rsample()
 
-        embedding = embedding.view(-1, 1, embedding.size(-1))
-        h_context = self.resize_embed(embedding, self.embed_dim)
-        h_context_prime = self.to_language_prior(src_h[:, 0])
-
-
         tgt_pred = self.forward_decoder_fut(src_h, post_z)
         loss_post = self.forward_loss(tgt_imgs, tgt_pred)
         kl_loss, kl_value = self.compute_kl_loss(post_logits, prior_logits)
-        context_loss = self.mse_loss(h_context, h_context_prime)
 
         # MAE
         img_h, mask, ids_restore = self.forward_encoder(tgt_imgs, mask_ratio=self.mask_ratio)
@@ -55,8 +54,8 @@ class RspCaptionMse(RspCaption):
 
         return loss, tgt_pred, (loss_post, loss_prior, kl_loss, kl_value, mae_loss)
 
-def rsp_mse_vit_small_patch8_dec512d8b(**kwargs):
-    model = RspCaptionMse(
+def rsp_context_in_post_small_patch8_dec512d8b(**kwargs):
+    model = RspContextInPosterior(
         patch_size=8,
         embed_dim=384,
         depth=12,
@@ -70,8 +69,8 @@ def rsp_mse_vit_small_patch8_dec512d8b(**kwargs):
     )
     return model
 
-def rsp_mse_vit_small_patch16_dec512d8b(**kwargs):
-    model = RspCaptionMse(
+def rsp_context_in_post_small_patch16_dec512d8b(**kwargs):
+    model = RspContextInPosterior(
         patch_size=16,
         embed_dim=384,
         depth=12,
@@ -85,8 +84,8 @@ def rsp_mse_vit_small_patch16_dec512d8b(**kwargs):
     )
     return model
 
-def rsp_mse_vit_base_patch16_dec512d8b(**kwargs):
-    model = RspCaptionMse(
+def rsp_context_in_post_base_patch16_dec512d8b(**kwargs):
+    model = RspContextInPosterior(
         patch_size=16,
         embed_dim=768,
         depth=12,
@@ -100,8 +99,8 @@ def rsp_mse_vit_base_patch16_dec512d8b(**kwargs):
     )
     return model
 
-def rsp_mse_vit_large_patch16_dec512d8b(**kwargs):
-    model = RspCaptionMse(
+def rsp_context_in_post_large_patch16_dec512d8b(**kwargs):
+    model = RspContextInPosterior(
         patch_size=16,
         embed_dim=1024,
         depth=24,
@@ -116,7 +115,7 @@ def rsp_mse_vit_large_patch16_dec512d8b(**kwargs):
     return model
 
 # Aliases
-rsp_mse_vit_small_patch8 = rsp_mse_vit_small_patch8_dec512d8b
-rsp_mse_vit_small_patch16 = rsp_mse_vit_small_patch16_dec512d8b
-rsp_mse_vit_base_patch16 = rsp_mse_vit_base_patch16_dec512d8b
-rsp_mse_vit_large_patch16 = rsp_mse_vit_large_patch16_dec512d8b
+rsp_context_in_posterior_vit_small_patch8 = rsp_context_in_post_small_patch8_dec512d8b
+rsp_context_in_posterior_vit_small_patch16 = rsp_context_in_post_small_patch16_dec512d8b
+rsp_context_in_posterior_vit_base_patch16 = rsp_context_in_post_base_patch16_dec512d8b
+rsp_context_in_posterior_vit_large_patch16 = rsp_context_in_post_large_patch16_dec512d8b

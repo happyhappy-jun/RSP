@@ -1,5 +1,6 @@
 defaults:
   - main
+  - _self_
 
 exp_name: rsp_fixed
 

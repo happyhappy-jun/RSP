@@ -76,7 +76,7 @@ class CSABlock(nn.Module):
         return x
 
 
-class RSP(nn.Module):
+class RspCaption(nn.Module):
     def __init__(
         self,
         img_size=224,
@@ -142,13 +142,14 @@ class RSP(nn.Module):
         # For continuous latents:
         # - It is M-dimenisonal gaussian. Thus it has M * 2 for mean and std
         stoch_size = stoch * discrete if discrete != 0 else stoch * 2
+        self.stoch_size = stoch_size
 
         # Posterior takes both src_h and tgt_h
         # Thus it has embed_dim * 2 as an input dimension
         self.to_posterior = nn.Sequential(
-            nn.Linear(embed_dim * 3, embed_dim * 3),
+            nn.Linear(embed_dim * 2, embed_dim * 2),
             nn.ReLU(),
-            nn.Linear(embed_dim * 3, stoch_size),
+            nn.Linear(embed_dim * 2, stoch_size),
         )
 
         # Prior only takes src_h
@@ -499,7 +500,7 @@ class RSP(nn.Module):
 
         # Posterior distribution from both images
         h_context = self.resize_embed(embedding, self.embed_dim)
-        post_h = torch.cat([src_h[:, 0], tgt_h[:, 0], h_context], -1)
+        post_h = torch.cat([src_h[:, 0], tgt_h[:, 0]], -1)
         post_logits = self.to_posterior(post_h)
         post_dist = self.make_dist(post_logits)
         post_z = post_dist.rsample()
@@ -532,7 +533,7 @@ class RSP(nn.Module):
 
 
 def rsp_vit_small_patch8_dec512d8b(**kwargs):
-    model = RSP(
+    model = RspCaption(
         patch_size=8,
         embed_dim=384,
         depth=12,
@@ -548,7 +549,7 @@ def rsp_vit_small_patch8_dec512d8b(**kwargs):
 
 
 def rsp_vit_small_patch16_dec512d8b(**kwargs):
-    model = RSP(
+    model = RspCaption(
         patch_size=16,
         embed_dim=384,
         depth=12,
@@ -563,7 +564,7 @@ def rsp_vit_small_patch16_dec512d8b(**kwargs):
     return model
 
 def rsp_vit_base_patch16_dec512d8b(**kwargs):
-    model = RSP(
+    model = RspCaption(
         patch_size=16,
         embed_dim=768,
         depth=12,
@@ -580,7 +581,7 @@ def rsp_vit_base_patch16_dec512d8b(**kwargs):
 
 
 def rsp_vit_large_patch16_dec512d8b(**kwargs):
-    model = RSP(
+    model = RspCaption(
         patch_size=16,
         embed_dim=1024,
         depth=24,
