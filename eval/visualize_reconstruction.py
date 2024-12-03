@@ -69,9 +69,17 @@ def visualize_reconstruction(model, src_imgs, tgt_imgs, device, cfg):
         
         # Get reconstruction from prior
         tgt_pred_prior = model.forward_decoder_fut(src_h, prior_z)
+        
+        # If norm_pix_loss was used during training, we need to revert it
+        if cfg.norm_pix_loss:
+            target = model.patchify(tgt_imgs)
+            mean = target.mean(dim=-1, keepdim=True)
+            var = target.var(dim=-1, keepdim=True)
+            tgt_pred_prior = tgt_pred_prior * (var + 1.0e-6) ** 0.5 + mean
+            
         reconstructed_imgs = model.unpatchify(tgt_pred_prior)
         
-        # Denormalize images
+        # Denormalize images (ImageNet normalization)
         mean = torch.tensor([0.485, 0.456, 0.406]).view(3, 1, 1).to(device)
         std = torch.tensor([0.229, 0.224, 0.225]).view(3, 1, 1).to(device)
         
