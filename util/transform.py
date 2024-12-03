@@ -1,6 +1,7 @@
+import torch
+import random
 from torchvision import transforms
 import torchvision.transforms.functional as F
-import random
 
 class PairedRandomResizedCrop:
     def __init__(
