@@ -100,8 +100,10 @@ def visualize_reconstruction(model, src_imgs, tgt_imgs, device, cfg):
         # Add experiment name from config to the main title
         plt.suptitle(f'Reconstruction Results - {cfg.exp_name}', y=1.02)
         plt.tight_layout()
-        plt.savefig('reconstruction_visualization.png')
+        save_path = f'artifacts/{cfg.exp_name}_viz.png'
+        plt.savefig(save_path)
         plt.close()
+        print(f'Saved visualization to {save_path}')
 
 def main(args):
     # Load config
