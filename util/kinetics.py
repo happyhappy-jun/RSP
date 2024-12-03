@@ -1,16 +1,11 @@
 import os
 import random
 import pickle
-import torch
 import numpy as np
-
 from decord import VideoReader, cpu
-
 import torch
 from torch.utils.data import Dataset
 from torchvision import transforms
-import torchvision.transforms.functional as F
-
 from util.kinetics_caption import PairedRandomResizedCrop
 
 
