@@ -18,8 +18,11 @@ class PairedRandomResizedCrop:
         size=(224, 224),
         scale=(0.5, 1.0),
         ratio=(3./4., 4./3.),
-        interpolation=F.InterpolationMode.BICUBIC
+        interpolation=F.InterpolationMode.BICUBIC,
+        seed=42
     ):
+        torch.manual_seed(seed)
+        random.seed(seed)
         self.hflip_p = hflip_p
         self.size = size
         self.scale = scale
@@ -57,7 +60,8 @@ class PairedKineticsWithGlobalCaption(Dataset):
         json_path,   # Path to caption JSON file
         embeddings_path=None,  # Path to precomputed embeddings
         max_distance=48,
-        repeated_sampling=2
+        repeated_sampling=2,
+        seed=42
     ):
         super().__init__()
         self.video_root = video_root
@@ -65,7 +69,7 @@ class PairedKineticsWithGlobalCaption(Dataset):
         self.repeated_sampling = repeated_sampling
 
         # Setup transforms
-        self.transforms = PairedRandomResizedCrop()
+        self.transforms = PairedRandomResizedCrop(seed=seed)
         self.basic_transform = transforms.Compose([
             transforms.ToTensor(),
             transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
