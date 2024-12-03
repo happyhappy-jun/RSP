@@ -81,6 +81,7 @@ def visualize_reconstruction(model, src_imgs, tgt_imgs, device, cfg):
         
         # Plot results
         fig, axes = plt.subplots(num_samples, 3, figsize=(12, 4*num_samples))
+        fig.suptitle('Video Frame Reconstruction', fontsize=16, y=0.95)
         for i in range(num_samples):
             # Source image
             axes[i, 0].imshow(src_imgs[i].cpu().permute(1, 2, 0).clamp(0, 1))
