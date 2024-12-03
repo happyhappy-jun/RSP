@@ -50,7 +50,7 @@ def prepare_model(args, cfg):
     model.eval()
     return model
 
-def visualize_reconstruction(model, src_imgs, tgt_imgs, device):
+def visualize_reconstruction(model, src_imgs, tgt_imgs, device, cfg):
     # Move images to device
     src_imgs = src_imgs.to(device)
     tgt_imgs = tgt_imgs.to(device)
@@ -140,7 +140,7 @@ def main(args):
 
     src_imgs = src_imgs[indices]
     tgt_imgs = tgt_imgs[indices]
-    visualize_reconstruction(model, src_imgs, tgt_imgs, args.device)
+    visualize_reconstruction(model, src_imgs, tgt_imgs, args.device, cfg)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser('Visualization script', parents=[get_args_parser()])
