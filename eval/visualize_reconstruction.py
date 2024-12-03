@@ -81,7 +81,6 @@ def visualize_reconstruction(model, src_imgs, tgt_imgs, device, cfg):
         
         # Plot results
         fig, axes = plt.subplots(num_samples, 3, figsize=(12, 4*num_samples))
-        fig.suptitle('Video Frame Reconstruction', fontsize=16, y=0.95)
         for i in range(num_samples):
             # Source image
             axes[i, 0].imshow(src_imgs[i].cpu().permute(1, 2, 0).clamp(0, 1))
@@ -99,7 +98,7 @@ def visualize_reconstruction(model, src_imgs, tgt_imgs, device, cfg):
             axes[i, 2].axis('off')
         
         # Add experiment name from config to the main title
-        plt.suptitle(f'Reconstruction Results - {cfg.exp_name}', y=1.02)
+        plt.title(f'Reconstruction Results - {cfg.exp_name}')
         plt.tight_layout()
         save_path = f'artifacts/{cfg.exp_name}_viz.png'
         plt.savefig(save_path)
