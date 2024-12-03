@@ -97,6 +97,8 @@ def visualize_reconstruction(model, src_imgs, tgt_imgs, device):
             axes[i, 2].set_title('Reconstruction')
             axes[i, 2].axis('off')
         
+        # Add experiment name from config to the main title
+        plt.suptitle(f'Reconstruction Results - {cfg.exp_name}', y=1.02)
         plt.tight_layout()
         plt.savefig('reconstruction_visualization.png')
         plt.close()
