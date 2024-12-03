@@ -6,7 +6,7 @@ from decord import VideoReader, cpu
 import torch
 from torch.utils.data import Dataset
 from torchvision import transforms
-from util.kinetics_caption import PairedRandomResizedCrop
+from util.transform import PairedRandomResizedCrop
 
 
 def seed_everything(seed):

@@ -9,8 +9,11 @@ class PairedRandomResizedCrop:
         size=(224, 224),
         scale=(0.5, 1.0),
         ratio=(3./4., 4./3.),
-        interpolation=F.InterpolationMode.BICUBIC
+        interpolation=F.InterpolationMode.BICUBIC,
+        seed=42
     ):
+        torch.manual_seed(seed)
+        random.seed(seed)
         self.hflip_p = hflip_p
         self.size = size
         self.scale = scale

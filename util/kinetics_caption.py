@@ -10,6 +10,13 @@ from torchvision import transforms
 from util.transform import PairedRandomResizedCrop
 
 
+def seed_everything(seed):
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+
+
 class PairedKineticsWithCaption(Dataset):
     """PairedKinetics dataset that loads from preprocessed JSON"""
     def __init__(
@@ -77,8 +84,8 @@ class PairedKineticsWithCaption(Dataset):
             
         self.repeated_sampling = repeated_sampling
         
-        # Setup transforms
-        self.transforms = PairedRandomResizedCrop()
+        # Setup transforms with seed
+        self.transforms = PairedRandomResizedCrop(seed=42)
         self.basic_transform = transforms.Compose([
             transforms.ToTensor(),
             transforms.Normalize(mean=[0.485, 0.456, 0.406], 
