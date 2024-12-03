@@ -9,7 +9,42 @@ import torch
 from torch.utils.data import Dataset
 from torchvision import transforms
 import torchvision.transforms.functional as F
-from DeBERTa import deberta
+from transformers import DebertaV2Model, DebertaV2Tokenizer
+
+def precompute_deberta_embeddings(json_path, save_path=None):
+    """Precompute DeBERTa embeddings for video captions"""
+    # Initialize DeBERTa model and tokenizer
+    model = DebertaV2Model.from_pretrained('microsoft/deberta-v2-xlarge')
+    tokenizer = DebertaV2Tokenizer.from_pretrained('microsoft/deberta-v2-xlarge')
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    model = model.to(device)
+    model.eval()
+    
+    # Load captions
+    with open(json_path, 'r') as f:
+        data = json.load(f)
+    
+    embeddings = {}
+    
+    # Process each video
+    for result in data['results']:
+        video_idx = result['video_idx']
+        caption = result.get('caption', '')
+        
+        # Tokenize and get embedding
+        with torch.no_grad():
+            inputs = tokenizer(caption, return_tensors='pt', padding=True, truncation=True)
+            inputs = {k: v.to(device) for k, v in inputs.items()}
+            outputs = model(**inputs)
+            # Use [CLS] token embedding as caption embedding
+            embedding = outputs.last_hidden_state[:, 0, :].cpu()
+            embeddings[video_idx] = embedding.squeeze(0)
+    
+    # Save embeddings if path provided
+    if save_path:
+        torch.save(embeddings, save_path)
+        
+    return embeddings
 
 class PairedRandomResizedCrop:
     def __init__(
