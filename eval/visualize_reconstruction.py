@@ -84,7 +84,7 @@ def visualize_reconstruction(model, src_imgs, tgt_imgs, device, cfg):
         for i in range(num_samples):
             # Source image
             axes[i, 0].imshow(src_imgs[i].cpu().permute(1, 2, 0).clamp(0, 1))
-            axes[i, 0].set_title('Source')
+            axes[i, 0].set_title(f'Source - {cfg.exp_name}')
             axes[i, 0].axis('off')
             
             # Target image
