@@ -86,6 +86,7 @@ def main(cfg: DictConfig):
         pin_memory=cfg.pin_mem,
         prefetch_factor=cfg.prefetch_factor,
         drop_last=True,
+        persistent_workers=True,
         multiprocessing_context=torch.multiprocessing.get_context("spawn"),
     )
 
@@ -197,10 +198,16 @@ def main(cfg: DictConfig):
 
 
 if __name__ == "__main__":
+    # Set multiprocessing start method and context
+    if mp.get_start_method(allow_none=True) is None:
+        mp.set_start_method('spawn', force=True)
+    
     try:
-        mp.set_start_method('spawn')  # Try this if you're on Linux
-        torch.utils.data.DataLoader.debug = True
         main()
     except Exception as e:
         print("Error occurred during training:")
         print(traceback.format_exc())
+    finally:
+        # Cleanup
+        if torch.distributed.is_initialized():
+            torch.distributed.destroy_process_group()

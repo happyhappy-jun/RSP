@@ -21,7 +21,8 @@ class PairedKinetics(Dataset):
         root,
         max_distance=48,
         repeated_sampling=2,
-        seed=42
+        seed=42,
+        timeout=30  # Add timeout parameter
     ):
         super().__init__()
         seed_everything(seed)
@@ -95,7 +96,13 @@ class PairedKineticsFixed(PairedKinetics):
         # Presample multiple pairs of indices for all videos
         for idx in range(len(self.samples)):
             sample = os.path.join(self.root, self.samples[idx][1])
-            vr = VideoReader(sample, num_threads=1, ctx=cpu(0))
+            try:
+                vr = VideoReader(sample, num_threads=1, ctx=cpu(0))
+            except Exception as e:
+                print(f"Error loading video {sample}: {str(e)}")
+                # Return a default/empty sample
+                return torch.zeros(self.repeated_sampling, 3, 224, 224), \
+                       torch.zeros(self.repeated_sampling, 3, 224, 224), 0
             seg_len = len(vr)
             least_frames_num = self.max_distance + 1
             
