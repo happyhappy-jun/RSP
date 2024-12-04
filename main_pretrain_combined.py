@@ -27,7 +27,10 @@ from util.misc import NativeScalerWithGradNormCount as NativeScaler
 
 import modeling
 
+from torch.distributed.elastic.multiprocessing.errors import record
+
 @hydra.main(config_path="config", config_name="main", version_base="1.2")
+@record
 def main(cfg: DictConfig):
     misc.init_distributed_mode(cfg)
 
@@ -211,9 +214,18 @@ if __name__ == "__main__":
         # Cleanup
         if torch.distributed.is_initialized():
             torch.distributed.destroy_process_group()
-        # Cleanup any remaining worker processes
+        # Cleanup any remaining worker processes and resources
         if mp.current_process().name == 'MainProcess':
-            mp.active_children()  # Collect inactive children
+            # Clean up any remaining children
             for child in mp.active_children():
                 child.terminate()
                 child.join()
+            # Clean up any remaining semaphores
+            try:
+                import resource_tracker
+                resource_tracker._CLEANUP_FUNCS = {}  # Reset cleanup functions
+                resource_tracker._REGISTERED_NAMES = set()  # Reset registered names
+            except:
+                pass
+            # Force cleanup of remaining resources
+            mp.util.cleanup_remaining_resources()
