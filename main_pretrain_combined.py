@@ -3,6 +3,8 @@ import time
 import json
 import datetime
 import argparse
+import traceback
+
 import wandb
 
 from pathlib import Path
@@ -16,7 +18,7 @@ from torch.utils.tensorboard import SummaryWriter
 import timm
 assert timm.__version__ == "0.3.2"  # version check
 import timm.optim.optim_factory as optim_factory
-
+import torch.multiprocessing as mp
 import util.misc as misc
 import hydra
 from omegaconf import DictConfig, OmegaConf
@@ -195,4 +197,10 @@ def main(cfg: DictConfig):
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        mp.set_start_method('spawn')  # Try this if you're on Linux
+        torch.utils.data.DataLoader.debug = True
+        main()
+    except Exception as e:
+        print("Error occurred during training:")
+        print(traceback.format_exc())
