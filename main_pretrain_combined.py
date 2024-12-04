@@ -211,3 +211,9 @@ if __name__ == "__main__":
         # Cleanup
         if torch.distributed.is_initialized():
             torch.distributed.destroy_process_group()
+        # Cleanup any remaining worker processes
+        if mp.current_process().name == 'MainProcess':
+            mp.active_children()  # Collect inactive children
+            for child in mp.active_children():
+                child.terminate()
+                child.join()

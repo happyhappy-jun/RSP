@@ -16,6 +16,10 @@ def seed_everything(seed):
     torch.cuda.manual_seed_all(seed)
 
 class PairedKinetics(Dataset):
+    def __del__(self):
+        # Cleanup any remaining resources
+        torch.cuda.empty_cache()
+        
     def __init__(
         self,
         root,
@@ -46,7 +50,8 @@ class PairedKinetics(Dataset):
 
     def __getitem__(self, index):
         sample = os.path.join(self.root, self.samples[index][1])
-        vr = VideoReader(sample, num_threads=1, ctx=cpu(0))
+        try:
+            vr = VideoReader(sample, num_threads=1, ctx=cpu(0))
         src_images = []
         tgt_images = []
         for i in range(self.repeated_sampling):
@@ -56,6 +61,7 @@ class PairedKinetics(Dataset):
             tgt_images.append(tgt_image)
         src_images = torch.stack(src_images, dim=0)
         tgt_images = torch.stack(tgt_images, dim=0)
+        del vr  # Explicitly delete VideoReader object
         return src_images, tgt_images, 0
 
 
