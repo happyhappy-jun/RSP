@@ -52,8 +52,13 @@ class PairedKinetics(Dataset):
         sample = os.path.join(self.root, self.samples[index][1])
         try:
             vr = VideoReader(sample, num_threads=1, ctx=cpu(0))
-        src_images = []
-        tgt_images = []
+            src_images = []
+            tgt_images = []
+        except Exception as e:
+            print(f"Error loading video {sample}: {str(e)}")
+            # Return a default/empty sample
+            return torch.zeros(self.repeated_sampling, 3, 224, 224), \
+                   torch.zeros(self.repeated_sampling, 3, 224, 224), 0
         for i in range(self.repeated_sampling):
             src_image, tgt_image = self.load_frames(vr)
             src_image, tgt_image = self.transform(src_image, tgt_image)
