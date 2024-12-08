@@ -32,6 +32,7 @@ log_dir: logs/${run_name}
 
 # Model parameters
 model: "rsp_vit_small_patch16"
+amp: true
 input_size: 224
 context_emb_dim: 1536
 norm_pix_loss: true

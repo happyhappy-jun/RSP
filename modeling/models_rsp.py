@@ -8,6 +8,7 @@ import torch.nn.functional as F
 
 from timm.models.vision_transformer import PatchEmbed, Block
 from timm.models.vision_transformer import CrossAttention, Attention, DropPath, Mlp
+from wandb.cli.cli import enabled
 
 from util.pos_embed import get_2d_sincos_pos_embed
 
@@ -319,8 +320,9 @@ class RSP(nn.Module):
         x = mask_tokens + self.decoder_pos_embed
 
         # apply Transformer blocks
-        for blk in self.decoder_blocks:
-            x = blk(x, kvx=kvx_h)
+        with torch.cuda.amp.autocast(enabled=False):
+            for blk in self.decoder_blocks:
+                x = blk(x, kvx=kvx_h)
         x = self.decoder_norm(x)
 
         # predictor projection
@@ -344,8 +346,9 @@ class RSP(nn.Module):
         x = mask_tokens + self.decoder_pos_embed
 
         # apply Transformer blocks
-        for blk in self.decoder_blocks:
-            x = blk(x, kvx=kvx_h)
+        with torch.cuda.amp.autocast(enabled=False):
+            for blk in self.decoder_blocks:
+                x = blk(x, kvx=kvx_h)
         x = self.decoder_norm(x)
 
         # predictor projection
@@ -397,7 +400,7 @@ class RSP(nn.Module):
             dist = td.Normal(mean, std)
         return dist
 
-    def context_loss(self, post_logits, prior_logits):
+    def kl_loss(self, post_logits, prior_logits):
         balance = self.kl_balance
         freebit = self.kl_freebit
         post_to_prior_kl = td.kl_divergence(
@@ -410,13 +413,13 @@ class RSP(nn.Module):
             post_to_prior_kl * balance + prior_to_post_kl * (1.0 - balance)
         ).mean()
         kl_loss = torch.maximum(kl_value, torch.ones_like(kl_value) * freebit)
-        return kl_loss
+        return kl_loss, kl_value
 
     def forward(self, src_imgs, tgt_imgs, epoch):
         # Extract embeddings
         src_h, _, _ = self.forward_encoder(src_imgs, mask_ratio=0)
         tgt_h, _, _ = self.forward_encoder(self.perturb(tgt_imgs), mask_ratio=0)
-        
+
         # Posterior distribution from both images
         post_h = torch.cat([src_h[:, 0], tgt_h[:, 0]], -1)
         post_logits = self.to_posterior(post_h)
@@ -431,7 +434,7 @@ class RSP(nn.Module):
 
         tgt_pred = self.forward_decoder_fut(src_h, post_z)
         loss_post = self.forward_loss(tgt_imgs, tgt_pred)
-        kl_loss, kl_value = self.context_loss(post_logits, prior_logits)
+        kl_loss, kl_value = self.kl_loss(post_logits, prior_logits)
 
         # MAE
         img_h, mask, ids_restore = self.forward_encoder(tgt_imgs, mask_ratio=self.mask_ratio)

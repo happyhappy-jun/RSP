@@ -227,5 +227,3 @@ if __name__ == "__main__":
                 resource_tracker._REGISTERED_NAMES = set()  # Reset registered names
             except:
                 pass
-            # Force cleanup of remaining resources
-            mp.util.cleanup_remaining_resources()

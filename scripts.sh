@@ -71,3 +71,4 @@ python captioning/extract_frames.py \
     --task semi-supervised \
     --results_path /home/bjyoon/RSP/outputs/fixed-gpt_emb_small-paired-type_embedding-noise_2024-11-24_12-16-04/davis_seg \
     --davis_path /data/DAVIS_480_880
+
