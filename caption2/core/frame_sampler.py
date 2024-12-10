@@ -47,38 +47,48 @@ class UniformFrameSampler(BaseFrameSampler):
         return frame_indices
 
 class PairedFrameSampler(BaseFrameSampler):
-    """Sample pairs of frames with configurable gap"""
+    """Sample pairs of frames with configurable gap between them.
     
-    def __init__(self, min_gap=5, max_gap=30, seed=None):
+    Based on Kinetics dataset sampling strategy:
+    - For videos longer than max_distance + 1 frames:
+      - Randomly select start frame
+      - Select second frame with random interval between min_gap and max_distance
+    - For shorter videos:
+      - Randomly sample any two frames in order
+    """
+    
+    def __init__(self, min_gap=4, max_distance=48, num_pairs=2, seed=None):
         super().__init__(seed)
         self.min_gap = min_gap
-        self.max_gap = max_gap
-    
-    def sample_frames(self, video_path, num_pairs=2):
+        self.max_distance = max_distance
+        self.num_pairs = num_pairs
+        
+    def sample_frames(self, video_path):
+        """Sample num_pairs pairs of frames from video
+        
+        Args:
+            video_path (str): Path to video file
+            
+        Returns:
+            list: List of frame indices, arranged as [start1, end1, start2, end2, ...]
+        """
         vr = VideoReader(video_path, num_threads=1, ctx=cpu(0))
         total_frames = len(vr)
+        least_frames = self.max_distance + 1
         
         frame_indices = []
-        for _ in range(num_pairs):
-            # Select start frame
-            if frame_indices:
-                # Ensure some gap between pairs
-                start = frame_indices[-1] + self.min_gap
-                if start >= total_frames:
-                    break
+        for _ in range(self.num_pairs):
+            if total_frames >= least_frames:
+                # For longer videos, maintain minimum gap
+                start = random.randint(0, total_frames - least_frames)
+                interval = random.randint(self.min_gap, self.max_distance)
+                end = start + interval
             else:
-                start = 0
+                # For shorter videos, just sample any two frames
+                indices = random.sample(range(total_frames), 2)
+                indices.sort()  # Keep temporal order
+                start, end = indices
                 
-            # Select end frame with gap
-            max_end = min(start + self.max_gap, total_frames - 1)
-            if max_end <= start + self.min_gap:
-                break
-                
-            end = random.randint(start + self.min_gap, max_end)
             frame_indices.extend([start, end])
             
-        # Pad with duplicates if needed
-        while len(frame_indices) < num_pairs * 2:
-            frame_indices.extend(frame_indices[-2:])
-            
-        return frame_indices[:num_pairs * 2]
+        return frame_indices
