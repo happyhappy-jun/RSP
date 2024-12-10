@@ -64,7 +64,7 @@ def extract_frames(
             video_dir.mkdir(exist_ok=True)
             
             # Sample and save frames
-            frame_indices = sampler.sample_frames(video_path)
+            frame_indices = sampler.sample_frames(str(video_path))
             frame_paths = []
             
             for frame_idx, video_frame_idx in enumerate(frame_indices):
