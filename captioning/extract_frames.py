@@ -1,4 +1,6 @@
 import os
+import random
+import cv2
 import numpy as np
 from pathlib import Path
 from decord import VideoReader, cpu
@@ -75,6 +77,7 @@ def extract_frames(args):
         }
         
         # Sample frames using configured strategy
+        vr = VideoReader(video_path, num_threads=1, ctx=cpu(0))
         frame_indices = sampler.sample_frames(video_path)
         
         # Extract and save frames
