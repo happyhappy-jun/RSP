@@ -218,19 +218,26 @@ def main():
                 
     print(f"Found {len(video_paths)} videos")
     
-    # Extract frames with seed
-    print("\nExtracting frames...")
-    frame_info = extract_frames(
-        video_paths,
-        paths['frames'],
-        args.sampler,
-        config,
-        seed=args.seed
-    )
-    
-    # Save frame info
-    with open(paths['frames'] / "frame_info.json", 'w') as f:
-        json.dump(frame_info, f, indent=2)
+    # Check if frame extraction was already done
+    frame_info_path = paths['frames'] / "frame_info.json"
+    if frame_info_path.exists():
+        print("\nLoading existing frame info...")
+        with open(frame_info_path) as f:
+            frame_info = json.load(f)
+    else:
+        # Extract frames with seed
+        print("\nExtracting frames...")
+        frame_info = extract_frames(
+            video_paths,
+            paths['frames'],
+            args.sampler,
+            config,
+            seed=args.seed
+        )
+        
+        # Save frame info
+        with open(frame_info_path, 'w') as f:
+            json.dump(frame_info, f, indent=2)
         
     # Create caption requests
     print("\nCreating caption requests...")
