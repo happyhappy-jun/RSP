@@ -57,7 +57,10 @@ def extract_frames(
             video_path = Path(video_path)
             video_name = video_path.stem
             class_label = video_path.parent.name
-            video_dir = output_dir / class_label / video_name
+            # Create class directory first, then video directory
+            class_dir = output_dir / class_label
+            class_dir.mkdir(exist_ok=True, parents=True)
+            video_dir = class_dir / video_name
             video_dir.mkdir(exist_ok=True)
             
             # Sample and save frames
