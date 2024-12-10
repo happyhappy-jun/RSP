@@ -92,7 +92,7 @@ def create_requests(
     if config is None:
         config = Config()
         
-    builder = RequestBuilder()
+    builder = RequestBuilder(config=config)
     requests = []
     
     for video in frame_info['videos']:
@@ -109,7 +109,7 @@ def create_requests(
                 frame_paths=video['frame_paths'],
                 custom_id=f"video_{video['video_idx']}",
                 metadata=metadata,
-                system_prompt=config.prompt_config['caption']['system_prompt']
+                system_prompt=config.prompt_config['caption']['prompts'][config.prompt_config['caption']['default_prompt']]
             )
             requests.append(request)
         except Exception as e:

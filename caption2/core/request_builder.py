@@ -57,6 +57,7 @@ class RequestBuilder:
                 "max_tokens": 8000
             }
         }
+        return request
     
     def build_embedding_request(
         self,
