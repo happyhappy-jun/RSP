@@ -59,9 +59,9 @@ python captioning/extract_frames.py \
 
 
 
-  CUDA_VISIBLE_DEVICES=4 python eval_video_segmentation_davis.py \
-    --finetune /home/bjyoon/RSP/outputs/fixed-gpt_emb_small-paired-type_embedding-noise_2024-11-24_12-16-04/checkpoint-199.pth \
-    --output_dir /home/bjyoon/RSP/outputs/fixed-gpt_emb_small-paired-type_embedding-noise_2024-11-24_12-16-04/davis_seg \
+  CUDA_VISIBLE_DEVICES=4 python eval/DAVIS/eval_video_segmentation_davis.py \
+    --finetune /home/junyoon/RSP/outputs/rsp-fixed-kl_scale0.001-gradscale15-noattentionamp_2024-12-09_21-36-52/checkpoint-199.pth \
+    --output_dir /home/junyoon/RSP/outputs/rsp-fixed-kl_scale0.001-gradscale15-noattentionamp_2024-12-09_21-36-52/davis_seg \
     --data_path /data/DAVIS_480_880 \
     --topk 7 --size_mask_neighborhood 30 --n_last_frames 30 \
     --model vit_small
