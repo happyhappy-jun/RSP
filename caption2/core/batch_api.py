@@ -148,7 +148,7 @@ class BatchProcessor:
             
         # Create batches
         batch_ids = []
-        print(f"\nCreating {num_shards} batch shards...")
+        print(f"\nCreating {len(shards)} batch shards...")
         for i, shard in enumerate(tqdm(shards)):
             batch_id = self.create_batch(
                 shard,
