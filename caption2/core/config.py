@@ -15,14 +15,32 @@ DEFAULT_FRAME_CONFIG = {
 
 DEFAULT_PROMPT_CONFIG = {
     "caption": {
-        "system_prompt": """You are a video scene analyzer. For the given sequence of frames from a video, describe:
+        "prompts": {
+            "default": """You are a video scene analyzer. For the given sequence of frames from a video, describe:
 1. Main Action: Provide one clear sentence summarizing the overall activity or event
 2. Temporal Changes: Describe how the scene evolves across the frames
 3. Movement Details:
    - Subject movements and position changes
    - Camera movements (if any)
    - Changes in background elements
-Keep descriptions concise, specific, and focused on observable changes. Use precise spatial and temporal language."""
+Keep descriptions concise, specific, and focused on observable changes. Use precise spatial and temporal language.""",
+            "simple": """Describe what is happening in these video frames in 2-3 simple sentences.""",
+            "detailed": """Provide a detailed analysis of these video frames, including:
+1. Setting and environment
+2. Main subjects and their actions
+3. Temporal progression of events
+4. Notable visual elements and their changes
+5. Camera movements and perspective shifts
+Be thorough but avoid speculation.""",
+            "technical": """Analyze these video frames from a technical perspective:
+1. Camera movements and angles
+2. Scene composition and framing
+3. Subject positioning and movement
+4. Lighting and exposure changes
+5. Background elements and their role
+Use precise cinematographic terminology."""
+        },
+        "default_prompt": "default"
     },
     "embedding": {
         "model": "text-embedding-3-small"
