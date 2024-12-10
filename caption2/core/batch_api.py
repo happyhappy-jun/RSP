@@ -97,21 +97,54 @@ class BatchProcessor:
             'results': sorted(results, key=lambda x: x['custom_id'])
         }
         
+    def _estimate_request_size(self, request: Dict[str, Any]) -> int:
+        """Estimate size of a request in bytes"""
+        # Base size for request structure
+        size = 1000  # Conservative base estimate
+        
+        # Add size of image data if present
+        if 'body' in request and 'messages' in request['body']:
+            for message in request['body']['messages']:
+                if 'content' in message:
+                    if isinstance(message['content'], list):
+                        for content in message['content']:
+                            if isinstance(content, dict) and 'image_url' in content:
+                                # Extract base64 length and convert to bytes
+                                img_url = content['image_url']['url']
+                                if img_url.startswith('data:image/jpeg;base64,'):
+                                    base64_str = img_url.split(',')[1]
+                                    size += len(base64_str) * 3 // 4  # Convert base64 to bytes
+                    
+        return size
+
     def process_requests(
         self,
         requests: List[Dict[str, Any]],
-        shard_size: int = 50000,
+        max_batch_size: int = 512 * 1024 * 1024,  # 512MB in bytes
         num_workers: int = 4,
         description: str = None
     ) -> List[Dict[str, Any]]:
-        """Process large number of requests with sharding"""
-        # Split requests into shards
-        num_shards = (len(requests) + shard_size - 1) // shard_size
+        """Process large number of requests with sharding based on size limit"""
         shards = []
-        for i in range(num_shards):
-            start_idx = i * shard_size
-            end_idx = min((i + 1) * shard_size, len(requests))
-            shards.append(requests[start_idx:end_idx])
+        current_shard = []
+        current_size = 0
+        
+        print("\nCalculating request sizes...")
+        for request in tqdm(requests):
+            request_size = self._estimate_request_size(request)
+            
+            # If adding this request would exceed max size, start new shard
+            if current_size + request_size > max_batch_size and current_shard:
+                shards.append(current_shard)
+                current_shard = []
+                current_size = 0
+                
+            current_shard.append(request)
+            current_size += request_size
+            
+        # Add final shard if not empty
+        if current_shard:
+            shards.append(current_shard)
             
         # Create batches
         batch_ids = []
