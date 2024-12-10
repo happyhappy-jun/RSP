@@ -5,8 +5,9 @@ from pathlib import Path
 class RequestBuilder:
     """Build API requests for different endpoints"""
     
-    def __init__(self, model: str = "gpt-4-vision-preview"):
+    def __init__(self, model: str = "gpt-4-vision-preview", config=None):
         self.model = model
+        self.config = config
         
     def build_caption_request(
         self, 
@@ -16,15 +17,12 @@ class RequestBuilder:
         system_prompt: str = None
     ) -> Dict[str, Any]:
         """Build a request for frame captioning"""
+        if system_prompt is None and self.config:
+            prompt_type = self.config.prompt_config["caption"].get("default_prompt", "default")
+            system_prompt = self.config.prompt_config["caption"]["prompts"].get(prompt_type)
+        
         if system_prompt is None:
-            system_prompt = """You are a video scene analyzer. For the given sequence of frames from a video, describe:
-1. Main Action: Provide one clear sentence summarizing the overall activity or event
-2. Temporal Changes: Describe how the scene evolves across the frames
-3. Movement Details:
-   - Subject movements and position changes
-   - Camera movements (if any)
-   - Changes in background elements
-Keep descriptions concise, specific, and focused on observable changes. Use precise spatial and temporal language."""
+            system_prompt = self.config.prompt_config["caption"]["prompts"]["default"]
 
         # Encode all images
         contents = []
