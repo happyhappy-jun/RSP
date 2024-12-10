@@ -94,7 +94,7 @@ def extract_frames(
                 'video_path': str(video_path),
                 'video_name': video_name,
                 'class_label': class_label,
-                'frame_indices': frame_indices,
+                'frame_indices': frames,
                 'frame_paths': frame_paths,
                 'sampling_seed': seed
             })
