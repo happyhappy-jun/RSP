@@ -120,7 +120,7 @@ class BatchProcessor:
     def process_requests(
         self,
         requests: List[Dict[str, Any]],
-        max_batch_size: int = 512 * 1024 * 1024,  # 512MB in bytes
+        max_batch_size: int = 100 * 1024 * 1024,  # 512MB in bytes
         num_workers: int = 4,
         description: str = None
     ) -> List[Dict[str, Any]]:
