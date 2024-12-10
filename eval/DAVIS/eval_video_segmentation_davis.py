@@ -12,7 +12,7 @@ import numpy as np
 import torch
 from torch.nn import functional as F
 
-from utils import load_pretrained_weights
+from util.load_ckpt import load_pretrained_weights
 import vision_transformer as vits
 
 
