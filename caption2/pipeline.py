@@ -29,19 +29,22 @@ def extract_frames(
     video_paths: List[str],
     output_dir: Path,
     sampler_type: str = "uniform",
-    config: Config = None
+    config: Config = None,
+    seed: int = 42
 ) -> Dict[str, Any]:
     """Extract frames using configured sampler"""
     if config is None:
         config = Config()
         
-    # Create sampler
+    # Create sampler with seed
     if sampler_type == "uniform":
-        sampler = UniformFrameSampler()
+        sampler = UniformFrameSampler(seed=seed)
         frame_config = config.frame_config['uniform']
     else:
-        sampler = PairedFrameSampler(**config.frame_config['paired'])
+        sampler = PairedFrameSampler(seed=seed, **config.frame_config['paired'])
         frame_config = config.frame_config['paired']
+    
+    frame_config['seed'] = seed  # Track seed in config
     
     frame_info = {
         'config': frame_config,
@@ -50,9 +53,11 @@ def extract_frames(
     
     for video_idx, video_path in enumerate(tqdm(video_paths)):
         try:
-            # Get video name and create output directory
-            video_name = Path(video_path).stem
-            video_dir = output_dir / video_name
+            # Get video metadata
+            video_path = Path(video_path)
+            video_name = video_path.stem
+            class_label = video_path.parent.name
+            video_dir = output_dir / class_label / video_name
             video_dir.mkdir(exist_ok=True)
             
             # Sample and save frames
@@ -65,10 +70,12 @@ def extract_frames(
                 
             frame_info['videos'].append({
                 'video_idx': video_idx,
-                'video_path': video_path,
+                'video_path': str(video_path),
                 'video_name': video_name,
+                'class_label': class_label,
                 'frame_indices': frame_indices,
-                'frame_paths': frame_paths
+                'frame_paths': frame_paths,
+                'sampling_seed': seed
             })
             
         except Exception as e:
@@ -90,9 +97,18 @@ def create_requests(
     
     for video in frame_info['videos']:
         try:
+            # Include metadata in request
+            metadata = {
+                'video_name': video['video_name'],
+                'class_label': video['class_label'],
+                'frame_indices': video['frame_indices'],
+                'sampling_seed': video['sampling_seed']
+            }
+            
             request = builder.build_caption_request(
                 frame_paths=video['frame_paths'],
                 custom_id=f"video_{video['video_idx']}",
+                metadata=metadata,
                 system_prompt=config.prompt_config['caption']['system_prompt']
             )
             requests.append(request)
@@ -130,6 +146,8 @@ def create_embedding_requests(
 
 def main():
     parser = argparse.ArgumentParser()
+    parser.add_argument('--seed', type=int, default=42,
+                       help='Random seed for reproducibility')
     parser.add_argument('--data_root', type=str, required=True,
                        help='Root directory containing videos')
     parser.add_argument('--output_root', type=str, required=True,
@@ -154,13 +172,14 @@ def main():
                 
     print(f"Found {len(video_paths)} videos")
     
-    # Extract frames
+    # Extract frames with seed
     print("\nExtracting frames...")
     frame_info = extract_frames(
         video_paths,
         paths['frames'],
         args.sampler,
-        config
+        config,
+        seed=args.seed
     )
     
     # Save frame info

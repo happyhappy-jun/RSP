@@ -12,6 +12,7 @@ class RequestBuilder:
         self, 
         frame_paths: List[str], 
         custom_id: str,
+        metadata: Dict[str, Any] = None,
         system_prompt: str = None
     ) -> Dict[str, Any]:
         """Build a request for frame captioning"""
@@ -38,9 +39,10 @@ Keep descriptions concise, specific, and focused on observable changes. Use prec
                 }
             })
         
-        return {
+        request = {
             "custom_id": custom_id,
-            "method": "POST",
+            "metadata": metadata or {},
+            "method": "POST", 
             "url": "/v1/chat/completions",
             "body": {
                 "model": self.model,
