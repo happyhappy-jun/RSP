@@ -64,18 +64,30 @@ def extract_frames(
             video_dir.mkdir(exist_ok=True)
             
             # Sample frames
-            frame_indices = sampler.sample_frames(str(video_path))
+            frames = sampler.sample_frames(str(video_path))
             frame_paths = []
             
-            # Save frames and verify they exist
-            for frame_idx, video_frame_idx in enumerate(frame_indices):
+            # Save frames using OpenCV
+            import cv2
+            cap = cv2.VideoCapture(str(video_path))
+            
+            for frame_idx, video_frame_idx in enumerate(frames):
                 frame_path = video_dir / f"frame_{frame_idx}.jpg"
-                sampler.save_frame(str(video_path), video_frame_idx, str(frame_path))
                 
-                if frame_path.exists():
-                    frame_paths.append(str(frame_path))
+                # Set frame position
+                cap.set(cv2.CAP_PROP_POS_FRAMES, video_frame_idx)
+                ret, frame = cap.read()
+                
+                if ret:
+                    cv2.imwrite(str(frame_path), frame)
+                    if frame_path.exists():
+                        frame_paths.append(str(frame_path))
+                    else:
+                        raise FileNotFoundError(f"Failed to save frame to {frame_path}")
                 else:
-                    raise FileNotFoundError(f"Failed to save frame to {frame_path}")
+                    raise ValueError(f"Could not read frame {video_frame_idx} from video")
+            
+            cap.release()
                 
             frame_info['videos'].append({
                 'video_idx': video_idx,
