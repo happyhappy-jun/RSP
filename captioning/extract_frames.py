@@ -2,13 +2,13 @@ import os
 import numpy as np
 from pathlib import Path
 from decord import VideoReader, cpu
-import cv2
 from tqdm import tqdm
 import argparse
 import multiprocessing as mp
 import json
-import random
 import pickle
+from caption2.core.frame_sampler import UniformFrameSampler
+from caption2.utils.image_utils import resize_image
 
 def set_seed(seed):
     """Set random seeds for reproducibility"""
@@ -52,15 +52,11 @@ def get_video_files(data_root):
     return videos
 
 def extract_frames(args):
-    """Extract 4 frames from a video file"""
+    """Extract frames from a video file using configured sampler"""
     video_path, output_dir, video_idx, seed = args
     try:
-        # Set seed for this video
-        set_seed(seed + video_idx)
-        
-        # Create VideoReader
-        vr = VideoReader(video_path, num_threads=1, ctx=cpu(0))
-        seg_len = len(vr)
+        # Create frame sampler
+        sampler = UniformFrameSampler(seed + video_idx)
         
         # Get label from video path
         label = os.path.dirname(os.path.relpath(video_path, os.path.dirname(os.path.dirname(video_path))))
@@ -78,19 +74,8 @@ def extract_frames(args):
             'frames': []
         }
         
-        # Sample 4 evenly spaced frames from the video
-        if seg_len >= 4:
-            # Divide video into 4 segments and sample one frame from each
-            segment_size = seg_len // 4
-            frame_indices = [
-                random.randint(i * segment_size, (i + 1) * segment_size - 1)
-                for i in range(4)
-            ]
-        else:
-            # If video is too short, sample with replacement
-            frame_indices = random.choices(range(seg_len), k=4)
-            
-        frame_indices.sort()  # Keep temporal order
+        # Sample frames using configured strategy
+        frame_indices = sampler.sample_frames(video_path)
         
         # Extract and save frames
         for frame_idx, video_frame_idx in enumerate(frame_indices):
