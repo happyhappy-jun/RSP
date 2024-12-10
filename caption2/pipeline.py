@@ -63,13 +63,19 @@ def extract_frames(
             video_dir = class_dir / video_name
             video_dir.mkdir(exist_ok=True)
             
-            # Sample and save frames
+            # Sample frames
             frame_indices = sampler.sample_frames(str(video_path))
             frame_paths = []
             
+            # Save frames and verify they exist
             for frame_idx, video_frame_idx in enumerate(frame_indices):
                 frame_path = video_dir / f"frame_{frame_idx}.jpg"
-                frame_paths.append(str(frame_path))
+                sampler.save_frame(str(video_path), video_frame_idx, str(frame_path))
+                
+                if frame_path.exists():
+                    frame_paths.append(str(frame_path))
+                else:
+                    raise FileNotFoundError(f"Failed to save frame to {frame_path}")
                 
             frame_info['videos'].append({
                 'video_idx': video_idx,
