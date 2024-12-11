@@ -131,8 +131,8 @@ def create_requests(
                         'video_name': video['video_name'],
                         'class_label': video['class_label'],
                         'frame_indices': json.dumps(pair_indices),
-                        'pair_index': pair_idx // 2,
-                        'sampling_seed': video['sampling_seed']
+                        'pair_index': str(pair_idx // 2),
+                        'sampling_seed': str(video['sampling_seed'])
                     }
                     
                     request = builder.build_caption_request(
@@ -148,7 +148,7 @@ def create_requests(
                     'video_name': video['video_name'],
                     'class_label': video['class_label'],
                     'frame_indices': json.dumps(video['frame_indices']),
-                    'sampling_seed': video['sampling_seed']
+                    'sampling_seed': str(video['sampling_seed'])
                 }
                 
                 request = builder.build_caption_request(
