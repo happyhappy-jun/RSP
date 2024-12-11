@@ -5,7 +5,7 @@ from pathlib import Path
 class RequestBuilder:
     """Build API requests for different endpoints"""
     
-    def __init__(self, model: str = "gpt-4-vision-preview", config=None):
+    def __init__(self, model: str = "gpt-4o-mini", config=None):
         self.model = model
         self.config = config
         
