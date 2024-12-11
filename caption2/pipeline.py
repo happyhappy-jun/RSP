@@ -203,6 +203,8 @@ def main():
     parser.add_argument('--sampler', type=str, default='uniform',
                        choices=['uniform', 'paired'],
                        help='Frame sampling strategy')
+    parser.add_argument('--sanity_check', action='store_true',
+                       help='Run sanity check with single request only')
     args = parser.parse_args()
     
     # Setup
@@ -253,8 +255,14 @@ def main():
     
     caption_results = processor.process_requests(
         caption_requests,
-        description="Frame caption generation"
+        description="Frame caption generation",
+        sanity_check=args.sanity_check
     )
+    
+    if args.sanity_check:
+        print("\nSanity check results:")
+        print(json.dumps(caption_results, indent=2))
+        return
     
     # Save caption results
     with open(paths['results'] / "caption_results.json", 'w') as f:

@@ -122,7 +122,8 @@ class BatchProcessor:
         requests: List[Dict[str, Any]],
         max_batch_size: int = 100 * 1024 * 1024,  # 512MB in bytes
         num_workers: int = 4,
-        description: str = None
+        description: str = None,
+        sanity_check: bool = False
     ) -> List[Dict[str, Any]]:
         """Process large number of requests with sharding based on size limit"""
         shards = []
@@ -146,9 +147,14 @@ class BatchProcessor:
         if current_shard:
             shards.append(current_shard)
             
+        # For sanity check, only process the first request
+        if sanity_check:
+            print("\nRunning sanity check with first request only...")
+            shards = [[requests[0]]]
+
         # Create batches
         batch_ids = []
-        print(f"\nCreating {len(shards)} batch shards...")
+        print(f"\nCreating {len(shards)} batch shard{'s' if len(shards) > 1 else ''}...")
         for i, shard in enumerate(tqdm(shards)):
             batch_id = self.create_batch(
                 shard,
