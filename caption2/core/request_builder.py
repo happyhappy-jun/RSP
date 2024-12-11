@@ -53,7 +53,6 @@ class RequestBuilder:
                         "content": contents
                     }
                 ],
-                "metadata": metadata or {},
                 "max_tokens": 2000
             }
         }

@@ -126,6 +126,38 @@ class BatchProcessor:
         sanity_check: bool = False
     ) -> List[Dict[str, Any]]:
         """Process large number of requests with sharding based on size limit"""
+        # Initialize metadata store
+        metadata_store = MetadataStore(self.output_dir)
+        
+        # Store metadata for each request
+        for request in requests:
+            if 'metadata' in request['body']:
+                metadata_store.add_metadata(request['custom_id'], request['body'].pop('metadata'))
+        
+        # For sanity check, use direct API call
+        if sanity_check:
+            print("\nRunning sanity check with first request only...")
+            try:
+                request = requests[0]
+                response = self.client.chat.completions.create(**request['body'])
+                result = {
+                    'custom_id': request['custom_id'],
+                    'response': {
+                        'body': {
+                            'choices': [{
+                                'message': {
+                                    'content': response.choices[0].message.content
+                                }
+                            }]
+                        }
+                    }
+                }
+                return metadata_store.merge_results([result])
+            except Exception as e:
+                print(f"Sanity check failed: {str(e)}")
+                return []
+                
+        # Process batches normally
         shards = []
         current_shard = []
         current_size = 0
@@ -134,7 +166,6 @@ class BatchProcessor:
         for request in tqdm(requests):
             request_size = self._estimate_request_size(request)
             
-            # If adding this request would exceed max size, start new shard
             if current_size + request_size > max_batch_size and current_shard:
                 shards.append(current_shard)
                 current_shard = []
@@ -143,14 +174,8 @@ class BatchProcessor:
             current_shard.append(request)
             current_size += request_size
             
-        # Add final shard if not empty
         if current_shard:
             shards.append(current_shard)
-            
-        # For sanity check, only process the first request
-        if sanity_check:
-            print("\nRunning sanity check with first request only...")
-            shards = [[requests[0]]]
 
         # Create batches
         batch_ids = []
