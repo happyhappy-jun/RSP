@@ -39,7 +39,6 @@ class RequestBuilder:
         
         request = {
             "custom_id": custom_id,
-            "metadata": metadata or {},
             "method": "POST", 
             "url": "/v1/chat/completions",
             "body": {
@@ -54,7 +53,8 @@ class RequestBuilder:
                         "content": contents
                     }
                 ],
-                "max_tokens": 8000
+                "metadata": metadata or {},
+                "max_tokens": 2000
             }
         }
         return request
