@@ -6,6 +6,7 @@ from typing import List, Dict, Any, Optional
 from concurrent.futures import ThreadPoolExecutor
 from tqdm import tqdm
 from openai import OpenAI
+from .metadata_store import MetadataStore
 
 class BatchProcessor:
     """Wrapper for OpenAI's batch API"""
