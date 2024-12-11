@@ -130,7 +130,7 @@ def create_requests(
                     metadata = {
                         'video_name': video['video_name'],
                         'class_label': video['class_label'],
-                        'frame_indices': pair_indices,
+                        'frame_indices': json.dumps(pair_indices),
                         'pair_index': pair_idx // 2,
                         'sampling_seed': video['sampling_seed']
                     }
@@ -147,7 +147,7 @@ def create_requests(
                 metadata = {
                     'video_name': video['video_name'],
                     'class_label': video['class_label'],
-                    'frame_indices': video['frame_indices'],
+                    'frame_indices': json.dumps(video['frame_indices']),
                     'sampling_seed': video['sampling_seed']
                 }
                 
