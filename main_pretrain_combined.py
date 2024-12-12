@@ -94,16 +94,7 @@ def main(cfg: DictConfig):
     )
 
     # define the model
-    model = modeling.__dict__[cfg.model](
-        norm_pix_loss=cfg.norm_pix_loss,
-        kl_scale=cfg.kl_scale,
-        kl_balance=cfg.kl_balance,
-        kl_freebit=cfg.kl_freebit,
-        stoch=cfg.stoch,
-        discrete=cfg.discrete,
-        mask_ratio=cfg.mask_ratio,
-        noise_scale=cfg.noise_scale
-    )
+    model = modeling.__dict__[cfg.model_name](**cfg.model)
 
     model.to(device)
     model_without_ddp = model

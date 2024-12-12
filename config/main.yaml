@@ -31,19 +31,21 @@ output_dir: outputs/${run_name}
 log_dir: logs/${run_name}
 
 # Model parameters
-model: "rsp_vit_small_patch16"
+model_name: "rsp_vit_small_patch16"
 amp: true
 input_size: 224
 context_emb_dim: 1536
-norm_pix_loss: true
 dtype: "float32"  # Options: float32, float16, bfloat16
-mask_ratio: 0.75
-noise_scale: 0.5
-kl_scale: 0.01
-kl_balance: 0.2
-kl_freebit: 0.1
-stoch: 32
-discrete: 32
+
+model_params:
+  norm_pix_loss: true
+  kl_scale: 0.01
+  kl_balance: 0.2
+  kl_freebit: 0.1
+  stoch: 32
+  discrete: 32
+  mask_ratio: 0.75
+  noise_scale: 0.5
 
 # Optimizer parameters
 weight_decay: 0.05

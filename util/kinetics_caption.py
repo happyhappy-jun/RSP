@@ -41,7 +41,7 @@ class PairedKineticsWithCaption(Dataset):
                 parts = record['custom_id'].split('_')
                 video_idx = int(parts[1])
                 pair_idx = int(parts[3])
-                embedding = BatchOutput(**record).response.body.data[0].embedding
+                embedding = record['embedding']
                 self.embeddings[(video_idx, pair_idx)] = np.array(embedding, dtype=np.float32)
         
         # Process videos and create pairs
@@ -64,7 +64,7 @@ class PairedKineticsWithCaption(Dataset):
         sorted_results = sorted(results, key=lambda x: (x['video_idx'], x['pair_idx']))
         print(f"Found {len(sorted_results)} total pairs")
         print(f"Found {len(self.embeddings)} embeddings")
-        
+
         # Filter out pairs without embeddings
         filtered_results = []
         for pair in sorted_results:
@@ -72,7 +72,7 @@ class PairedKineticsWithCaption(Dataset):
                 filtered_results.append(pair)
             else:
                 print(f"Skipping pair without embedding: video_{pair['video_idx']}_pair_{pair['pair_idx']}")
-                
+
         sorted_results = filtered_results
         print(f"Using {len(sorted_results)} pairs after filtering")
         
@@ -168,31 +168,34 @@ def collate_fn(batch):
 if __name__ == "__main__":
     print("\nInitializing dataset...")
     dataset = PairedKineticsWithCaption(
-        frame_info_path="/path/to/frames/frame_info.json",
-        embeddings_path="/path/to/embeddings/combined_output.jsonl",
+        frame_info_path="/home/junyoon/RSP/artifacts/frames/frame_info.json",
+        embeddings_path="/home/junyoon/RSP/artifacts/embeddings/embedding_results.jsonl",
     )
     
     print(f"Total number of videos: {len(dataset)}")
     a = dataset[0]['embeddings'][0]
     b = dataset[0]['embeddings'][1]
-    c = dataset[1]['embeddings'][0]
-    d = dataset[1]['embeddings'][1]
-    e = dataset[3]['embeddings'][0]
-    f = dataset[3]['embeddings'][1]
+    c = dataset[100]['embeddings'][0]
+    d = dataset[100]['embeddings'][1]
+    e = dataset[18745]['embeddings'][0]
+    f = dataset[18745]['embeddings'][1]
     
     # Print cosine similarities between embeddings
     print("\nComputing cosine similarities between embeddings:")
     
     # List of embeddings to compare
     embeddings = [a, b, c, d, e, f]
-    embedding_names = ['0-0', '0-1', '1-0', '1-1', '3-0', '3-1']
+    embedding_names = ['0-0', '0-1', '1-0', '1-1', '2-0', '2-1']
     
     # Compute cosine similarity for all pairs
     for (e1, n1), (e2, n2) in combinations(zip(embeddings, embedding_names), 2):
         sim = torch.nn.functional.cosine_similarity(e1.unsqueeze(0), e2.unsqueeze(0))
         print(f"Cosine similarity between {n1} and {n2}: {sim.item():.4f}")
-        
-    print(dataset[0])
+
+    print(a[:30])
+    print(b[:30])
+    print(c[:30])
+    print(d[:30])
 
     dataloader = torch.utils.data.DataLoader(
         dataset,
