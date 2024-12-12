@@ -78,7 +78,10 @@ class RspCaptionMse(RspCaption):
         prior_z = prior_dist.rsample()
 
         embedding = embedding.view(-1, 1, embedding.size(-1))
+        print(embedding.shape)
         h_context = self.resize_embed(embedding, self.decoder_embed_dim)
+        print(h_context.shape)
+
         h_context = h_context + self.language_type_embed
         # Project context to prior space
         h_context_prime = self.to_language_prior(src_h[:, 0])
