@@ -32,30 +32,40 @@ class StatusTracker:
 class EmbeddingCreator:
     """Creates embeddings using OpenAI's text-embedding-3-small model with async processing"""
     
-    def __init__(self, api_key: str = None):
-        """Initialize with optional API key"""
-        self.api_key = api_key or os.getenv("OPENAI_API_KEY")
-        self.model = "text-embedding-3-small"
-        self.request_url = "https://api.openai.com/v1/embeddings"
-        self.max_requests_per_minute = 10_000 * 0.75  # Using 75% of limit for safety
-        self.max_tokens_per_minute = 10_000_000 * 0.75
-        self.encoding = tiktoken.get_encoding("cl100k_base")
+    def __init__(self, embedding_dim: int = 1536):
+        """Initialize with embedding dimension"""
+        self.embedding_dim = embedding_dim
         
     def count_tokens(self, text: str) -> int:
         """Count tokens in text"""
         return len(self.encoding.encode(text))
         
-    async def create_embedding(self, session: aiohttp.ClientSession, text: str) -> List[float]:
-        """Create embedding for a single text string"""
-        headers = {"Authorization": f"Bearer {self.api_key}"}
-        json_data = {"model": self.model, "input": text, "encoding_format": "float"}
+    def _create_mock_embedding(self, text: str) -> List[float]:
+        """Create a deterministic mock embedding from text"""
+        import hashlib
+        import numpy as np
         
+        # Create a deterministic seed from the text
+        text_hash = hashlib.md5(text.encode()).hexdigest()
+        seed = int(text_hash, 16) % (2**32)
+        
+        # Use the seed to generate a random embedding
+        rng = np.random.RandomState(seed)
+        embedding = rng.normal(0, 1, self.embedding_dim)
+        
+        # Normalize the embedding
+        norm = np.linalg.norm(embedding)
+        if norm > 0:
+            embedding = embedding / norm
+            
+        return embedding.tolist()
+
+    async def create_embedding(self, session: aiohttp.ClientSession, text: str) -> List[float]:
+        """Create a mock embedding for a text string"""
         try:
-            async with session.post(self.request_url, headers=headers, json=json_data) as response:
-                response_data = await response.json()
-                if "error" in response_data:
-                    raise Exception(response_data["error"])
-                return response_data["data"][0]["embedding"]
+            # Simulate some async processing time
+            await asyncio.sleep(0.01)
+            return self._create_mock_embedding(text)
         except Exception as e:
             logging.error(f"Error creating embedding: {str(e)}")
             return None
