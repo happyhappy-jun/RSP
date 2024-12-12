@@ -144,7 +144,20 @@ class BatchManager:
                     f.write('\n')
             logger.info(f"Wrote errors to {error_file}")
         
-        return sorted(all_records, key=lambda x: int(x.get('custom_id', '').split("-")[-1]))
+        def sort_key(x):
+            custom_id = x.get('custom_id', '')
+            try:
+                # Extract video number and pair number
+                parts = custom_id.split('_')
+                if len(parts) >= 4:
+                    video_num = int(parts[1])  # get number after 'video'
+                    pair_num = int(parts[3])   # get number after 'pair'
+                    return (video_num, pair_num)
+                return (float('inf'), float('inf'))  # Put records without proper format at the end
+            except (ValueError, IndexError):
+                return (float('inf'), float('inf'))
+                
+        return sorted(all_records, key=sort_key)
 
     @staticmethod
     def _process_jsonl_file(file_path: Path) -> List[Dict[str, Any]]:
