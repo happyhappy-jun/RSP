@@ -57,7 +57,7 @@ class EmbeddingCreator:
         caption_results: List[Dict[str, Any]],
         output_dir: Path,
         max_attempts: int = 5
-    ) -> Dict[str, Any]:
+    ) -> List[Dict[str, Any]]:
         """Process caption results and create embeddings asynchronously"""
         
         status = StatusTracker()
