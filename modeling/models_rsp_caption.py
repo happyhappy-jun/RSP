@@ -103,7 +103,7 @@ class RspCaption(nn.Module):
     ):
         super().__init__()
         self.patch_embed = PatchEmbed(img_size, patch_size, in_chans, embed_dim)
-        num_patches = self.patch_embed.num_patches
+        self.num_patches = self.patch_embed.num_patches
         self.neftune_noise_alpha = neftune_noise_alpha
         self.embed_dim = embed_dim
         self.context_patch_length = 1
