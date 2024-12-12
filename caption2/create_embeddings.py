@@ -42,7 +42,8 @@ async def main():
                 batch_results = [json.loads(line) for line in f]
                 # Merge based on custom_id
                 caption_results.extend(batch_results)
-    
+ 
+    print(f"{len(caption_results)}")
     await creator.process_caption_results(caption_results, output_dir)
 
 if __name__ == "__main__":
