@@ -165,7 +165,7 @@ def create_requests(
     return requests
 
 
-def main():
+async def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--seed', type=int, default=42,
                        help='Random seed for reproducibility')
@@ -253,4 +253,5 @@ def main():
     print(f"Results saved to: {args.output_root}")
 
 if __name__ == "__main__":
-    main()
+    import asyncio
+    asyncio.run(main())
