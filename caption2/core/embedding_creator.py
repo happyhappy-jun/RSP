@@ -170,8 +170,8 @@ class EmbeddingCreator:
 
                 # Process current chunk
                 for custom_id, caption, task in tasks:
-                progress_bar.set_postfix_str(status.get_progress_str())
-                try:
+                    progress_bar.set_postfix_str(status.get_progress_str())
+                    try:
                     embedding = await task
                     if embedding:
                         result = {
