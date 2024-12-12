@@ -16,29 +16,27 @@ DEFAULT_FRAME_CONFIG = {
 DEFAULT_PROMPT_CONFIG = {
     "caption": {
         "prompts": {
-            "default": """You are a video scene analyzer. For the given sequence of frames from a video, describe:
-1. Main Action: Provide one clear sentence summarizing the overall activity or event
-2. Temporal Changes: Describe how the scene evolves across the frames
-3. Movement Details:
-   - Subject movements and position changes
-   - Camera movements (if any)
-   - Changes in background elements
-Keep descriptions concise, specific, and focused on observable changes. Use precise spatial and temporal language.""",
-            "simple": """Describe what is happening in these video frames in 2-3 simple sentences.""",
-            "detailed": """Provide a detailed analysis of these video frames, including:
-1. Setting and environment
-2. Main subjects and their actions
-3. Temporal progression of events
-4. Notable visual elements and their changes
-5. Camera movements and perspective shifts
-Be thorough but avoid speculation.""",
-            "technical": """Analyze these video frames from a technical perspective:
-1. Camera movements and angles
-2. Scene composition and framing
-3. Subject positioning and movement
-4. Lighting and exposure changes
-5. Background elements and their role
-Use precise cinematographic terminology."""
+            "default": """You are a movement analyzer specialized in comparing consecutive video frames. Analyze and describe changes between frames using the following guidelines:
+FORMAT:
+- Provide one clear sentence summarizing the overall dynamics and activity
+- Describe qualitive and relative dynamics between frames
+- Use precise directional terms (left, right, up, down, forward, backward)
+- Focus on observable, concrete changes
+
+ANALYZE THE FOLLOWING ELEMENTS:
+- Main Subject/Object:
+    - Position: Track center of mass movement
+    - Rotation: Note any turns or spins
+    - Orientation: Describe facing direction
+    - State Changes: Document visible changes in:
+        - Physical form or shape
+        - Color or appearance
+        - Expression or emotional state (if applicable)
+- Background:
+    - Note any changes in background elements
+    - Identify moving vs static elements
+
+Keep descriptions concise, objective, and focused on visible changes between frames."""
         },
         "default_prompt": "default"
     },

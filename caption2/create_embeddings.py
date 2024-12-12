@@ -23,14 +23,17 @@ async def main():
     
     # Load caption results
     caption_results = []
-    
+
+    print(f"\nLoading caption results from: {caption_results_path}")
     # Load main caption results
     with open(caption_results_path) as f:
         if str(caption_results_path).endswith('.jsonl'):
             caption_results = [json.loads(line) for line in f]
         else:
             caption_results = json.load(f)
-    
+
+
+    print("\nLoaded caption results")
     # Load and merge batch responses if provided
     if args.batch_response:
         batch_path = Path(args.batch_response)
