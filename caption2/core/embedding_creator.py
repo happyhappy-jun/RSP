@@ -137,9 +137,39 @@ class EmbeddingCreator:
                     logging.error(f"Error queueing result {custom_id}: {str(e)}")
                     continue
 
-            # Process results as they complete
-            progress_bar = tqdm(tasks, desc="Creating embeddings", total=len(tasks))
-            for custom_id, caption, task in progress_bar:
+            # Process results in chunks to avoid memory issues
+            chunk_size = 1000
+            total_processed = 0
+            progress_bar = tqdm(total=len(caption_results), desc="Creating embeddings")
+            
+            while total_processed < len(caption_results):
+                # Create tasks for current chunk
+                chunk_end = min(total_processed + chunk_size, len(caption_results))
+                current_chunk = caption_results[total_processed:chunk_end]
+                
+                tasks = []
+                for result in current_chunk:
+                    try:
+                        if 'response' in result:
+                            response_body = result['response']['body']
+                            if isinstance(response_body, str):
+                                response_body = json.loads(response_body)
+                            caption = response_body['choices'][0]['message']['content']
+                            custom_id = result['custom_id']
+                        else:
+                            caption = result['choices'][0]['message']['content']
+                            custom_id = result.get('custom_id', str(result.get('created')))
+                        
+                        task = asyncio.create_task(self.create_embedding(session, caption))
+                        tasks.append((custom_id, caption, task))
+                        status.num_tasks_started += 1
+                        status.num_tasks_in_progress += 1
+                    except Exception as e:
+                        logging.error(f"Error queueing result {custom_id}: {str(e)}")
+                        continue
+
+                # Process current chunk
+                for custom_id, caption, task in tasks:
                 progress_bar.set_postfix_str(status.get_progress_str())
                 try:
                     embedding = await task
@@ -164,11 +194,9 @@ class EmbeddingCreator:
                 finally:
                     status.num_tasks_in_progress -= 1
 
-        # Save results in JSONL format
-        output_path = output_dir / "embedding_results.jsonl"
-        with open(output_path, 'w') as f:
-            for result in embedding_results:
-                f.write(json.dumps(result) + '\n')
+                # Update progress
+                total_processed += len(current_chunk)
+                progress_bar.update(len(current_chunk))
             
         logging.info(f"\nProcessing complete:")
         logging.info(f"Succeeded: {status.num_tasks_succeeded}")
