@@ -79,17 +79,14 @@ class RspCaptionMse(RspCaption):
 
         embedding = embedding.view(-1, 1, embedding.size(-1))
         h_context = self.resize_embed(embedding, self.decoder_embed_dim)
+        
+        h_context = h_context + self.language_type_embed
+        # Project context to prior space
+        h_context_prime = self.to_language_prior(src_h[:, 0])
 
-        tgt_pred = self.forward_decoder_fut(src_h, post_z)
->>>>>>> ab0e522 (refactor: Remove context embedding from posterior distribution calculation)
+        tgt_pred = self.forward_decoder_fut(src_h, h_context, post_z)
         loss_post = self.forward_loss(tgt_imgs, tgt_pred)
         kl_loss, kl_value = self.compute_kl_loss(post_logits, prior_logits)
-=======
-        tgt_pred = self.forward_decoder_fut(src_h, post_z)
->>>>>>> ab0e522 (refactor: Remove context embedding from posterior distribution calculation)
-        loss_post = self.forward_loss(tgt_imgs, tgt_pred)
-        kl_loss, kl_value = self.compute_kl_loss(post_logits, prior_logits)
-        # Squeeze the middle dimension of h_context to match h_context_prime
         context_loss = torch.nn.functional.mse_loss(h_context.squeeze(1), h_context_prime)
 
         # MAE
