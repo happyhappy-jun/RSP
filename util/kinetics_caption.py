@@ -60,56 +60,17 @@ class PairedKineticsWithCaption(Dataset):
                     }
                     results.append(pair)
 
-        # Sort results by video_idx and pair_idx
-        sorted_results = sorted(results, key=lambda x: (x['video_idx'], x['pair_idx']))
-        print(f"Found {len(sorted_results)} total pairs")
-        print(f"Found {len(self.embeddings)} embeddings")
-
-        # Filter out pairs without embeddings
-        filtered_results = []
-        for pair in sorted_results:
+        # Filter and flatten pairs that have embeddings
+        self.valid_pairs = []
+        for pair in results:
             if (pair['video_idx'], pair['pair_idx']) in self.embeddings:
-                filtered_results.append(pair)
+                self.valid_pairs.append(pair)
             else:
                 print(f"Skipping pair without embedding: video_{pair['video_idx']}_pair_{pair['pair_idx']}")
-
-        sorted_results = filtered_results
-        print(f"Using {len(sorted_results)} pairs after filtering")
         
-        self.videos = defaultdict(list)
-        for i, pair in enumerate(sorted_results):
-            self.videos[pair["video_idx"]].append(pair)
-            self.videos[pair["video_idx"]].sort(key=lambda x: x.get('pair_idx', 0))
-        
-        # Get original indices and find gaps
-        orig_indices = sorted(self.videos.keys())
-        min_idx = min(orig_indices)
-        max_idx = max(orig_indices)
-        
-        # Create mapping to fill gaps
-        new_idx = 0
-        self.idx_mapping = {}
-        for idx in range(min_idx, max_idx + 1):
-            if idx in self.videos:
-                self.idx_mapping[idx] = new_idx
-                new_idx += 1
-                
-        # Remap videos to new continuous indices
-        remapped_videos = defaultdict(list)
-        for old_idx, pairs in self.videos.items():
-            new_idx = self.idx_mapping[old_idx]
-            remapped_videos[new_idx] = pairs
-            
-        self.videos = remapped_videos
-        self.video_indices = sorted(self.videos.keys())
-        
-        # Verify no gaps after remapping
-        expected_indices = set(range(len(self.video_indices)))
-        actual_indices = set(self.video_indices)
-        if expected_indices != actual_indices:
-            missing = expected_indices - actual_indices
-            extra = actual_indices - expected_indices
-            raise ValueError(f"Index continuity error after remapping. Missing: {missing}, Extra: {extra}")
+        print(f"Found {len(results)} total pairs")
+        print(f"Found {len(self.embeddings)} embeddings")
+        print(f"Using {len(self.valid_pairs)} pairs after filtering")
             
         self.repeated_sampling = repeated_sampling
         
@@ -122,7 +83,7 @@ class PairedKineticsWithCaption(Dataset):
         ])
 
     def __len__(self):
-        return len(self.video_indices)
+        return len(self.valid_pairs)
 
     def _process_path(self, frame_path):
         """Remove environment-specific prefix from path"""
@@ -139,31 +100,26 @@ class PairedKineticsWithCaption(Dataset):
         return cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
     
     def __getitem__(self, index):
-        video_idx = self.video_indices[index]
-        pair_infos = self.videos[video_idx]
-
-        src_images = []
-        tgt_images = []
-        embeddings = []
+        pair = self.valid_pairs[index]
+        video_idx = pair['video_idx']
+        pair_idx = pair['pair_idx']
         
-        for pair_idx, pair in enumerate(pair_infos):
-            frame_cur = self.load_frame(pair['frame_cur_path'])
-            frame_fut = self.load_frame(pair['frame_fut_path'])
-                
-            # Apply transforms
-            src_image, tgt_image = self.transforms(frame_cur, frame_fut)
-            src_image = self.basic_transform(src_image)
-            tgt_image = self.basic_transform(tgt_image)
+        # Load and process frames
+        frame_cur = self.load_frame(pair['frame_cur_path'])
+        frame_fut = self.load_frame(pair['frame_fut_path'])
             
-            src_images.append(src_image)
-            tgt_images.append(tgt_image)
-            # Convert numpy array to tensor here
-            embeddings.append(torch.from_numpy(self.embeddings[(video_idx, pair_idx)]))
+        # Apply transforms
+        src_image, tgt_image = self.transforms(frame_cur, frame_fut)
+        src_image = self.basic_transform(src_image)
+        tgt_image = self.basic_transform(tgt_image)
+        
+        # Get embedding
+        embedding = torch.from_numpy(self.embeddings[(video_idx, pair_idx)])
 
         return {
-            "src_images": torch.stack(src_images, dim=0),
-            "tgt_images": torch.stack(tgt_images, dim=0),
-            "embeddings": torch.stack(embeddings, dim=0),
+            "src_images": src_image.unsqueeze(0),  # Add batch dimension
+            "tgt_images": tgt_image.unsqueeze(0),
+            "embeddings": embedding.unsqueeze(0),
         }
             
 def collate_fn(batch):
