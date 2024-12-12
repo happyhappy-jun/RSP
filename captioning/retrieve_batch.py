@@ -154,7 +154,7 @@ class BatchManager:
             for line in f:
                 record = json.loads(line)
                 # Skip records that have batch_expired error
-                if "error" in record and record["error"].get("code") == "batch_expired":
+                if "error" in record and isinstance(record["error"], dict) and record["error"].get("code") == "batch_expired":
                     continue
                 records.append(record)
         return records
