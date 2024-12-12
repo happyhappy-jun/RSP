@@ -112,12 +112,7 @@ class BatchManager:
         all_records = []
         errors = []
         
-        # Filter out expired batches
-        valid_batches = [b for b in batches if b.status != "expired"]
-        if len(valid_batches) != len(batches):
-            logger.warning(f"Filtered out {len(batches) - len(valid_batches)} expired batches")
-        
-        for batch in tqdm(valid_batches, desc="Processing batches", unit="batch"):
+        for batch in tqdm(batches, desc="Processing batches", unit="batch"):
                 
             with tempfile.TemporaryDirectory() as temp_dir:
                 # Process output file if it exists
@@ -157,7 +152,11 @@ class BatchManager:
         records = []
         with open(file_path, 'r') as f:
             for line in f:
-                records.append(json.loads(line))
+                record = json.loads(line)
+                # Skip records that have batch_expired error
+                if "error" in record and record["error"].get("code") == "batch_expired":
+                    continue
+                records.append(record)
         return records
 
 class BatchSelector:
