@@ -62,15 +62,26 @@ class PairedKineticsWithCaption(Dataset):
 
         # Filter and flatten pairs that have embeddings
         self.valid_pairs = []
+        missing_embeddings = defaultdict(list)
+        
         for pair in results:
-            if (pair['video_idx'], pair['pair_idx']) in self.embeddings:
+            video_idx, pair_idx = pair['video_idx'], pair['pair_idx']
+            if (video_idx, pair_idx) in self.embeddings:
                 self.valid_pairs.append(pair)
             else:
-                print(f"Skipping pair without embedding: video_{pair['video_idx']}_pair_{pair['pair_idx']}")
+                missing_embeddings[video_idx].append(pair_idx)
         
-        print(f"Found {len(results)} total pairs")
-        print(f"Found {len(self.embeddings)} embeddings")
-        print(f"Using {len(self.valid_pairs)} pairs after filtering")
+        print(f"\nDataset Statistics:")
+        print(f"Total pairs found: {len(results)}")
+        print(f"Total embeddings found: {len(self.embeddings)}")
+        print(f"Valid pairs after filtering: {len(self.valid_pairs)}")
+        print(f"Videos with missing embeddings: {len(missing_embeddings)}")
+        
+        # Print some example missing embeddings
+        if missing_embeddings:
+            print("\nExample videos with missing embeddings:")
+            for video_idx, pairs in list(missing_embeddings.items())[:5]:
+                print(f"Video {video_idx}: Missing {len(pairs)} pairs - {pairs[:5]}")
             
         self.repeated_sampling = repeated_sampling
         
@@ -100,13 +111,22 @@ class PairedKineticsWithCaption(Dataset):
         return cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
     
     def __getitem__(self, index):
-        pair = self.valid_pairs[index]
-        video_idx = pair['video_idx']
-        pair_idx = pair['pair_idx']
-        
-        # Load and process frames
-        frame_cur = self.load_frame(pair['frame_cur_path'])
-        frame_fut = self.load_frame(pair['frame_fut_path'])
+        try:
+            pair = self.valid_pairs[index]
+            video_idx = pair['video_idx']
+            pair_idx = pair['pair_idx']
+            
+            # Verify embedding exists
+            if (video_idx, pair_idx) not in self.embeddings:
+                raise KeyError(f"Missing embedding for video_{video_idx}_pair_{pair_idx}")
+            
+            # Load and process frames
+            frame_cur = self.load_frame(pair['frame_cur_path'])
+            frame_fut = self.load_frame(pair['frame_fut_path'])
+        except Exception as e:
+            print(f"Error loading index {index}: {str(e)}")
+            # Re-raise to maintain DataLoader's error handling
+            raise
             
         # Apply transforms
         src_image, tgt_image = self.transforms(frame_cur, frame_fut)
