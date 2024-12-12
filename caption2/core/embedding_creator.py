@@ -188,10 +188,10 @@ class EmbeddingCreator:
                         else:
                             print(f"Failed to create embedding for {custom_id}")
                             status.num_tasks_failed += 1
-                except Exception as e:
-                    logging.error(f"Error processing result {custom_id}: {str(e)}")
-                    status.num_tasks_failed += 1
-                finally:
+                    except Exception as e:
+                        logging.error(f"Error processing result {custom_id}: {str(e)}")
+                        status.num_tasks_failed += 1
+                    finally:
                     status.num_tasks_in_progress -= 1
 
                 # Update progress
