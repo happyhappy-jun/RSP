@@ -487,7 +487,7 @@ class RspCaption(nn.Module):
         """
         # embed: [B, 1, D]
         # retur: [B, 1, tgt_size]
-        return self.normalize_l2(embed)[:, :tgt_size]
+        return self.normalize_l2(embed)[:, :, :tgt_size]
 
     def forward(self, src_imgs, tgt_imgs, embedding, epoch):
         # Extract embeddings
