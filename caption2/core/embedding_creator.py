@@ -192,7 +192,7 @@ class EmbeddingCreator:
                         logging.error(f"Error processing result {custom_id}: {str(e)}")
                         status.num_tasks_failed += 1
                     finally:
-                    status.num_tasks_in_progress -= 1
+                        status.num_tasks_in_progress -= 1
 
                 # Update progress
                 total_processed += len(current_chunk)
