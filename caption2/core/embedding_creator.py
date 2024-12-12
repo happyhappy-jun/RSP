@@ -133,8 +133,8 @@ class EmbeddingCreator:
                     if embedding:
                         embedding_results.append({
                             'custom_id': custom_id,
-                            'embedding': embedding,
-                            'original_caption': caption
+                            'original_caption': caption,
+                            'embedding': embedding
                         })
                         status.num_tasks_succeeded += 1
                     else:
