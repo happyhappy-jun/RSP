@@ -145,10 +145,11 @@ class EmbeddingCreator:
                 finally:
                     status.num_tasks_in_progress -= 1
 
-        # Save results
-        output_path = output_dir / "embedding_results.json"
+        # Save results in JSONL format
+        output_path = output_dir / "embedding_results.jsonl"
         with open(output_path, 'w') as f:
-            json.dump(embedding_results, f, indent=2)
+            for result in embedding_results:
+                f.write(json.dumps(result) + '\n')
             
         logging.info(f"\nProcessing complete:")
         logging.info(f"Succeeded: {status.num_tasks_succeeded}")
