@@ -124,9 +124,18 @@ class PairedKineticsWithCaption(Dataset):
     def __len__(self):
         return len(self.video_indices)
 
+    def _process_path(self, frame_path):
+        """Remove environment-specific prefix from path"""
+        if '/RSP/' in frame_path:
+            return frame_path.split('/RSP/', 1)[1]
+        return frame_path
+
     def load_frame(self, frame_path):
         """Load and convert frame to RGB"""
-        frame = cv2.imread(frame_path)
+        processed_path = self._process_path(frame_path)
+        frame = cv2.imread(processed_path)
+        if frame is None:
+            raise ValueError(f"Failed to load frame from path: {processed_path}")
         return cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
     
     def __getitem__(self, index):
