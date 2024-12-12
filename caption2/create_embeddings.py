@@ -5,17 +5,6 @@ from pathlib import Path
 from typing import Optional
 from pydantic import BaseModel
 from caption2.core.embedding_creator import EmbeddingCreator
-from models import Response
-
-
-class BatchOutput(BaseModel):
-    """
-    BatchOutput class is used to store the output of the batch processing
-    """
-    id: str
-    custom_id: str  
-    response: Response
-    error: Optional[str] = None
 
 async def main():
     parser = argparse.ArgumentParser(description='Create embeddings from caption results')
@@ -39,41 +28,15 @@ async def main():
 
     print(f"\nLoading caption results from: {caption_results_path}")
     # Load main caption results
-    raw_results = []
     with open(caption_results_path) as f:
-        for line in f:
-            try:
-                result = json.loads(line)
-                raw_results.append(result)
-            except json.JSONDecodeError as e:
-                print(f"Error parsing line: {e}")
-                continue
-    
-    print(f"Loaded {len(raw_results)} raw results")
-    caption_results = []
-    for result in raw_results:
-        try:
-            batch_output = BatchOutput(**result)
-            caption_results.append(batch_output)
-        except Exception as e:
-            print(f"Error processing result: {e}")
-            continue
-    
-    print(f"Successfully processed {len(caption_results)} results")
-
-
-    print("\nLoaded caption results")
-    # Load and merge batch responses if provided
-    if args.batch_response:
-        batch_path = Path(args.batch_response)
-        if batch_path.exists():
-            with open(batch_path) as f:
-                raw_batch = [json.loads(line) for line in f]
-                batch_results = [BatchOutput(**result) for result in raw_batch]
-                # Merge based on custom_id
-                caption_results.extend(batch_results)
+        if str(caption_results_path).endswith('.jsonl'):
+            raw_results = [json.loads(line) for line in f]
+        else:
+            raw_results = json.load(f)
+        
+        caption_results = [{"custom_id": result["custom_id"], "response": result["response"]} for result in raw_results]
+    print(len(caption_results))
  
-    print(f"{len(caption_results)}")
     await creator.process_caption_results(caption_results, output_dir)
 
 if __name__ == "__main__":

@@ -1,15 +1,30 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 import json
-from typing import List, Optional
-from openai.types.create_embedding_response import CreateEmbeddingResponse, Usage
+from typing import List, Optional, Dict
+
+class EmbeddingData(BaseModel):
+    """Data model for embedding output"""
+    embedding: List[float]
+    index: int = 0
+    object: str = "embedding"
+
+class Usage(BaseModel):
+    """Usage statistics"""
+    prompt_tokens: int
+    total_tokens: int
+
+class EmbeddingResponse(BaseModel):
+    """Response format matching embedding output"""
+    object: str = "list"
+    data: List[EmbeddingData]
+    model: str = "text-embedding-custom"
+    usage: Usage
 
 class Response(BaseModel):
-    """
-    Response class is used to store the response of the API
-    """
-    status_code: int
+    """Response class for batch processing"""
+    status_code: int = 200
     request_id: str
-    body: CreateEmbeddingResponse
+    body: EmbeddingResponse
 
 class BatchOutput(BaseModel):
     """
