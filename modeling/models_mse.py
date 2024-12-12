@@ -7,8 +7,9 @@ from modeling.models_rsp_caption import RspCaption
 
 class RspCaptionMse(RspCaption):
     """RSP model variant that uses MSE loss instead of KL divergence"""
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, mse_scale=1.0, **kwargs):
         super().__init__(*args, **kwargs)
+        self.mse_scale = mse_scale
 
     def forward(self, src_imgs, tgt_imgs, embedding, epoch):
         # Extract embeddings
@@ -51,7 +52,7 @@ class RspCaptionMse(RspCaption):
             tgt_pred_prior = self.forward_decoder_fut(src_h, prior_z)
             loss_prior = self.forward_loss(tgt_imgs, tgt_pred_prior)
 
-        loss = loss_post + self.kl_scale * kl_loss + context_loss + mae_loss
+        loss = loss_post + self.kl_scale * kl_loss + self.mse_scale * context_loss + mae_loss
 
         return loss, tgt_pred, (loss_post, loss_prior, kl_loss, kl_value, mae_loss)
 
