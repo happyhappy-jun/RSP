@@ -8,11 +8,12 @@ model: rsp_vit_small_patch16_caption
 
 dataset:
   _target_: util.kinetics_caption.PairedKineticsWithCaption
-  data_path: ${oc.env:HOME}/RSP/artifacts/frame_analysis_results_complete.json
-  embeddings_path: ${oc.env:HOME}/RSP/artifacts/combined_output.jsonl
+  frame_info_path: ${oc.env:HOME}/RSP/artifacts/frames/frame_info.json
+  embeddings_path: ${oc.env:HOME}/RSP/artifacts/embeddings/embedding_results.jsonl
 
 train_loop:
   _target_: engine_pretrain_repsamp.train_one_epoch_llm
   _partial_: true
 
+mse_scale: 0.1
 
