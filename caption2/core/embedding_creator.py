@@ -20,6 +20,14 @@ class StatusTracker:
     num_tasks_failed: int = 0
     num_rate_limit_errors: int = 0
     time_of_last_rate_limit_error: int = 0
+    total_tasks: int = 0
+    
+    def get_progress_str(self) -> str:
+        """Get a formatted progress string"""
+        return (f"Progress: {self.num_tasks_succeeded}/{self.total_tasks} "
+                f"[Success: {self.num_tasks_succeeded}, "
+                f"Failed: {self.num_tasks_failed}, "
+                f"In Progress: {self.num_tasks_in_progress}]")
 
 class EmbeddingCreator:
     """Creates embeddings using OpenAI's text-embedding-3-small model with async processing"""
@@ -60,7 +68,7 @@ class EmbeddingCreator:
     ) -> List[Dict[str, Any]]:
         """Process caption results and create embeddings asynchronously"""
         
-        status = StatusTracker()
+        status = StatusTracker(total_tasks=len(caption_results))
         embedding_results = []
         retry_queue = asyncio.Queue()
         
@@ -117,7 +125,9 @@ class EmbeddingCreator:
                     continue
 
             # Process results as they complete
-            for custom_id, caption, task in tqdm(tasks, desc="Creating embeddings"):
+            progress_bar = tqdm(tasks, desc="Creating embeddings")
+            for custom_id, caption, task in progress_bar:
+                progress_bar.set_postfix_str(status.get_progress_str())
                 try:
                     embedding = await task
                     if embedding:
