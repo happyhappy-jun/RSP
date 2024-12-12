@@ -131,7 +131,7 @@ def train_one_epoch_llm(
         tgt_samples = batch["tgt_images"].to(device, non_blocking=True)
         lm_logits = batch["embeddings"].to(device, non_blocking=True)
 
-        loss, _, (loss_post, loss_prior, loss_kl, value_kl, loss_mae) = model(
+        loss, _, (loss_post, loss_prior, loss_kl, value_kl, loss_context, loss_mae) = model(
             src_samples, tgt_samples, lm_logits,
             data_iter_step / len(data_loader) + epoch
         )
@@ -160,6 +160,7 @@ def train_one_epoch_llm(
         metric_logger.update(loss_kl=loss_kl.item())
         metric_logger.update(kl=value_kl.item())
         metric_logger.update(loss_mae=loss_mae.item())
+        metric_logger.update(loss_context=loss_context.item())
         lr = optimizer.param_groups[0]["lr"]
         metric_logger.update(lr=lr)
 
@@ -170,6 +171,7 @@ def train_one_epoch_llm(
             log_writer.add_scalar("lr", lr, epoch_1000x)
             log_writer.add_scalar("loss_post", loss_post.item(), epoch_1000x)
             log_writer.add_scalar("loss_prior", loss_prior.item(), epoch_1000x)
+            log_writer.add_scalar("loss_context", loss_context.item(), epoch_1000x)
             log_writer.add_scalar("loss_mae", loss_mae.item(), epoch_1000x)
             log_writer.add_scalar("kl", value_kl.item(), epoch_1000x)
 

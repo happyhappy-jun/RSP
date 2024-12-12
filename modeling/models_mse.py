@@ -101,7 +101,7 @@ class RspCaptionMse(RspCaption):
 
         loss = loss_post + self.kl_scale * kl_loss + self.mse_scale * context_loss + mae_loss
 
-        return loss, tgt_pred, (loss_post, loss_prior, kl_loss, kl_value, mae_loss)
+        return loss, tgt_pred, (loss_post, loss_prior, kl_loss, kl_value, context_loss, mae_loss)
 
 def rsp_mse_vit_small_patch8_dec512d8b(**kwargs):
     model = RspCaptionMse(
