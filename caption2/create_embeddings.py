@@ -39,13 +39,27 @@ async def main():
 
     print(f"\nLoading caption results from: {caption_results_path}")
     # Load main caption results
+    raw_results = []
     with open(caption_results_path) as f:
-        if str(caption_results_path).endswith('.jsonl'):
-            raw_results = [json.loads(line) for line in f]
-        else:
-            raw_results = json.load(f)
-        
-        caption_results = [BatchOutput(**result) for result in raw_results]
+        for line in f:
+            try:
+                result = json.loads(line)
+                raw_results.append(result)
+            except json.JSONDecodeError as e:
+                print(f"Error parsing line: {e}")
+                continue
+    
+    print(f"Loaded {len(raw_results)} raw results")
+    caption_results = []
+    for result in raw_results:
+        try:
+            batch_output = BatchOutput(**result)
+            caption_results.append(batch_output)
+        except Exception as e:
+            print(f"Error processing result: {e}")
+            continue
+    
+    print(f"Successfully processed {len(caption_results)} results")
 
 
     print("\nLoaded caption results")
