@@ -87,12 +87,6 @@ class RspCaptionMse(RspCaption):
         tgt_pred = self.forward_decoder_fut(src_h, h_context, post_z)
         loss_post = self.forward_loss(tgt_imgs, tgt_pred)
         kl_loss, kl_value = self.compute_kl_loss(post_logits, prior_logits)
-        context_loss = torch.nn.functional.mse_loss(h_context.squeeze(1), h_context_prime)
-        
-        tgt_pred = self.forward_decoder_fut(src_h, post_z)
-        loss_post = self.forward_loss(tgt_imgs, tgt_pred)
-        kl_loss, kl_value = self.compute_kl_loss(post_logits, prior_logits)
-        h_context = h_context.squeeze(1)  # Remove middle dimension: [B, 1, D] -> [B, D]
         h_context_prime = h_context_prime.view(h_context.shape)  # Ensure same shape as h_context
         context_loss = torch.nn.functional.mse_loss(h_context, h_context_prime)
 
