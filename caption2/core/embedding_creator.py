@@ -75,9 +75,14 @@ class EmbeddingCreator:
             for result in caption_results:
                 try:
                     if 'response' in result:
-                        caption = result['response']['body']['choices'][0]['message']['content']
+                        # Handle combined_output.jsonl format
+                        response_body = result['response']['body']
+                        if isinstance(response_body, str):
+                            response_body = json.loads(response_body)
+                        caption = response_body['choices'][0]['message']['content']
                         custom_id = result['custom_id']
                     else:
+                        # Handle direct API response format
                         caption = result['choices'][0]['message']['content']
                         custom_id = result.get('custom_id', str(result.get('created')))
                     

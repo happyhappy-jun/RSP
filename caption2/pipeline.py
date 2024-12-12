@@ -242,6 +242,12 @@ def main():
     # Save caption results
     with open(paths['results'] / "caption_results.json", 'w') as f:
         json.dump(caption_results, f, indent=2)
+
+    # Create embeddings from the caption results
+    print("\nCreating embeddings...")
+    from caption2.core.embedding_creator import EmbeddingCreator
+    creator = EmbeddingCreator()
+    await creator.process_caption_results(caption_results, paths['embeddings'])
         
     print("\nPipeline complete!")
     print(f"Results saved to: {args.output_root}")
