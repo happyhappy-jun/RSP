@@ -22,26 +22,44 @@ class PairedKineticsWithCaption(Dataset):
     """PairedKinetics dataset that loads from preprocessed JSON"""
     def __init__(
         self,
-        data_path,           # Path to preprocessed JSON file
-        embeddings_path,     # Path to precomputed embeddings
-        repeated_sampling=2, # Number of augmented samples per pair
+        frame_info_path,     # Path to frame_info.json
+        embeddings_path,     # Path to combined_output.jsonl
+        repeated_sampling=2  # Number of augmented samples per pair
     ):
         super().__init__()
-        # Load video frame data
-        with open(data_path, 'r') as f:
-            results = json.load(f)["results"]
+        # Load frame info data
+        with open(frame_info_path, 'r') as f:
+            frame_info = json.load(f)
+            videos = frame_info['videos']
 
-        # Load embeddings data more efficiently using numpy memmap
+        # Load embeddings data
         self.embeddings = {}
         with open(embeddings_path, 'r') as f:
             for line in f:
                 record = json.loads(line)
-                id = int(record['custom_id'].split('-')[-1]) - 1
-                video_idx, pair_idx = id // 2, id % 2
+                # Parse video_idx and pair_idx from custom_id (format: video_X_pair_Y)
+                parts = record['custom_id'].split('_')
+                video_idx = int(parts[1])
+                pair_idx = int(parts[3])
                 embedding = BatchOutput(**record).response.body.data[0].embedding
-                # Store as numpy array instead of tensor
                 self.embeddings[(video_idx, pair_idx)] = np.array(embedding, dtype=np.float32)
         
+        # Process videos and create pairs
+        results = []
+        for video in videos:
+            video_idx = video['video_idx']
+            frame_paths = video['frame_paths']
+            # Process frames in pairs
+            for i in range(0, len(frame_paths), 2):
+                if i + 1 < len(frame_paths):  # Ensure we have a complete pair
+                    pair = {
+                        'video_idx': video_idx,
+                        'pair_idx': i // 2,
+                        'frame_cur_path': frame_paths[i],
+                        'frame_fut_path': frame_paths[i + 1]
+                    }
+                    results.append(pair)
+
         # Sort results by video_idx and pair_idx
         sorted_results = sorted(results, key=lambda x: (x['video_idx'], x['pair_idx']))
         print(f"Loaded {len(sorted_results)} pairs")
@@ -140,8 +158,8 @@ def collate_fn(batch):
 if __name__ == "__main__":
     print("\nInitializing dataset...")
     dataset = PairedKineticsWithCaption(
-        data_path="/home/junyoon/RSP/artifacts/frame_analysis_results_complete.json",
-        embeddings_path="/home/junyoon/RSP/artifacts/combined_output.jsonl",
+        frame_info_path="/path/to/frames/frame_info.json",
+        embeddings_path="/path/to/embeddings/combined_output.jsonl",
     )
     
     print(f"Total number of videos: {len(dataset)}")
