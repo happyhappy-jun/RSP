@@ -112,10 +112,12 @@ class BatchManager:
         all_records = []
         errors = []
         
-        for batch in tqdm(batches, desc="Processing batches", unit="batch"):
-            if batch.status == "expired":
-                logger.warning(f"Batch {batch.id} expired at {datetime.fromtimestamp(batch.expired_at)}")
-                continue
+        # Filter out expired batches
+        valid_batches = [b for b in batches if b.status != "expired"]
+        if len(valid_batches) != len(batches):
+            logger.warning(f"Filtered out {len(batches) - len(valid_batches)} expired batches")
+        
+        for batch in tqdm(valid_batches, desc="Processing batches", unit="batch"):
                 
             with tempfile.TemporaryDirectory() as temp_dir:
                 # Process output file if it exists
