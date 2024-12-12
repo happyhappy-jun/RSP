@@ -38,8 +38,14 @@ class EmbeddingCreator:
         for result in tqdm(caption_results, desc="Creating embeddings"):
             try:
                 # Extract caption text from result
-                caption = result['response']['body']['choices'][0]['message']['content']
-                custom_id = result['custom_id']
+                if 'response' in result:
+                    # Handle pipeline format
+                    caption = result['response']['body']['choices'][0]['message']['content']
+                    custom_id = result['custom_id']
+                else:
+                    # Handle JSONL format
+                    caption = result['choices'][0]['message']['content']
+                    custom_id = result.get('custom_id', str(result.get('created')))
                 
                 # Create embedding
                 embedding = self.create_embedding(caption)
@@ -67,8 +73,13 @@ def create_embeddings(caption_results_path: str, output_dir: str) -> None:
     """Convenience function to create embeddings from caption results file"""
     
     # Load caption results
+    caption_results = []
     with open(caption_results_path) as f:
-        caption_results = json.load(f)
+        if caption_results_path.endswith('.jsonl'):
+            for line in f:
+                caption_results.append(json.loads(line))
+        else:
+            caption_results = json.load(f)
         
     # Create output directory
     output_path = Path(output_dir)
