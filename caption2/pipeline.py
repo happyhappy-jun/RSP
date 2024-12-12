@@ -164,31 +164,6 @@ def create_requests(
             
     return requests
 
-def create_embedding_requests(
-    caption_results: List[Dict[str, Any]],
-    config: Config = None
-) -> List[Dict[str, Any]]:
-    """Create embedding requests for captions"""
-    if config is None:
-        config = Config()
-        
-    builder = RequestBuilder()
-    requests = []
-    
-    for result in caption_results:
-        try:
-            analysis = result['response']['body']['choices'][0]['message']['content']
-            request = builder.build_embedding_request(
-                text=analysis,
-                custom_id=result['custom_id'],
-                model=config.prompt_config['embedding']['model']
-            )
-            requests.append(request)
-        except Exception as e:
-            print(f"Error creating embedding request for {result['custom_id']}: {str(e)}")
-            continue
-            
-    return requests
 
 def main():
     parser = argparse.ArgumentParser()
@@ -267,20 +242,6 @@ def main():
     # Save caption results
     with open(paths['results'] / "caption_results.json", 'w') as f:
         json.dump(caption_results, f, indent=2)
-        
-    # Create and process embedding requests
-    print("\nCreating embedding requests...")
-    embedding_requests = create_embedding_requests(caption_results, config)
-    
-    print("\nProcessing embedding requests...")
-    embedding_results = processor.process_requests(
-        embedding_requests,
-        description="Caption embedding generation"
-    )
-    
-    # Save embedding results
-    with open(paths['embeddings'] / "embedding_results.json", 'w') as f:
-        json.dump(embedding_results, f, indent=2)
         
     print("\nPipeline complete!")
     print(f"Results saved to: {args.output_root}")
