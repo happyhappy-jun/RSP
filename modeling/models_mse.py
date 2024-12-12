@@ -91,7 +91,8 @@ class RspCaptionMse(RspCaption):
 >>>>>>> ab0e522 (refactor: Remove context embedding from posterior distribution calculation)
         loss_post = self.forward_loss(tgt_imgs, tgt_pred)
         kl_loss, kl_value = self.compute_kl_loss(post_logits, prior_logits)
-        context_loss = torch.nn.functional.mse_loss(h_context, h_context_prime)
+        # Squeeze the middle dimension of h_context to match h_context_prime
+        context_loss = torch.nn.functional.mse_loss(h_context.squeeze(1), h_context_prime)
 
         # MAE
         img_h, mask, ids_restore = self.forward_encoder(tgt_imgs, mask_ratio=self.mask_ratio)
