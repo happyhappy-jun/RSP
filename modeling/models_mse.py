@@ -81,11 +81,9 @@ class RspCaptionMse(RspCaption):
         h_context = self.resize_embed(embedding, self.decoder_embed_dim)
 
         h_context = h_context + self.language_type_embed
-        # Project context to prior space
-        h_context_prime = self.to_language_prior(src_h[:, 0])
-
-<<<<<<< HEAD
-        tgt_pred = self.forward_decoder_fut(src_h, h_context, post_z)
+        tgt_pred = self.forward_decoder_fut(src_h, post_z)
+>>>>>>> ab0e522 (refactor: Remove context embedding from posterior distribution calculation)
+        loss_post = self.forward_loss(tgt_imgs, tgt_pred)
 =======
         tgt_pred = self.forward_decoder_fut(src_h, post_z)
 >>>>>>> ab0e522 (refactor: Remove context embedding from posterior distribution calculation)
