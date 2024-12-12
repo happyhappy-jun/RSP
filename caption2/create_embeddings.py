@@ -5,7 +5,8 @@ from pathlib import Path
 from typing import Optional
 from pydantic import BaseModel
 from caption2.core.embedding_creator import EmbeddingCreator
-from caption2.core.types import Response
+from models import Response
+
 
 class BatchOutput(BaseModel):
     """
