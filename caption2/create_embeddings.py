@@ -2,7 +2,19 @@ import asyncio
 import argparse
 import json
 from pathlib import Path
+from typing import Optional
+from pydantic import BaseModel
 from caption2.core.embedding_creator import EmbeddingCreator
+from caption2.core.types import Response
+
+class BatchOutput(BaseModel):
+    """
+    BatchOutput class is used to store the output of the batch processing
+    """
+    id: str
+    custom_id: str  
+    response: Response
+    error: Optional[str] = None
 
 async def main():
     parser = argparse.ArgumentParser(description='Create embeddings from caption results')
@@ -28,9 +40,11 @@ async def main():
     # Load main caption results
     with open(caption_results_path) as f:
         if str(caption_results_path).endswith('.jsonl'):
-            caption_results = [json.loads(line) for line in f]
+            raw_results = [json.loads(line) for line in f]
         else:
-            caption_results = json.load(f)
+            raw_results = json.load(f)
+        
+        caption_results = [BatchOutput(**result) for result in raw_results]
 
 
     print("\nLoaded caption results")
@@ -39,7 +53,8 @@ async def main():
         batch_path = Path(args.batch_response)
         if batch_path.exists():
             with open(batch_path) as f:
-                batch_results = [json.loads(line) for line in f]
+                raw_batch = [json.loads(line) for line in f]
+                batch_results = [BatchOutput(**result) for result in raw_batch]
                 # Merge based on custom_id
                 caption_results.extend(batch_results)
  
