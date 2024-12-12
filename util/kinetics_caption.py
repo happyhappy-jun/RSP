@@ -62,9 +62,19 @@ class PairedKineticsWithCaption(Dataset):
 
         # Sort results by video_idx and pair_idx
         sorted_results = sorted(results, key=lambda x: (x['video_idx'], x['pair_idx']))
-        print(f"Loaded {len(sorted_results)} pairs")
-        print(f"Loaded {len(self.embeddings)} embeddings")
-        assert len(self.embeddings.keys()) == len(sorted_results)
+        print(f"Found {len(sorted_results)} total pairs")
+        print(f"Found {len(self.embeddings)} embeddings")
+        
+        # Filter out pairs without embeddings
+        filtered_results = []
+        for pair in sorted_results:
+            if (pair['video_idx'], pair['pair_idx']) in self.embeddings:
+                filtered_results.append(pair)
+            else:
+                print(f"Skipping pair without embedding: video_{pair['video_idx']}_pair_{pair['pair_idx']}")
+                
+        sorted_results = filtered_results
+        print(f"Using {len(sorted_results)} pairs after filtering")
         
         self.videos = defaultdict(list)
         for i, pair in enumerate(sorted_results):
