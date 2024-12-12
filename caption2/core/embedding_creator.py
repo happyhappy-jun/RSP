@@ -35,6 +35,9 @@ class EmbeddingCreator:
     def __init__(self, embedding_dim: int = 1536):
         """Initialize with embedding dimension"""
         self.embedding_dim = embedding_dim
+        self.max_requests_per_minute = 3500  # Rate limit for text-embedding-3-small
+        self.max_tokens_per_minute = 150000  # Token limit per minute
+        self.encoding = tiktoken.get_encoding("cl100k_base")
         
     def count_tokens(self, text: str) -> int:
         """Count tokens in text"""
