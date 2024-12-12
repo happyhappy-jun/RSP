@@ -84,7 +84,11 @@ class RspCaptionMse(RspCaption):
         # Project context to prior space
         h_context_prime = self.to_language_prior(src_h[:, 0])
 
+<<<<<<< HEAD
         tgt_pred = self.forward_decoder_fut(src_h, h_context, post_z)
+=======
+        tgt_pred = self.forward_decoder_fut(src_h, post_z)
+>>>>>>> ab0e522 (refactor: Remove context embedding from posterior distribution calculation)
         loss_post = self.forward_loss(tgt_imgs, tgt_pred)
         kl_loss, kl_value = self.compute_kl_loss(post_logits, prior_logits)
         context_loss = torch.nn.functional.mse_loss(h_context, h_context_prime)
