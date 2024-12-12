@@ -10,6 +10,51 @@ class RspCaptionMse(RspCaption):
     def __init__(self, *args, mse_scale=1.0, **kwargs):
         super().__init__(*args, **kwargs)
         self.mse_scale = mse_scale
+        self.image_type_embed = nn.Parameter(
+            torch.zeros(1, self.num_patches + 1, self.decoder_embed_dim),
+        )
+        nn.init.normal_(self.image_type_embed, std=0.02)
+        self.language_type_embed = nn.Parameter(
+            torch.zeros(1, 1, self.decoder_embed_dim), requires_grad=True
+        )
+        nn.init.normal_(self.language_type_embed, std=0.02)
+
+    def get_feat(self, h, h_context, z):
+        # Process deterministic path
+        h = self.decoder_embed_deter(h)  # [B, L, decoder_embed_dim]
+        h = h + self.decoder_pos_embed  # Add positional embedding
+        h = h + self.image_type_embed
+
+        # Concatenate along sequence dimension
+        h_concat = torch.cat([h, h_context], dim=1)  # [B, L+1, decoder_embed_dim]
+
+        # Process stochastic path
+        if self.discrete != 0:
+            z = z.reshape(*z.shape[:-2], 1, self.stoch * self.discrete)
+        z = self.decoder_embed_stoch(z)
+
+        # Final concatenation
+        feat = torch.cat([z, h_concat], dim=1)
+        return feat
+
+    def forward_decoder_fut(self, h, h_context, z):
+        kvx_h = self.get_feat(h, h_context, z)
+
+        mask_tokens = self.mask_token.repeat(h.shape[0], h.shape[1], 1)
+        x = mask_tokens + self.decoder_pos_embed
+
+        # apply Transformer blocks
+        for blk in self.decoder_blocks:
+            x = blk(x, kvx=kvx_h)
+        x = self.decoder_norm(x)
+
+        # predictor projection
+        x = self.decoder_pred(x)
+
+        # remove cls token
+        x = x[:, 1:, :]
+
+        return x
 
     def forward(self, src_imgs, tgt_imgs, embedding, epoch):
         # Extract embeddings
@@ -21,8 +66,7 @@ class RspCaptionMse(RspCaption):
         tgt_h, _, _ = self.forward_encoder(self.perturb(tgt_imgs), mask_ratio=0)
 
         # Posterior distribution from both images
-        h_context = self.resize_embed(embedding, self.embed_dim)
-        post_h = torch.cat([src_h[:, 0], tgt_h[:, 0], h_context], -1)
+        post_h = torch.cat([src_h[:, 0], tgt_h[:, 0]], -1)
         post_logits = self.to_posterior(post_h)
         post_dist = self.make_dist(post_logits)
         post_z = post_dist.rsample()
@@ -34,14 +78,15 @@ class RspCaptionMse(RspCaption):
         prior_z = prior_dist.rsample()
 
         embedding = embedding.view(-1, 1, embedding.size(-1))
-        h_context = self.resize_embed(embedding, self.embed_dim)
+        h_context = self.resize_embed(embedding, self.decoder_embed_dim)
+        h_context = h_context + self.language_type_embed
+        # Project context to prior space
         h_context_prime = self.to_language_prior(src_h[:, 0])
 
-
-        tgt_pred = self.forward_decoder_fut(src_h, post_z)
+        tgt_pred = self.forward_decoder_fut(src_h, h_context, post_z)
         loss_post = self.forward_loss(tgt_imgs, tgt_pred)
         kl_loss, kl_value = self.compute_kl_loss(post_logits, prior_logits)
-        context_loss = self.mse_loss(h_context, h_context_prime)
+        context_loss = torch.nn.functional.mse_loss(h_context, h_context_prime)
 
         # MAE
         img_h, mask, ids_restore = self.forward_encoder(tgt_imgs, mask_ratio=self.mask_ratio)
