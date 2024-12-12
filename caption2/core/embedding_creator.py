@@ -172,22 +172,22 @@ class EmbeddingCreator:
                 for custom_id, caption, task in tasks:
                     progress_bar.set_postfix_str(status.get_progress_str())
                     try:
-                    embedding = await task
-                    if embedding:
-                        result = {
-                            'custom_id': custom_id,
-                            'original_caption': caption,
-                            'embedding': embedding
-                        }
-                        # Write result immediately to avoid memory issues
-                        output_path = output_dir / "embedding_results.jsonl"
-                        with open(output_path, 'a') as f:
-                            f.write(json.dumps(result) + '\n')
-                        embedding_results.append(result)
-                        status.num_tasks_succeeded += 1
-                    else:
-                        print(f"Failed to create embedding for {custom_id}")
-                        status.num_tasks_failed += 1
+                        embedding = await task
+                        if embedding:
+                            result = {
+                                'custom_id': custom_id,
+                                'original_caption': caption,
+                                'embedding': embedding
+                            }
+                            # Write result immediately to avoid memory issues
+                            output_path = output_dir / "embedding_results.jsonl"
+                            with open(output_path, 'a') as f:
+                                f.write(json.dumps(result) + '\n')
+                            embedding_results.append(result)
+                            status.num_tasks_succeeded += 1
+                        else:
+                            print(f"Failed to create embedding for {custom_id}")
+                            status.num_tasks_failed += 1
                 except Exception as e:
                     logging.error(f"Error processing result {custom_id}: {str(e)}")
                     status.num_tasks_failed += 1
