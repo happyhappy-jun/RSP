@@ -110,10 +110,10 @@ class RspCaption(nn.Module):
 
         self.cls_token = nn.Parameter(torch.zeros(1, 1, embed_dim))
         self.pos_embed = nn.Parameter(
-            torch.zeros(1, num_patches + 1, embed_dim), requires_grad=False
+            torch.zeros(1, self.num_patches + 1, embed_dim), requires_grad=False
         )  # fixed sin-cos embedding
         self.image_type_embed = nn.Parameter(
-            torch.zeros(1, num_patches + 1, decoder_embed_dim),
+            torch.zeros(1, self.num_patches + 1, decoder_embed_dim),
         )
         nn.init.normal_(self.image_type_embed, std=0.02)
         self.language_type_embed = nn.Parameter(
@@ -174,7 +174,7 @@ class RspCaption(nn.Module):
         self.context_proj = nn.Linear(context_emb_dim, decoder_embed_dim, bias=True)
 
         self.decoder_pos_embed = nn.Parameter(
-            torch.zeros(1, num_patches + 1, decoder_embed_dim),
+            torch.zeros(1, self.num_patches + 1, decoder_embed_dim),
             requires_grad=False
         )
         self.decoder_blocks = nn.ModuleList(
