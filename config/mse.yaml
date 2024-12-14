@@ -18,6 +18,6 @@ train_loop:
 model:
   kl_scale: 0.001
   mse_scale: 0.1
-  rms_norm: true
+  enable_rms_norm: true
   embed_scale_factor: 1.0
 
