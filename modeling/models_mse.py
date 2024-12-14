@@ -1,13 +1,15 @@
 from functools import partial
 import torch
 import torch.nn as nn
+
+from modeling.layers import RMSNorm
 from modeling.models_rsp import RSP
 from modeling.models_rsp_caption import RspCaption
 
 
 class RspCaptionMse(RspCaption):
     """RSP model variant that uses MSE loss instead of KL divergence"""
-    def __init__(self, *args, mse_scale=1.0, **kwargs):
+    def __init__(self, *args, mse_scale=1.0, rms_norm=False, **kwargs):
         super().__init__(*args, **kwargs)
         self.mse_scale = mse_scale
         self.image_type_embed = nn.Parameter(
@@ -18,6 +20,7 @@ class RspCaptionMse(RspCaption):
             torch.zeros(1, 1, self.decoder_embed_dim), requires_grad=True
         )
         nn.init.normal_(self.language_type_embed, std=0.02)
+        self.rms_norm = rms_norm
 
     def get_feat(self, h, h_context, z):
         # Process deterministic path
@@ -79,6 +82,8 @@ class RspCaptionMse(RspCaption):
 
         embedding = embedding.view(-1, 1, embedding.size(-1))
         h_context = self.resize_embed(embedding, self.decoder_embed_dim)
+        if self.rms_norm:
+            h_context = RMSNorm(self.decoder_embed_dim, scale_factor=1.0, eps=1e-6)(h_context)
         
         h_context = h_context + self.language_type_embed
         # Project context to prior space

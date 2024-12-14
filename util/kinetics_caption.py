@@ -158,29 +158,29 @@ if __name__ == "__main__":
     )
     
     print(f"Total number of videos: {len(dataset)}")
-    a = dataset[0]['embeddings'][0]
-    b = dataset[0]['embeddings'][1]
-    c = dataset[100]['embeddings'][0]
-    d = dataset[100]['embeddings'][1]
-    e = dataset[18745]['embeddings'][0]
-    f = dataset[18745]['embeddings'][1]
-    
+    a = dataset[0]['embeddings']
+    b = dataset[1]['embeddings']
+    c = dataset[500]['embeddings']
+    d = dataset[501]['embeddings']
+    e = dataset[999]['embeddings']
+    f = dataset[1000]['embeddings']
+
     # Print cosine similarities between embeddings
     print("\nComputing cosine similarities between embeddings:")
     
     # List of embeddings to compare
     embeddings = [a, b, c, d, e, f]
-    embedding_names = ['0-0', '0-1', '1-0', '1-1', '2-0', '2-1']
+    embedding_names = ['0-cur', '0-fut', '500-cur', '500-fut', '999-cur', '999-fut']
     
     # Compute cosine similarity for all pairs
     for (e1, n1), (e2, n2) in combinations(zip(embeddings, embedding_names), 2):
-        sim = torch.nn.functional.cosine_similarity(e1.unsqueeze(0), e2.unsqueeze(0))
+        sim = torch.nn.functional.cosine_similarity(e1, e2)
         print(f"Cosine similarity between {n1} and {n2}: {sim.item():.4f}")
 
-    print(a[:30])
-    print(b[:30])
-    print(c[:30])
-    print(d[:30])
+    print(f"Embedding snippet {a[:30]}")
+    print(f"Embedding snippet {b[:30]}")
+    print(f"Embedding snippet {c[:30]}")
+    print(f"Embedding snippet {d[:30]}")
 
     dataloader = torch.utils.data.DataLoader(
         dataset,
