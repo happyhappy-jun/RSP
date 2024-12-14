@@ -44,4 +44,5 @@ class RMSNorm(torch.nn.Module):
             torch.Tensor: The output tensor after applying RMSNorm.
 
         """
-        return (self.weight * self._norm(x.float())).type_as(x)
+        weight = self.weight.to(x.device)
+        return (weight * self._norm(x.float())).type_as(x)
