@@ -84,7 +84,7 @@ class RspCaptionMse(RspCaption):
         embedding = embedding.view(-1, 1, embedding.size(-1))
         h_context = self.resize_embed(embedding, self.decoder_embed_dim)
         if self.enable_rms_norm:
-            h_context = RMSNorm(self.decoder_embed_dim, scale_factor=self.embed_scale_factor, eps=1e-6)(h_context)
+            h_context = self.rms_norm(h_context)
         
         h_context = h_context + self.language_type_embed
         # Project context to prior space
