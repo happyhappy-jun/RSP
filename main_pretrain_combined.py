@@ -157,7 +157,7 @@ def main(cfg: DictConfig):
                 "epoch": epoch,
             }
             wandb.log(log_stats)
-        if cfg.output_dir and (epoch % 10 == 0 or epoch in [cfg.epochs - 2, cfg.epochs - 1, cfg.epochs]):
+        if cfg.output_dir and (epoch % 25 == 0 or epoch in [cfg.epochs - 2, cfg.epochs - 1, cfg.epochs]):
             misc.save_model(
                 args=cfg,
                 model=model,
