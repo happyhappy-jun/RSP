@@ -6,6 +6,8 @@ import datetime
 from collections import defaultdict, deque
 from pathlib import Path
 
+import random
+import numpy as np
 import torch
 import torch.distributed as dist
 
@@ -380,3 +382,10 @@ def all_reduce_mean(x):
         return x_reduce.item()
     else:
         return x
+
+
+def seed_everything(seed):
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)

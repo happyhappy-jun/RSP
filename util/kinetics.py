@@ -6,14 +6,10 @@ from decord import VideoReader, cpu
 import torch
 from torch.utils.data import Dataset
 from torchvision import transforms
+
+from util.misc import seed_everything
 from util.transform import PairedRandomResizedCrop
 
-
-def seed_everything(seed):
-    random.seed(seed)
-    np.random.seed(seed)
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed)
 
 class PairedKinetics(Dataset):
     def __del__(self):

@@ -41,7 +41,7 @@ async def main():
 
     print(f"Total caption results: {len(caption_results)}")
     
-    # Limit to first 1000 requests
+    # Limit to first 1000 requests:q
     caption_results = caption_results[:1000]
     print(f"Processing first {len(caption_results)} requests")
     
