@@ -39,7 +39,7 @@ dtype: "float32"  # Options: float32, float16, bfloat16
 
 model_params:
   norm_pix_loss: true
-  kl_scale: 0.01
+  kl_scale: 0.001
   kl_balance: 0.2
   kl_freebit: 0.1
   stoch: 32
