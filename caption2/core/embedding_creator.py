@@ -106,8 +106,8 @@ class EmbeddingCreator:
                         available_token_capacity -= token_count
                         last_update_time = current_time
                         
-                        task = asyncio.create_task(self.create_embedding(session, caption))
-                        tasks.append((custom_id, caption, task))
+                        task = asyncio.create_task(self.create_embedding(session, caption, custom_id))
+                        tasks.append(task)
                         status.num_tasks_started += 1
                         status.num_tasks_in_progress += 1
                         print(status)
