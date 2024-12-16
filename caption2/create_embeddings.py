@@ -39,8 +39,12 @@ async def main():
                                raw_results]
         
 
-    print(len(caption_results))
- 
+    print(f"Total caption results: {len(caption_results)}")
+    
+    # Limit to first 1000 requests
+    caption_results = caption_results[:1000]
+    print(f"Processing first {len(caption_results)} requests")
+    
     await creator.process_caption_results(caption_results, output_dir)
 
 if __name__ == "__main__":
