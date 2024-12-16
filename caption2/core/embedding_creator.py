@@ -115,63 +115,81 @@ class EmbeddingCreator:
                     logging.error(f"Error queueing result {custom_id}: {str(e)}")
                     continue
 
-            # Process results in chunks to avoid memory issues
-            chunk_size = 1000
-            total_processed = 0
+            # Process all results with rate limiting
             progress_bar = tqdm(total=len(caption_results), desc="Creating embeddings")
             
-            while total_processed < len(caption_results):
-                # Create tasks for current chunk
-                chunk_end = min(total_processed + chunk_size, len(caption_results))
-                current_chunk = caption_results[total_processed:chunk_end]
-                
-                tasks = []
-                for result in current_chunk:
-                    try:
-                        if 'response' in result:
-                            caption = result['response']
-                            custom_id = result['custom_id']
-                        else:
-                            logging.error(f"Missing response field in result: {result}")
-                            continue
-                        
-                        task = asyncio.create_task(self.create_embedding(session, caption))
-                        tasks.append((custom_id, caption, task))
-                        status.num_tasks_started += 1
-                        status.num_tasks_in_progress += 1
-                    except Exception as e:
-                        logging.error(f"Error queueing result {custom_id}: {str(e)}")
+            for result in caption_results:
+                try:
+                    if 'response' not in result:
+                        logging.error(f"Missing response field in result: {result}")
                         continue
-
-                # Process current chunk
-                for custom_id, caption, task in tasks:
+                        
+                    caption = result['response']
+                    custom_id = result['custom_id']
+                    token_count = self.count_tokens(caption)
+                    
+                    # Check and update rate limits
+                    current_time = time.time()
+                    time_elapsed = current_time - last_update_time
+                    
+                    # Replenish capacity based on time elapsed
+                    available_request_capacity = min(
+                        available_request_capacity + (self.max_requests_per_minute * time_elapsed / 60.0),
+                        self.max_requests_per_minute
+                    )
+                    available_token_capacity = min(
+                        available_token_capacity + (self.max_tokens_per_minute * time_elapsed / 60.0),
+                        self.max_tokens_per_minute
+                    )
+                    
+                    # Wait if we're at capacity
+                    while available_request_capacity < 1 or available_token_capacity < token_count:
+                        await asyncio.sleep(0.1)  # Wait 100ms before checking again
+                        current_time = time.time()
+                        time_elapsed = current_time - last_update_time
+                        available_request_capacity = min(
+                            available_request_capacity + (self.max_requests_per_minute * time_elapsed / 60.0),
+                            self.max_requests_per_minute
+                        )
+                        available_token_capacity = min(
+                            available_token_capacity + (self.max_tokens_per_minute * time_elapsed / 60.0),
+                            self.max_tokens_per_minute
+                        )
+                    
+                    # Update capacity and time
+                    available_request_capacity -= 1
+                    available_token_capacity -= token_count
+                    last_update_time = current_time
+                    
+                    status.num_tasks_started += 1
+                    status.num_tasks_in_progress += 1
                     progress_bar.set_postfix_str(status.get_progress_str())
-                    try:
-                        embedding = await task
-                        if embedding:
-                            result = {
-                                'custom_id': custom_id,
-                                'original_caption': caption,
-                                'embedding': embedding
-                            }
-                            # Write result immediately to avoid memory issues
-                            output_path = output_dir / "embedding_results.jsonl"
-                            with open(output_path, 'a') as f:
-                                f.write(json.dumps(result) + '\n')
-                            embedding_results.append(result)
-                            status.num_tasks_succeeded += 1
-                        else:
-                            print(f"Failed to create embedding for {custom_id}")
-                            status.num_tasks_failed += 1
-                    except Exception as e:
-                        logging.error(f"Error processing result {custom_id}: {str(e)}")
+                    
+                    # Create and process embedding
+                    embedding = await self.create_embedding(session, caption)
+                    
+                    if embedding:
+                        result = {
+                            'custom_id': custom_id,
+                            'original_caption': caption,
+                            'embedding': embedding
+                        }
+                        # Write result immediately
+                        output_path = output_dir / "embedding_results.jsonl"
+                        with open(output_path, 'a') as f:
+                            f.write(json.dumps(result) + '\n')
+                        embedding_results.append(result)
+                        status.num_tasks_succeeded += 1
+                    else:
+                        logging.error(f"Failed to create embedding for {custom_id}")
                         status.num_tasks_failed += 1
-                    finally:
-                        status.num_tasks_in_progress -= 1
-
-                # Update progress
-                total_processed += len(current_chunk)
-                progress_bar.update(len(current_chunk))
+                    
+                except Exception as e:
+                    logging.error(f"Error processing result {custom_id}: {str(e)}")
+                    status.num_tasks_failed += 1
+                finally:
+                    status.num_tasks_in_progress -= 1
+                    progress_bar.update(1)
             
         output_file = output_dir / "embedding_results.jsonl"
         logging.info(f"\nProcessing complete:")
