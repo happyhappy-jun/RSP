@@ -108,6 +108,7 @@ class EmbeddingCreator:
                         tasks.append((custom_id, caption, task))
                         status.num_tasks_started += 1
                         status.num_tasks_in_progress += 1
+                        print(status)
                     else:
                         await asyncio.sleep(0.001)  # Brief pause if at capacity
                         
