@@ -17,6 +17,7 @@ class PairedKineticsWithGlobalCaption(Dataset):
     """PairedKinetics dataset that loads from preprocessed JSON and JSONL embeddings"""
 
     def __init__(
+<<<<<<< HEAD
             self,
             root,  # Root directory containing videos
             caption_path,
@@ -30,12 +31,26 @@ class PairedKineticsWithGlobalCaption(Dataset):
 
         self.root = root
         self.video_root = os.path.join(self.root, "train2")
+=======
+        self,
+        root,           # Root directory containing videos
+        embeddings_path, # Path to embeddings.jsonl
+        max_distance=48,
+        repeated_sampling=2,
+        seed=42
+    ):
+        super().__init__()
+        seed_everything(seed)
+        
+        self.root = root
+>>>>>>> 27bfb06 (feat: Read video labels from pickle instead of frame_info.json)
         self.max_distance = max_distance
         self.repeated_sampling = repeated_sampling
 
         # Load video samples from pickle
         with open(os.path.join(self.root, "labels", f"label_full_1.0.pickle"), "rb") as f:
             self.samples = pickle.load(f)
+<<<<<<< HEAD
 
         self.captions = json.load(open(caption_path))["results"]
         self.data = dict()
@@ -44,10 +59,13 @@ class PairedKineticsWithGlobalCaption(Dataset):
                 "label": item["label"],
                 "video_name": item["video_name"],
             }
+=======
+>>>>>>> 27bfb06 (feat: Read video labels from pickle instead of frame_info.json)
 
         with open(embeddings_path, 'r') as f:
             for line in f:
                 record = json.loads(line)
+<<<<<<< HEAD
                 custom_id = record[-1]["custom_id"]
                 embedding = record[1]["data"][0]["embedding"]
                 self.data[custom_id]["embedding"] = embedding
@@ -56,6 +74,18 @@ class PairedKineticsWithGlobalCaption(Dataset):
         self.valid_samples = [video_path.split(".")[0] for _, video_path in self.samples]
         self.data = [v for _, v in self.data.items() if v["video_name"] not in self.valid_samples]
 
+=======
+                video_idx = int(record['video_idx'])
+                embedding = record['embedding']
+                self.embeddings[video_idx] = np.array(embedding, dtype=np.float32)
+        
+        # Filter samples to only those with embeddings
+        self.valid_samples = []
+        for idx, (video_idx, path, label) in enumerate(self.samples):
+            if video_idx in self.embeddings:
+                self.valid_samples.append((video_idx, path, label))
+        
+>>>>>>> 27bfb06 (feat: Read video labels from pickle instead of frame_info.json)
         # Setup transforms
         self.transforms = PairedRandomResizedCrop(seed=seed)
         self.basic_transform = transforms.Compose([
@@ -65,7 +95,19 @@ class PairedKineticsWithGlobalCaption(Dataset):
         ])
 
         print(f"\nDataset Statistics:")
+<<<<<<< HEAD
         print(f"Total videos found: {len(self.data)}")
+=======
+        print(f"Total videos found: {len(self.samples)}")
+        print(f"Total embeddings found: {len(self.embeddings)}")
+        print(f"Valid videos after filtering: {len(self.valid_samples)}")
+        
+        # Print missing embeddings info
+        missing = set(s[0] for s in self.samples) - set(self.embeddings.keys())
+        if missing:
+            print(f"\nVideos missing embeddings: {len(missing)}")
+            print(f"Example missing video_idx: {list(missing)[:5]}")
+>>>>>>> 27bfb06 (feat: Read video labels from pickle instead of frame_info.json)
 
     def load_frames(self, vr):
         """Sample two frames with temporal constraint"""
@@ -98,7 +140,18 @@ class PairedKineticsWithGlobalCaption(Dataset):
 
     def __getitem__(self, index):
         try:
+<<<<<<< HEAD
             video_path = os.path.join(self.video_root, self.data[index]["label"], self.data[index]["video_name"] + ".mp4")
+=======
+            video_idx, rel_path, label = self.valid_samples[index]
+            
+            # Verify embedding exists
+            if video_idx not in self.embeddings:
+                raise KeyError(f"Missing embedding for video_{video_idx}")
+            
+            # Load video and sample frames
+            video_path = os.path.join(self.root, rel_path)
+>>>>>>> 27bfb06 (feat: Read video labels from pickle instead of frame_info.json)
             vr = VideoReader(video_path, num_threads=1, ctx=cpu(0))
 
             src_images = []
@@ -126,6 +179,12 @@ class PairedKineticsWithGlobalCaption(Dataset):
             "src_images": torch.stack(src_images, dim=0),
             "tgt_images": torch.stack(tgt_images, dim=0),
             "embeddings": embedding,
+<<<<<<< HEAD
+=======
+            "video_idx": video_idx,
+            "label": label,
+            "frame_indices": frame_indices
+>>>>>>> 27bfb06 (feat: Read video labels from pickle instead of frame_info.json)
         }
 
 
