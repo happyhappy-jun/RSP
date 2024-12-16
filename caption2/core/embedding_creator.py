@@ -6,7 +6,6 @@ import logging
 from pathlib import Path
 from typing import List, Dict, Any
 from tqdm import tqdm
-from openai import OpenAI
 import tiktoken
 import time
 from dataclasses import dataclass, field
@@ -19,6 +18,8 @@ class StatusTracker:
     num_tasks_succeeded: int = 0
     num_tasks_failed: int = 0
     num_rate_limit_errors: int = 0
+    num_api_errors: int = 0
+    num_other_errors: int = 0
     time_of_last_rate_limit_error: int = 0
     total_tasks: int = 0
     
@@ -27,190 +28,207 @@ class StatusTracker:
         return (f"Progress: {self.num_tasks_succeeded}/{self.total_tasks} "
                 f"[Success: {self.num_tasks_succeeded}, "
                 f"Failed: {self.num_tasks_failed}, "
-                f"In Progress: {self.num_tasks_in_progress}]")
+                f"In Progress: {self.num_tasks_in_progress}, "
+                f"Rate Limits: {self.num_rate_limit_errors}]")
+
+@dataclass
+class APIRequest:
+    """Stores an API request's inputs, outputs, and other metadata"""
+    task_id: int
+    request_json: dict
+    token_consumption: int
+    attempts_left: int
+    metadata: dict
+    result: list = field(default_factory=list)
+
+    async def call_api(
+        self,
+        session: aiohttp.ClientSession,
+        request_url: str,
+        request_header: dict,
+        retry_queue: asyncio.Queue,
+        save_filepath: str,
+        status_tracker: StatusTracker,
+    ):
+        """Calls the OpenAI API and saves results"""
+        logging.debug(f"Starting request #{self.task_id}")
+        error = None
+        try:
+            async with session.post(
+                url=request_url,
+                headers=request_header,
+                json=self.request_json
+            ) as response:
+                response = await response.json()
+            
+            if "error" in response:
+                logging.warning(f"Request {self.task_id} failed with error {response['error']}")
+                status_tracker.num_api_errors += 1
+                error = response
+                if "rate limit" in response["error"].get("message", "").lower():
+                    status_tracker.time_of_last_rate_limit_error = time.time()
+                    status_tracker.num_rate_limit_errors += 1
+                    status_tracker.num_api_errors -= 1  # rate limit errors counted separately
+        except Exception as e:
+            logging.warning(f"Request {self.task_id} failed with Exception {e}")
+            status_tracker.num_other_errors += 1
+            error = e
+
+        if error:
+            self.result.append(error)
+            if self.attempts_left:
+                retry_queue.put_nowait(self)
+            else:
+                logging.error(f"Request {self.task_id} failed after all attempts. Saving errors: {self.result}")
+                data = [self.request_json, [str(e) for e in self.result], self.metadata] if self.metadata else [self.request_json, [str(e) for e in self.result]]
+                append_to_jsonl(data, save_filepath)
+                status_tracker.num_tasks_in_progress -= 1
+                status_tracker.num_tasks_failed += 1
+        else:
+            data = [self.request_json, response, self.metadata] if self.metadata else [self.request_json, response]
+            append_to_jsonl(data, save_filepath)
+            status_tracker.num_tasks_in_progress -= 1
+            status_tracker.num_tasks_succeeded += 1
+            logging.debug(f"Request {self.task_id} completed successfully")
 
 class EmbeddingCreator:
     """Creates embeddings using OpenAI's text-embedding-3-small model with async processing"""
     
-    def __init__(self, embedding_dim: int = 1536, max_concurrent: int = 3000):
-        """Initialize with embedding dimension and concurrency limit"""
-        self.embedding_dim = embedding_dim
-        self.max_requests_per_minute = 10_000  # Rate limit for text-embedding-3-small
-        self.max_tokens_per_minute = 10_000_000  # Token limit per minute
+    def __init__(self, max_requests_per_minute: int = 3000):
+        """Initialize with rate limits"""
+        self.max_requests_per_minute = max_requests_per_minute
+        self.max_tokens_per_minute = 250_000  # Conservative token limit
         self.encoding = tiktoken.get_encoding("cl100k_base")
-        self.client = OpenAI()
-        self.semaphore = asyncio.Semaphore(max_concurrent)
-        
+        self.api_key = os.getenv("OPENAI_API_KEY")
+        if not self.api_key:
+            raise ValueError("OPENAI_API_KEY environment variable not set")
+            
     def count_tokens(self, text: str) -> int:
         """Count tokens in text"""
         return len(self.encoding.encode(text))
-        
 
-    async def create_embedding(self, session: aiohttp.ClientSession, text: str, custom_id: str) -> tuple:
-        """Create an embedding using OpenAI's API"""
-        async with self.semaphore:
-            try:
-                response = await asyncio.to_thread(
-                    self.client.embeddings.create,
-                    model="text-embedding-3-small",
-                    input=text,
-                    encoding_format="float"
-                )
-                return custom_id, text, response.data[0].embedding
-            except Exception as e:
-                logging.error(f"Error creating embedding for {custom_id}: {str(e)}")
-                return custom_id, text, None
-            
     async def process_caption_results(
         self,
         caption_results: List[Dict[str, Any]],
         output_dir: Path,
-        max_attempts: int = 5
-    ) -> List[Dict[str, Any]]:
+        max_attempts: int = 5,
+        seconds_to_sleep: float = 0.001
+    ) -> None:
         """Process caption results and create embeddings asynchronously"""
         
+        output_dir.mkdir(parents=True, exist_ok=True)
+        output_file = output_dir / "embedding_results.jsonl"
+        request_url = "https://api.openai.com/v1/embeddings"
+        request_header = {"Authorization": f"Bearer {self.api_key}"}
+        
+        # Initialize trackers
         status = StatusTracker(total_tasks=len(caption_results))
-        embedding_results = []
         retry_queue = asyncio.Queue()
+        task_id_counter = 0
         
         # Initialize rate limiting
         available_request_capacity = self.max_requests_per_minute
         available_token_capacity = self.max_tokens_per_minute
         last_update_time = time.time()
+        seconds_to_pause_after_rate_limit = 15
 
         async with aiohttp.ClientSession() as session:
-            # Create tasks for initial processing
-            tasks = []
-            for result in caption_results:
-                try:
-                    if 'response' in result:
+            next_request = None
+            
+            while True:
+                # Get next request
+                if next_request is None:
+                    if not retry_queue.empty():
+                        next_request = retry_queue.get_nowait()
+                        logging.debug(f"Retrying request {next_request.task_id}")
+                    elif task_id_counter < len(caption_results):
+                        result = caption_results[task_id_counter]
+                        if 'response' not in result:
+                            logging.error(f"Missing response field in result: {result}")
+                            task_id_counter += 1
+                            continue
+                            
                         caption = result['response']
                         custom_id = result['custom_id']
-                    
-                    token_count = self.count_tokens(caption)
-                    
-                    # Check capacity
-                    current_time = time.time()
-                    time_elapsed = current_time - last_update_time
-                    available_request_capacity = min(
-                        available_request_capacity + self.max_requests_per_minute * time_elapsed / 60.0,
-                        self.max_requests_per_minute
-                    )
-                    available_token_capacity = min(
-                        available_token_capacity + self.max_tokens_per_minute * time_elapsed / 60.0,
-                        self.max_tokens_per_minute
-                    )
-                    
-                    if available_request_capacity >= 1 and available_token_capacity >= token_count:
-                        available_request_capacity -= 1
-                        available_token_capacity -= token_count
-                        last_update_time = current_time
+                        token_count = self.count_tokens(caption)
                         
-                        task = asyncio.create_task(self.create_embedding(session, caption, custom_id))
-                        tasks.append(task)
-                        status.num_tasks_started += 1
-                        status.num_tasks_in_progress += 1
-                        print(status)
-                    else:
-                        await asyncio.sleep(0.001)  # Brief pause if at capacity
-                        
-                except Exception as e:
-                    logging.error(f"Error queueing result {custom_id}: {str(e)}")
-                    continue
-
-            # Process results in parallel batches
-            progress_bar = tqdm(total=len(caption_results), desc="Creating embeddings")
-            batch_size = 1000  # Process 50 embeddings concurrently
-            
-            for i in range(0, len(caption_results), batch_size):
-                batch = caption_results[i:i + batch_size]
-                embedding_tasks = []
-                
-                # Create tasks for the batch
-                for result in batch:
-                    if 'response' not in result:
-                        logging.error(f"Missing response field in result: {result}")
-                        continue
-                        
-                    caption = result['response']
-                    custom_id = result['custom_id']
-                    token_count = self.count_tokens(caption)
-                    
-                    # Check rate limits
-                    current_time = time.time()
-                    time_elapsed = current_time - last_update_time
-                    
-                    available_request_capacity = min(
-                        available_request_capacity + (self.max_requests_per_minute * time_elapsed / 60.0),
-                        self.max_requests_per_minute
-                    )
-                    available_token_capacity = min(
-                        available_token_capacity + (self.max_tokens_per_minute * time_elapsed / 60.0),
-                        self.max_tokens_per_minute
-                    )
-                    
-                    if available_request_capacity >= 1 and available_token_capacity >= token_count:
-                        available_request_capacity -= 1
-                        available_token_capacity -= token_count
-                        last_update_time = current_time
-                        
-                        task = self.create_embedding(session, caption, custom_id)
-                        embedding_tasks.append(task)
-                        status.num_tasks_started += 1
-                        status.num_tasks_in_progress += 1
-                    else:
-                        await asyncio.sleep(0.1)  # Brief pause if at capacity
-                
-                # Process batch concurrently
-                batch_results = await asyncio.gather(*embedding_tasks)
-                
-                # Process results
-                for custom_id, caption, embedding in batch_results:
-                    if embedding:
-                        result = {
-                            'custom_id': custom_id,
-                            'original_caption': caption,
-                            'embedding': embedding
+                        request_json = {
+                            "model": "text-embedding-3-small",
+                            "input": caption,
+                            "encoding_format": "float"
                         }
-                        # Write result immediately
-                        output_path = output_dir / "embedding_results.jsonl"
-                        with open(output_path, 'a') as f:
-                            f.write(json.dumps(result) + '\n')
-                        embedding_results.append(result)
-                        status.num_tasks_succeeded += 1
-                    else:
-                        logging.error(f"Failed to create embedding for {custom_id}")
-                        status.num_tasks_failed += 1
-                    
-                    status.num_tasks_in_progress -= 1
-                    progress_bar.update(1)
-                    progress_bar.set_postfix_str(status.get_progress_str())
-            
-        output_file = output_dir / "embedding_results.jsonl"
+                        
+                        next_request = APIRequest(
+                            task_id=task_id_counter,
+                            request_json=request_json,
+                            token_consumption=token_count,
+                            attempts_left=max_attempts,
+                            metadata={"custom_id": custom_id, "original_caption": caption}
+                        )
+                        task_id_counter += 1
+                        status.num_tasks_started += 1
+                        status.num_tasks_in_progress += 1
+                
+                # Update available capacity
+                current_time = time.time()
+                seconds_since_update = current_time - last_update_time
+                available_request_capacity = min(
+                    available_request_capacity + self.max_requests_per_minute * seconds_since_update / 60.0,
+                    self.max_requests_per_minute
+                )
+                available_token_capacity = min(
+                    available_token_capacity + self.max_tokens_per_minute * seconds_since_update / 60.0,
+                    self.max_tokens_per_minute
+                )
+                last_update_time = current_time
+
+                # Process request if capacity available
+                if next_request:
+                    next_request_tokens = next_request.token_consumption
+                    if (available_request_capacity >= 1 and 
+                        available_token_capacity >= next_request_tokens):
+                        
+                        available_request_capacity -= 1
+                        available_token_capacity -= next_request_tokens
+                        next_request.attempts_left -= 1
+
+                        asyncio.create_task(
+                            next_request.call_api(
+                                session=session,
+                                request_url=request_url,
+                                request_header=request_header,
+                                retry_queue=retry_queue,
+                                save_filepath=output_file,
+                                status_tracker=status
+                            )
+                        )
+                        next_request = None
+
+                # Break if all tasks complete
+                if status.num_tasks_in_progress == 0:
+                    break
+
+                # Sleep briefly
+                await asyncio.sleep(seconds_to_sleep)
+
+                # Pause if rate limited recently
+                seconds_since_rate_limit = time.time() - status.time_of_last_rate_limit_error
+                if seconds_since_rate_limit < seconds_to_pause_after_rate_limit:
+                    pause_time = seconds_to_pause_after_rate_limit - seconds_since_rate_limit
+                    logging.warning(f"Rate limit hit - pausing for {pause_time:.1f}s")
+                    await asyncio.sleep(pause_time)
+
+        # Log final status
         logging.info(f"\nProcessing complete:")
         logging.info(f"Succeeded: {status.num_tasks_succeeded}")
         logging.info(f"Failed: {status.num_tasks_failed}")
-        logging.info(f"Rate limits hit: {status.num_rate_limit_errors}")
-        logging.info(f"Saved {len(embedding_results)} embeddings to {output_file}")
-        
-        return embedding_results
+        logging.info(f"Rate limits: {status.num_rate_limit_errors}")
+        logging.info(f"Other API errors: {status.num_api_errors}")
+        logging.info(f"Other errors: {status.num_other_errors}")
+        logging.info(f"Results saved to: {output_file}")
 
-def create_embeddings(caption_results_path: str, output_dir: str) -> None:
-    """Convenience function to create embeddings from caption results file"""
-    
-    # Load caption results
-    caption_results = []
-    with open(caption_results_path) as f:
-        if caption_results_path.endswith('.jsonl'):
-            for line in f:
-                caption_results.append(json.loads(line))
-        else:
-            caption_results = json.load(f)
-        
-    # Create output directory
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    
-    # Create embeddings
-    creator = EmbeddingCreator()
-    creator.process_caption_results(caption_results, output_path)
+def append_to_jsonl(data: Any, filename: str) -> None:
+    """Append a json payload to a jsonl file"""
+    json_string = json.dumps(data)
+    with open(filename, "a") as f:
+        f.write(json_string + "\n")
