@@ -38,37 +38,23 @@ class EmbeddingCreator:
         self.max_requests_per_minute = 3500  # Rate limit for text-embedding-3-small
         self.max_tokens_per_minute = 150000  # Token limit per minute
         self.encoding = tiktoken.get_encoding("cl100k_base")
+        self.client = OpenAI()
         
     def count_tokens(self, text: str) -> int:
         """Count tokens in text"""
         return len(self.encoding.encode(text))
         
-    def _create_mock_embedding(self, text: str) -> List[float]:
-        """Create a deterministic mock embedding from text"""
-        import hashlib
-        import numpy as np
-        
-        # Create a deterministic seed from the text
-        text_hash = hashlib.md5(text.encode()).hexdigest()
-        seed = int(text_hash, 16) % (2**32)
-        
-        # Use the seed to generate a random embedding
-        rng = np.random.RandomState(seed)
-        embedding = rng.normal(0, 1, self.embedding_dim)
-        
-        # Normalize the embedding
-        norm = np.linalg.norm(embedding)
-        if norm > 0:
-            embedding = embedding / norm
-            
-        return embedding.tolist()
 
     async def create_embedding(self, session: aiohttp.ClientSession, text: str) -> List[float]:
-        """Create a mock embedding for a text string"""
+        """Create an embedding using OpenAI's API"""
         try:
-            # Simulate some async processing time
-            await asyncio.sleep(0.01)
-            return self._create_mock_embedding(text)
+            response = await asyncio.to_thread(
+                self.client.embeddings.create,
+                model="text-embedding-3-small",
+                input=text,
+                encoding_format="float"
+            )
+            return response.data[0].embedding
         except Exception as e:
             logging.error(f"Error creating embedding: {str(e)}")
             return None
