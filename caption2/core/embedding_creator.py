@@ -32,32 +32,34 @@ class StatusTracker:
 class EmbeddingCreator:
     """Creates embeddings using OpenAI's text-embedding-3-small model with async processing"""
     
-    def __init__(self, embedding_dim: int = 1536):
-        """Initialize with embedding dimension"""
+    def __init__(self, embedding_dim: int = 1536, max_concurrent: int = 50):
+        """Initialize with embedding dimension and concurrency limit"""
         self.embedding_dim = embedding_dim
         self.max_requests_per_minute = 3500  # Rate limit for text-embedding-3-small
         self.max_tokens_per_minute = 150000  # Token limit per minute
         self.encoding = tiktoken.get_encoding("cl100k_base")
         self.client = OpenAI()
+        self.semaphore = asyncio.Semaphore(max_concurrent)
         
     def count_tokens(self, text: str) -> int:
         """Count tokens in text"""
         return len(self.encoding.encode(text))
         
 
-    async def create_embedding(self, session: aiohttp.ClientSession, text: str) -> List[float]:
+    async def create_embedding(self, session: aiohttp.ClientSession, text: str, custom_id: str) -> tuple:
         """Create an embedding using OpenAI's API"""
-        try:
-            response = await asyncio.to_thread(
-                self.client.embeddings.create,
-                model="text-embedding-3-small",
-                input=text,
-                encoding_format="float"
-            )
-            return response.data[0].embedding
-        except Exception as e:
-            logging.error(f"Error creating embedding: {str(e)}")
-            return None
+        async with self.semaphore:
+            try:
+                response = await asyncio.to_thread(
+                    self.client.embeddings.create,
+                    model="text-embedding-3-small",
+                    input=text,
+                    encoding_format="float"
+                )
+                return custom_id, text, response.data[0].embedding
+            except Exception as e:
+                logging.error(f"Error creating embedding for {custom_id}: {str(e)}")
+                return custom_id, text, None
             
     async def process_caption_results(
         self,
@@ -116,11 +118,16 @@ class EmbeddingCreator:
                     logging.error(f"Error queueing result {custom_id}: {str(e)}")
                     continue
 
-            # Process all results with rate limiting
+            # Process results in parallel batches
             progress_bar = tqdm(total=len(caption_results), desc="Creating embeddings")
+            batch_size = 50  # Process 50 embeddings concurrently
             
-            for result in caption_results:
-                try:
+            for i in range(0, len(caption_results), batch_size):
+                batch = caption_results[i:i + batch_size]
+                embedding_tasks = []
+                
+                # Create tasks for the batch
+                for result in batch:
                     if 'response' not in result:
                         logging.error(f"Missing response field in result: {result}")
                         continue
@@ -129,11 +136,10 @@ class EmbeddingCreator:
                     custom_id = result['custom_id']
                     token_count = self.count_tokens(caption)
                     
-                    # Check and update rate limits
+                    # Check rate limits
                     current_time = time.time()
                     time_elapsed = current_time - last_update_time
                     
-                    # Replenish capacity based on time elapsed
                     available_request_capacity = min(
                         available_request_capacity + (self.max_requests_per_minute * time_elapsed / 60.0),
                         self.max_requests_per_minute
@@ -143,33 +149,23 @@ class EmbeddingCreator:
                         self.max_tokens_per_minute
                     )
                     
-                    # Wait if we're at capacity
-                    while available_request_capacity < 1 or available_token_capacity < token_count:
-                        await asyncio.sleep(0.1)  # Wait 100ms before checking again
-                        current_time = time.time()
-                        time_elapsed = current_time - last_update_time
-                        available_request_capacity = min(
-                            available_request_capacity + (self.max_requests_per_minute * time_elapsed / 60.0),
-                            self.max_requests_per_minute
-                        )
-                        available_token_capacity = min(
-                            available_token_capacity + (self.max_tokens_per_minute * time_elapsed / 60.0),
-                            self.max_tokens_per_minute
-                        )
-                    
-                    # Update capacity and time
-                    available_request_capacity -= 1
-                    available_token_capacity -= token_count
-                    last_update_time = current_time
-                    
-                    status.num_tasks_started += 1
-                    status.num_tasks_in_progress += 1
-                    print(status)
-                    progress_bar.set_postfix_str(status.get_progress_str())
-                    
-                    # Create and process embedding
-                    embedding = await self.create_embedding(session, caption)
-                    
+                    if available_request_capacity >= 1 and available_token_capacity >= token_count:
+                        available_request_capacity -= 1
+                        available_token_capacity -= token_count
+                        last_update_time = current_time
+                        
+                        task = self.create_embedding(session, caption, custom_id)
+                        embedding_tasks.append(task)
+                        status.num_tasks_started += 1
+                        status.num_tasks_in_progress += 1
+                    else:
+                        await asyncio.sleep(0.1)  # Brief pause if at capacity
+                
+                # Process batch concurrently
+                batch_results = await asyncio.gather(*embedding_tasks)
+                
+                # Process results
+                for custom_id, caption, embedding in batch_results:
                     if embedding:
                         result = {
                             'custom_id': custom_id,
@@ -186,12 +182,9 @@ class EmbeddingCreator:
                         logging.error(f"Failed to create embedding for {custom_id}")
                         status.num_tasks_failed += 1
                     
-                except Exception as e:
-                    logging.error(f"Error processing result {custom_id}: {str(e)}")
-                    status.num_tasks_failed += 1
-                finally:
                     status.num_tasks_in_progress -= 1
                     progress_bar.update(1)
+                    progress_bar.set_postfix_str(status.get_progress_str())
             
         output_file = output_dir / "embedding_results.jsonl"
         logging.info(f"\nProcessing complete:")
