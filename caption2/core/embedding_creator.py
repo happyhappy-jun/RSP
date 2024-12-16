@@ -163,6 +163,7 @@ class EmbeddingCreator:
                     
                     status.num_tasks_started += 1
                     status.num_tasks_in_progress += 1
+                    print(status)
                     progress_bar.set_postfix_str(status.get_progress_str())
                     
                     # Create and process embedding
