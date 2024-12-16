@@ -13,7 +13,6 @@ from torchvision import transforms
 from util.misc import seed_everything
 from util.transform import PairedRandomResizedCrop
 
-
 class PairedKineticsWithGlobalCaption(Dataset):
     """PairedKinetics dataset that loads from preprocessed JSON and JSONL embeddings"""
 
