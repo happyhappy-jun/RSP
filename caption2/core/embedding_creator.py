@@ -120,7 +120,7 @@ class EmbeddingCreator:
 
             # Process results in parallel batches
             progress_bar = tqdm(total=len(caption_results), desc="Creating embeddings")
-            batch_size = 50  # Process 50 embeddings concurrently
+            batch_size = 1000  # Process 50 embeddings concurrently
             
             for i in range(0, len(caption_results), batch_size):
                 batch = caption_results[i:i + batch_size]
