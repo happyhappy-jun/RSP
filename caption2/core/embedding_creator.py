@@ -59,8 +59,16 @@ class APIRequest:
                 headers=request_header,
                 json=self.request_json
             ) as response:
-                response = await response.json()
-            
+                try:
+                    content_type = response.headers.get('Content-Type', '')
+                    if not content_type.startswith('application/json'):
+                        error_text = await response.text()
+                        raise ValueError(f"Unexpected response type '{content_type}'. Status: {response.status}. Body: {error_text[:200]}")
+                    
+                    response = await response.json()
+                except aiohttp.ContentTypeError as e:
+                    raise ValueError(f"Failed to parse JSON response. Status: {response.status}. Error: {str(e)}")
+                
             if "error" in response:
                 logging.warning(f"Request {self.task_id} failed with error {response['error']}")
                 status_tracker.num_api_errors += 1
