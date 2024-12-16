@@ -31,10 +31,14 @@ async def main():
     with open(caption_results_path) as f:
         if str(caption_results_path).endswith('.jsonl'):
             raw_results = [json.loads(line) for line in f]
+            caption_results = [{"custom_id": result["custom_id"], "response": result["response"]} for result in
+                               raw_results]
         else:
-            raw_results = json.load(f)
+            raw_results = json.load(f)["results"]
+            caption_results = [{"custom_id": result["custom_id"], "response": result["analysis"]} for result in
+                               raw_results]
         
-        caption_results = [{"custom_id": result["custom_id"], "response": result["response"]} for result in raw_results]
+
     print(len(caption_results))
  
     await creator.process_caption_results(caption_results, output_dir)
