@@ -32,11 +32,11 @@ class StatusTracker:
 class EmbeddingCreator:
     """Creates embeddings using OpenAI's text-embedding-3-small model with async processing"""
     
-    def __init__(self, embedding_dim: int = 1536, max_concurrent: int = 50):
+    def __init__(self, embedding_dim: int = 1536, max_concurrent: int = 3000):
         """Initialize with embedding dimension and concurrency limit"""
         self.embedding_dim = embedding_dim
-        self.max_requests_per_minute = 3500  # Rate limit for text-embedding-3-small
-        self.max_tokens_per_minute = 150000  # Token limit per minute
+        self.max_requests_per_minute = 10_000  # Rate limit for text-embedding-3-small
+        self.max_tokens_per_minute = 10_000_000  # Token limit per minute
         self.encoding = tiktoken.get_encoding("cl100k_base")
         self.client = OpenAI()
         self.semaphore = asyncio.Semaphore(max_concurrent)
