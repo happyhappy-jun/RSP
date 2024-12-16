@@ -129,14 +129,11 @@ class EmbeddingCreator:
                 for result in current_chunk:
                     try:
                         if 'response' in result:
-                            response_body = result['response']['body']
-                            if isinstance(response_body, str):
-                                response_body = json.loads(response_body)
-                            caption = response_body['choices'][0]['message']['content']
+                            caption = result['response']
                             custom_id = result['custom_id']
                         else:
-                            caption = result['choices'][0]['message']['content']
-                            custom_id = result.get('custom_id', str(result.get('created')))
+                            logging.error(f"Missing response field in result: {result}")
+                            continue
                         
                         task = asyncio.create_task(self.create_embedding(session, caption))
                         tasks.append((custom_id, caption, task))
@@ -176,11 +173,12 @@ class EmbeddingCreator:
                 total_processed += len(current_chunk)
                 progress_bar.update(len(current_chunk))
             
+        output_file = output_dir / "embedding_results.jsonl"
         logging.info(f"\nProcessing complete:")
         logging.info(f"Succeeded: {status.num_tasks_succeeded}")
         logging.info(f"Failed: {status.num_tasks_failed}")
         logging.info(f"Rate limits hit: {status.num_rate_limit_errors}")
-        logging.info(f"Saved {len(embedding_results)} embeddings to {output_path}")
+        logging.info(f"Saved {len(embedding_results)} embeddings to {output_file}")
         
         return embedding_results
 
