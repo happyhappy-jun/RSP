@@ -16,7 +16,7 @@ class RspContextInPosterior(RspCaption):
             nn.ReLU(),
             nn.Linear(self.embed_dim * 3, self.stoch_size),
         )
-        self.rms_norm = RMSNorm(self.decoder_embed_dim, scale_factor=embed_scale_factor, eps=1e-6)
+        self.rms_norm = RMSNorm(self.embed_dim, scale_factor=embed_scale_factor, eps=1e-6)
         self.enable_rms_norm = enable_rms_norm
 
     def forward(self, src_imgs, tgt_imgs, embedding, epoch):
@@ -58,7 +58,15 @@ class RspContextInPosterior(RspCaption):
 
         loss = loss_post + self.kl_scale * kl_loss + mae_loss
 
-        return loss, tgt_pred, (loss_post, loss_prior, kl_loss, kl_value, mae_loss)
+        detailed_loss = {
+            "loss_post": loss_post,
+            "loss_prior": loss_prior,
+            "kl_loss": kl_loss,
+            "kl": kl_value,
+            "loss_mae": mae_loss,
+        }
+
+        return loss, tgt_pred, detailed_loss
 
 def rsp_context_in_post_small_patch8_dec512d8b(**kwargs):
     model = RspContextInPosterior(
