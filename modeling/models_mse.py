@@ -82,7 +82,8 @@ class RspCaptionMse(RspCaption):
         prior_z = prior_dist.rsample()
 
         embedding = embedding.view(-1, 1, embedding.size(-1))
-        h_context = self.resize_embed(embedding, self.decoder_embed_dim)
+        # h_context = self.resize_embed(embedding, self.decoder_embed_dim)
+        h_context = embedding
         if self.enable_rms_norm:
             h_context = self.rms_norm(h_context)
         

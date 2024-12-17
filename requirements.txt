@@ -17,8 +17,7 @@ protobuf==4.25.3
 PySocks
 requests 
 six 
-tensorboard==2.17.0
-tensorboard-data-server==0.7.2
+tensorboard-data-server
 torch==1.13.1
 torchaudio==0.13.1
 torchvision==0.14.1
@@ -31,3 +30,4 @@ pydantic
 opencv-python
 openai
 aider-chat
+tensorboard

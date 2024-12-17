@@ -4,7 +4,7 @@ defaults:
 
 exp_name: rsp_fixed
 
-model: rsp_vit_small_patch16
+model_name: rsp_vit_small_patch16
 
 dataset:
   _target_: util.kinetics.PairedKinetics

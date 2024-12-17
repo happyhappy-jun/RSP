@@ -4,7 +4,7 @@ defaults:
 
 exp_name: rsp_context_in_post
 
-model: rsp_context_in_posterior_vit_small_patch16
+model_name: rsp_context_in_posterior_vit_small_patch16
 
 dataset:
   _target_: util.kinetics_caption.PairedKineticsWithCaption
@@ -15,4 +15,7 @@ train_loop:
   _target_: engine_pretrain_repsamp.train_one_epoch_llm
   _partial_: true
 
-
+model_params:
+  kl_scale: 0.001
+  enable_rms_norm: true
+  embed_scale_factor: 1.0

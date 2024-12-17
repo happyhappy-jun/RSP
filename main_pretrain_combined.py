@@ -94,7 +94,7 @@ def main(cfg: DictConfig):
     )
 
     # define the model
-    model = modeling.__dict__[cfg.model_name](**cfg.model)
+    model = modeling.__dict__[cfg.model_name](**cfg.model_params)
 
     model.to(device)
     model_without_ddp = model

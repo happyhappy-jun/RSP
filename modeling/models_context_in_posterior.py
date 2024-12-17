@@ -1,19 +1,23 @@
 from functools import partial
 import torch
 import torch.nn as nn
+
+from modeling.layers import RMSNorm
 from modeling.models_rsp import RSP
 from modeling.models_rsp_caption import RspCaption
 
 
 class RspContextInPosterior(RspCaption):
     """RSP model variant that uses MSE loss instead of KL divergence"""
-    def __init__(self, *args, **kwargs):
+    def __init__(self, enable_rms_norm=False, embed_scale_factor=1.0, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.to_posterior = nn.Sequential(
             nn.Linear(self.embed_dim * 3, self.embed_dim * 3),
             nn.ReLU(),
             nn.Linear(self.embed_dim * 3, self.stoch_size),
         )
+        self.rms_norm = RMSNorm(self.decoder_embed_dim, scale_factor=embed_scale_factor, eps=1e-6)
+        self.enable_rms_norm = enable_rms_norm
 
     def forward(self, src_imgs, tgt_imgs, embedding, epoch):
         # Extract embeddings
@@ -26,6 +30,8 @@ class RspContextInPosterior(RspCaption):
 
         # Posterior distribution from both images
         h_context = self.resize_embed(embedding, self.embed_dim)
+        if self.enable_rms_norm:
+            h_context = self.rms_norm(h_context)
         post_h = torch.cat([src_h[:, 0], tgt_h[:, 0], h_context], -1)
         post_logits = self.to_posterior(post_h)
         post_dist = self.make_dist(post_logits)
@@ -50,7 +56,7 @@ class RspContextInPosterior(RspCaption):
             tgt_pred_prior = self.forward_decoder_fut(src_h, prior_z)
             loss_prior = self.forward_loss(tgt_imgs, tgt_pred_prior)
 
-        loss = loss_post + self.kl_scale * kl_loss + context_loss + mae_loss
+        loss = loss_post + self.kl_scale * kl_loss + mae_loss
 
         return loss, tgt_pred, (loss_post, loss_prior, kl_loss, kl_value, mae_loss)
 
