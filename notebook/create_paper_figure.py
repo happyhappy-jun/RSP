@@ -1,7 +1,7 @@
 import os
 import random
 import numpy as np
-import matplotlib.pyplot as plt
+from PIL import Image
 import cv2
 
 # Directory containing video files
@@ -47,35 +47,41 @@ def load_frames(video_path):
     return frames
 
 
-def create_figure(frames, num_samples=10):
+def create_figure(frames, num_samples=10, frame_size=256, spacing=10):
     """Create figure with evenly sampled frames in one row"""
     total_frames = len(frames)
     indices = np.linspace(0, total_frames - 1, num_samples, dtype=int)
-
-    # Create figure with no padding
-    fig = plt.figure(figsize=(25, 3))
+    
+    # Calculate total width including spacing
+    total_width = (frame_size * num_samples) + (spacing * (num_samples - 1))
+    
+    # Create new image with white background
+    combined_image = Image.new('RGB', (total_width, frame_size), 'white')
     
     for idx in range(num_samples):
         frame = frames[indices[idx]]
         h, w = frame.shape[:2]
-
+        
         # Calculate center crop coordinates
         center_x, center_y = w // 2, h // 2
         size = min(h, w)
         half_size = size // 2
-
+        
         # Crop to square from center
         cropped = frame[
                   center_y - half_size:center_y + half_size,
                   center_x - half_size:center_x + half_size
                   ]
-
-        # Create axes with exact positioning
-        ax = fig.add_axes([idx/num_samples, 0, 1/num_samples, 1])
-        ax.imshow(cropped)
-        ax.axis('off')
-
-    return fig
+        
+        # Convert to PIL Image and resize
+        pil_image = Image.fromarray(cropped)
+        pil_image = pil_image.resize((frame_size, frame_size), Image.Resampling.LANCZOS)
+        
+        # Calculate position to paste
+        x_position = idx * (frame_size + spacing)
+        combined_image.paste(pil_image, (x_position, 0))
+    
+    return combined_image
 def main():
     # Set seed for reproducibility
     set_seed(42)
@@ -93,11 +99,10 @@ def main():
         print(f"Loaded {len(frames)} frames")
         
         # Create and save figure
-        fig = create_figure(frames)
+        combined_image = create_figure(frames)
         output_path = f"paper_figure_{i+1}_{class_name}.png"
-        fig.savefig(output_path, bbox_inches=None, pad_inches=0, dpi=300)
+        combined_image.save(output_path, quality=95)
         print(f"Saved figure to {output_path}")
-        plt.close()
     
     print("\nDone! Please check the generated figures and choose the best one.")
 
