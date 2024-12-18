@@ -46,34 +46,34 @@ def load_frames(video_path):
     cap.release()
     return frames
 
+
 def create_figure(frames, num_samples=10):
     """Create figure with evenly sampled frames in one row"""
     total_frames = len(frames)
-    indices = np.linspace(0, total_frames-1, num_samples, dtype=int)
-    
+    indices = np.linspace(0, total_frames - 1, num_samples, dtype=int)
+
     fig, axes = plt.subplots(1, num_samples, figsize=(25, 3))
-    
+
     for idx, ax in enumerate(axes):
         frame = frames[indices[idx]]
         h, w = frame.shape[:2]
-        
+
         # Calculate center crop coordinates
         center_x, center_y = w // 2, h // 2
         size = min(h, w)
         half_size = size // 2
-        
+
         # Crop to square from center
         cropped = frame[
-            center_y - half_size:center_y + half_size,
-            center_x - half_size:center_x + half_size
-        ]
-        
+                  center_y - half_size:center_y + half_size,
+                  center_x - half_size:center_x + half_size
+                  ]
+
         ax.imshow(cropped)
         ax.axis('off')
-    
+
     plt.tight_layout()
     return fig
-
 def main():
     # Set seed for reproducibility
     set_seed(42)
