@@ -78,21 +78,26 @@ def main():
     # Set seed for reproducibility
     set_seed(42)
     
-    # Get random video
-    video_path, class_name = get_random_video_path(DATA_DIR)
-    print(f"Selected class: {class_name}")
-    print(f"Selected video: {os.path.basename(video_path)}")
+    # Sample 10 different videos
+    for i in range(10):
+        # Get random video
+        video_path, class_name = get_random_video_path(DATA_DIR)
+        print(f"\nSample {i+1}/10")
+        print(f"Selected class: {class_name}")
+        print(f"Selected video: {os.path.basename(video_path)}")
+        
+        # Load frames
+        frames = load_frames(video_path)
+        print(f"Loaded {len(frames)} frames")
+        
+        # Create and save figure
+        fig = create_figure(frames)
+        output_path = f"paper_figure_{i+1}_{class_name}.png"
+        fig.savefig(output_path, bbox_inches='tight', dpi=300)
+        print(f"Saved figure to {output_path}")
+        plt.close()
     
-    # Load frames
-    frames = load_frames(video_path)
-    print(f"Loaded {len(frames)} frames")
-    
-    # Create and save figure
-    fig = create_figure(frames)
-    output_path = f"paper_figure_{class_name}.png"
-    fig.savefig(output_path, bbox_inches='tight', dpi=300)
-    print(f"Saved figure to {output_path}")
-    plt.close()
+    print("\nDone! Please check the generated figures and choose the best one.")
 
 if __name__ == "__main__":
     main()
