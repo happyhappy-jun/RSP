@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 from PIL import Image
 
 # Directory containing video frames
-DATA_DIR = "data/"  # Adjust this path as needed
+DATA_DIR = "/home/junyoon/kinetics400/train2"  # Adjust this path as needed
 
 def get_random_video_dir(data_dir):
     """Get a random video directory from the data folder"""
