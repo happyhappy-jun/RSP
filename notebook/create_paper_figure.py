@@ -52,10 +52,13 @@ def create_figure(frames, num_samples=10):
     total_frames = len(frames)
     indices = np.linspace(0, total_frames - 1, num_samples, dtype=int)
 
-    # Create figure with no padding
-    fig = plt.figure(figsize=(25, 3))
+    # Create figure with subplots
+    fig, axes = plt.subplots(1, num_samples, figsize=(25, 3))
     
-    for idx in range(num_samples):
+    # Remove external padding but keep internal spacing
+    plt.subplots_adjust(left=0, right=1, top=1, bottom=0, wspace=0.05)
+
+    for idx, ax in enumerate(axes):
         frame = frames[indices[idx]]
         h, w = frame.shape[:2]
 
@@ -70,8 +73,6 @@ def create_figure(frames, num_samples=10):
                   center_x - half_size:center_x + half_size
                   ]
 
-        # Create axes with exact positioning
-        ax = fig.add_axes([idx/num_samples, 0, 1/num_samples, 1])
         ax.imshow(cropped)
         ax.axis('off')
 
