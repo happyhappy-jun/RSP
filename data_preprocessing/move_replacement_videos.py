@@ -69,7 +69,6 @@ def process_videos(replacement_dir: Path, output_base: Path, id_to_label: dict):
             dest_path = class_dir / video_path.name
             try:
                 shutil.copy(video_path, dest_path)
-                print(f"Copied {video_path.name} to {label}/")
             except PermissionError:
                 print(f"Error: Permission denied when copying {video_path.name}")
                 print(f"Please ensure you have write permissions for: {dest_path.parent}")
