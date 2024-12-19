@@ -56,7 +56,13 @@ def extract_frames(
             cap = cv2.VideoCapture(str(video_path))
             
             for frame_idx, video_frame_idx in enumerate(frames):
-                frame_path = video_dir / f"frame_{frame_idx}.jpg"
+                # For paired sampling, use pair_X_frameY format
+                if sampler_type == "paired":
+                    pair_idx = frame_idx // 2
+                    frame_in_pair = frame_idx % 2
+                    frame_path = video_dir / f"pair_{pair_idx}_frame{frame_in_pair}.jpg"
+                else:
+                    frame_path = video_dir / f"frame_{frame_idx}.jpg"
                 
                 # Set frame position
                 cap.set(cv2.CAP_PROP_POS_FRAMES, video_frame_idx)
