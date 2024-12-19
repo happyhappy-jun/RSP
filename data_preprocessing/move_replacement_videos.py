@@ -37,17 +37,22 @@ def cleanup_temp_dir(temp_dir):
     """Clean up temporary directory"""
     shutil.rmtree(temp_dir)
 
-def process_split(split: str, replacement_dir: Path, output_base: Path, temp_dir: str):
-    """Process videos for a specific split"""
-    print(f"\nProcessing {split} split...")
+def get_combined_annotations(temp_dir: str) -> dict:
+    """Download and combine all annotation files"""
+    combined_mapping = {}
     
-    # Download CSV and load video ID to label mapping
-    csv_path = download_csv(ANNOTATION_URLS[split], temp_dir)
-    id_to_label = load_annotations(csv_path)
+    for split, url in ANNOTATION_URLS.items():
+        print(f"Downloading {split} annotations...")
+        csv_path = download_csv(url, temp_dir)
+        split_mapping = load_annotations(csv_path)
+        combined_mapping.update(split_mapping)
     
-    # Create split-specific output directory
+    return combined_mapping
 
-    # Process each replacement video
+def process_videos(replacement_dir: Path, output_base: Path, id_to_label: dict):
+    """Process all videos using combined annotations"""
+    print("\nProcessing videos...")
+    
     for video_path in tqdm(list(replacement_dir.glob('*.mp4'))):
         # Extract youtube ID (first 11 characters of filename)
         video_id = video_path.stem[:11]
@@ -57,24 +62,21 @@ def process_split(split: str, replacement_dir: Path, output_base: Path, temp_dir
             if " " in label:
                 label = label.replace(" ", "_").replace("(" , "").replace(")", "")
             
-            # Create class directory if it doesn't exist
-
             class_dir = output_base / label
             if not class_dir.exists():
                 raise ValueError(f"Output directory {class_dir} does not exist")
 
-            # Move video to appropriate class directory
             dest_path = class_dir / video_path.name
             try:
-                # Use basic copy instead of copy2 to avoid permission issues with metadata
                 shutil.copy(video_path, dest_path)
+                print(f"Copied {video_path.name} to {label}/")
             except PermissionError:
                 print(f"Error: Permission denied when copying {video_path.name}")
                 print(f"Please ensure you have write permissions for: {dest_path.parent}")
             except OSError as e:
                 print(f"Error copying {video_path.name}: {e}")
         else:
-            print(f"Warning: No label found for video {video_path.name} in {split} split")
+            print(f"Warning: No label found for video {video_path.name}")
 
 def main():
     parser = argparse.ArgumentParser(description='Move replacement videos to class directories')
@@ -92,9 +94,11 @@ def main():
     replacement_dir = Path(args.replacement_dir)
     output_base = Path(args.output_base)
     
-    # Process all splits
-    for split in ['train', 'val', 'test']:
-        process_split(split, replacement_dir, output_base, temp_dir)
+    # Get combined annotations from all splits
+    id_to_label = get_combined_annotations(temp_dir)
+    
+    # Process all videos using combined annotations
+    process_videos(replacement_dir, output_base, id_to_label)
 
 if __name__ == '__main__':
     main()
