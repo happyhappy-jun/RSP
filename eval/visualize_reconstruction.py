@@ -10,35 +10,85 @@ from PIL import Image
 import matplotlib.pyplot as plt
 from omegaconf import OmegaConf
 
-import util.misc as misc
 import modeling
-from util.kinetics import PairedKineticsFixed
-from util.kinetics_caption import PairedKineticsWithCaption, collate_fn
+from util.kinetics import PairedKineticsFixed, PairedKinetics
+import os
+import random
+import pickle
+import numpy as np
+from decord import VideoReader, cpu
+import torch
+from torch.utils.data import Dataset
+from util.misc import seed_everything
 
-def get_args_parser():
-    parser = argparse.ArgumentParser('Visualization script', add_help=False)
-    parser.add_argument('--config', default='path/to/your/config.yaml', type=str,
-                        help='Path to config file used for training')
-    parser.add_argument('--checkpoint', default='path/to/checkpoint.pth', type=str,
-                        help='Path to model checkpoint')
-    parser.add_argument('--device', default='cuda',
-                        help='device to use for training / testing')
-    parser.add_argument('--seed', default=0, type=int)
-    parser.add_argument('--num_samples', default=5, type=int,
-                        help='Number of samples to visualize')
-    return parser
+
+
+class PairedKineticsFixedViz(PairedKinetics):
+    def __init__(
+            self,
+            root,
+            max_distance=48,
+            repeated_sampling=2,
+            seed=42
+    ):
+        super().__init__(root, max_distance, repeated_sampling, seed)
+        self.presampled_indices = {}
+        # Presample multiple pairs of indices for all videos
+        for idx in range(len(self.samples)):
+            sample = os.path.join(self.root, self.samples[idx][1])
+            try:
+                vr = VideoReader(sample, num_threads=1, ctx=cpu(0))
+            except Exception as e:
+                print(f"Error loading video {sample}: {str(e)}")
+                # Return a default/empty sample
+                return torch.zeros(self.repeated_sampling, 3, 224, 224), \
+                    torch.zeros(self.repeated_sampling, 3, 224, 224), 0
+            seg_len = len(vr)
+            least_frames_num = self.max_distance + 1
+
+            # Sample repeated_sampling pairs of frames
+            pairs = []
+            for _ in range(self.repeated_sampling):
+                if seg_len >= least_frames_num:
+                    idx_cur = random.randint(0, seg_len - least_frames_num)
+                    interval = random.randint(4, self.max_distance)
+                    idx_fut = idx_cur + interval
+                else:
+                    indices = random.sample(range(seg_len), 2)
+                    indices.sort()
+                    idx_cur, idx_fut = indices
+                pairs.append((idx_cur, idx_fut))
+
+            self.presampled_indices[idx] = pairs
+
+    def load_frames(self, vr, index, pair_idx):
+        idx_cur, idx_fut = self.presampled_indices[index][pair_idx]
+        frame_cur = vr[idx_cur].asnumpy()
+        frame_fut = vr[idx_fut].asnumpy()
+        return frame_cur, frame_fut
+
+    def __getitem__(self, index):
+        sample = os.path.join(self.root, self.samples[index][1])
+        vr = VideoReader(sample, num_threads=1, ctx=cpu(0))
+
+        # Load and transform each pair of presampled frames
+        src_images = []
+        tgt_images = []
+        for pair_idx in range(self.repeated_sampling):
+            src_image, tgt_image = self.load_frames(vr, index, pair_idx)
+            src_images.append(src_image)
+            tgt_images.append(tgt_image)
+
+        src_images = torch.stack(src_images, dim=0)
+        tgt_images = torch.stack(tgt_images, dim=0)
+        return src_images, tgt_images, 0
+
+
 
 def prepare_model(args, cfg):
     # Define the model
-    model = modeling.__dict__[cfg.model](
-        norm_pix_loss=cfg.norm_pix_loss,
-        kl_scale=cfg.kl_scale,
-        kl_balance=cfg.kl_balance,
-        kl_freebit=cfg.kl_freebit,
-        stoch=cfg.stoch,
-        discrete=cfg.discrete,
-        mask_ratio=cfg.mask_ratio,
-        noise_scale=cfg.noise_scale
+    model = modeling.__dict__[cfg.model_name](
+       **cfg.model_params
     )
 
     # Load checkpoint
@@ -71,7 +121,8 @@ def visualize_reconstruction(model, src_imgs, tgt_imgs, device, cfg):
         tgt_pred_prior = model.forward_decoder_fut(src_h, prior_z)
         
         # If norm_pix_loss was used during training, we need to revert it
-        if cfg.norm_pix_loss:
+        if True:
+        # if cfg.norm_pix_loss:
             target = model.patchify(tgt_imgs)
             mean = target.mean(dim=-1, keepdim=True)
             var = target.var(dim=-1, keepdim=True)
@@ -113,19 +164,32 @@ def visualize_reconstruction(model, src_imgs, tgt_imgs, device, cfg):
         plt.close()
         print(f'Saved visualization to {save_path}')
 
+def get_args_parser():
+    parser = argparse.ArgumentParser('Visualization script', add_help=False)
+    parser.add_argument('--config', default='path/to/your/config.yaml', type=str,
+                        help='Path to config file used for training')
+    parser.add_argument('--checkpoint', default='path/to/checkpoint.pth', type=str,
+                        help='Path to model checkpoint')
+    parser.add_argument('--device', default='cuda',
+                        help='device to use for training / testing')
+    parser.add_argument('--seed', default=0, type=int)
+    parser.add_argument('--num_samples', default=5, type=int,
+                        help='Number of samples to visualize')
+    parser.add_argument('--norm_pix_loss', action='store_true',
+                        help='If set, the model uses pixel-wise normalization')
+    return parser
+
 def main(args):
     # Load config
     with initialize(version_base=None, config_path="../config"):
         cfg = compose(config_name=args.config)
 
     # Fix the seed
-    seed = args.seed
-    torch.manual_seed(seed)
-    np.random.seed(seed)
+    seed_everything(args.seed)
     cudnn.benchmark = True
     
     # Create dataset and dataloader
-    dataset = PairedKineticsFixed(root="/data/kinetics400")
+    dataset = PairedKineticsFixed(root=f"{os.environ['HOME']}/kinetics400", seed=args.seed)
     dataloader = torch.utils.data.DataLoader(
         dataset,
         batch_size=64,
