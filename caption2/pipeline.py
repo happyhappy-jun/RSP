@@ -1,10 +1,14 @@
 import os
 import json
 import argparse
+import logging
 from pathlib import Path
 from typing import List, Dict, Any
 from openai import OpenAI
 from tqdm import tqdm
+
+from caption2.core.logging_config import setup_logging
+from caption2.core.pipeline_state import PipelineState, PipelineStage
 
 from caption2.core.frame_extractor import extract_frames
 from caption2.core.request_builder import RequestBuilder
@@ -103,9 +107,16 @@ async def main():
                        help='Run sanity check with single request only')
     args = parser.parse_args()
     
-    # Setup
+    # Setup logging
+    setup_logging(
+        log_file=Path(args.log_file) if args.log_file else None
+    )
+    logger = logging.getLogger(__name__)
+    
+    # Setup pipeline
     paths = setup_directories(args.output_root)
     config = Config(args.config_path) if args.config_path else Config()
+    state = PipelineState(Path(args.output_root))
     
     # Get video paths
     video_paths = []
