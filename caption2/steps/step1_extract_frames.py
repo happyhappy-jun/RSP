@@ -1,4 +1,5 @@
 import argparse
+import json
 from pathlib import Path
 import os
 from caption2.core.frame_extractor import extract_frames
