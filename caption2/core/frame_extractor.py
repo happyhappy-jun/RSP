@@ -132,7 +132,7 @@ async def extract_frames(
 
     # Process videos in parallel using ThreadPoolExecutor
     loop = asyncio.get_event_loop()
-    chunk_size = 10  # Process videos in chunks to manage memory
+    chunk_size = 100  # Process videos in chunks to manage memory
     
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         progress_bar = tqdm(total=len(video_paths), desc="Processing videos")
