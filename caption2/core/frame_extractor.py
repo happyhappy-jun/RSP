@@ -3,10 +3,13 @@ import os
 import json
 import argparse
 import asyncio
+import numpy as np
 from pathlib import Path
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Tuple
 from tqdm import tqdm
 from concurrent.futures import ThreadPoolExecutor
+import functools
+import hashlib
 
 from caption2.core.frame_sampler import UniformFrameSampler, PairedFrameSampler
 from caption2.core.config import Config
@@ -38,14 +41,19 @@ async def extract_frames(
         'videos': []
     }
     
+    def get_cache_path(video_path: str, frame_indices: List[int]) -> Path:
+        """Generate cache path based on video path and frame indices"""
+        cache_key = f"{video_path}_{','.join(map(str, frame_indices))}"
+        return Path("/tmp") / f"frame_cache_{hashlib.md5(cache_key.encode()).hexdigest()}.npz"
+
     async def process_video(video_idx: int, video_path: str) -> List[Dict[str, Any]]:
         try:
-            # Get video metadata and make path relative to data root
             video_path = Path(video_path)
             rel_video_path = video_path.relative_to(Path(config.data_root))
             video_name = video_path.stem
             class_label = video_path.parent.name
-            # Create class directory first, then video directory
+            
+            # Create output directories
             class_dir = output_dir / class_label
             class_dir.mkdir(exist_ok=True, parents=True)
             video_dir = class_dir / video_name
@@ -55,10 +63,33 @@ async def extract_frames(
             frames = sampler.sample_frames(str(video_path))
             frame_paths = []
             
-            # Save frames using OpenCV
-            cap = cv2.VideoCapture(str(video_path))
+            # Check cache
+            cache_path = get_cache_path(str(video_path), frames)
+            if cache_path.exists():
+                cached_frames = np.load(cache_path)['frames']
+                batch_frames = [cached_frames[i] for i in range(len(frames))]
+            else:
+                # Read frames in batches
+                cap = cv2.VideoCapture(str(video_path))
+                batch_size = 32
+                batch_frames = []
+                
+                for i in range(0, len(frames), batch_size):
+                    batch_indices = frames[i:i + batch_size]
+                    for frame_idx in batch_indices:
+                        cap.set(cv2.CAP_PROP_POS_FRAMES, frame_idx)
+                        ret, frame = cap.read()
+                        if not ret:
+                            raise ValueError(f"Could not read frame {frame_idx}")
+                        batch_frames.append(frame)
+                
+                cap.release()
+                
+                # Cache the frames
+                np.savez_compressed(cache_path, frames=np.array(batch_frames))
             
-            for frame_idx, video_frame_idx in enumerate(frames):
+            # Save frames in parallel
+            for frame_idx, frame in enumerate(batch_frames):
                 # For paired sampling, use pair_X_frameY format
                 if sampler_type == "paired":
                     pair_idx = frame_idx // 2
@@ -119,18 +150,25 @@ async def extract_frames(
 
     # Process videos in parallel using ThreadPoolExecutor
     loop = asyncio.get_event_loop()
+    chunk_size = 10  # Process videos in chunks to manage memory
+    
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        tasks = []
-        for video_idx, video_path in enumerate(video_paths):
-            task = loop.run_in_executor(
-                executor,
-                lambda idx=video_idx, path=video_path: asyncio.run(process_video(idx, path))
-            )
-            tasks.append(task)
+        for i in range(0, len(video_paths), chunk_size):
+            chunk = video_paths[i:i + chunk_size]
+            tasks = []
             
-        # Use tqdm to show progress
-        for entries in tqdm(asyncio.as_completed(tasks), total=len(tasks)):
-            frame_info['videos'].extend(await entries)
+            for video_idx, video_path in enumerate(chunk, start=i):
+                task = loop.run_in_executor(
+                    executor,
+                    lambda idx=video_idx, path=video_path: asyncio.run(process_video(idx, path))
+                )
+                tasks.append(task)
+            
+            # Process chunk with progress bar
+            for entries in tqdm(asyncio.as_completed(tasks), 
+                              total=len(tasks),
+                              desc=f"Processing chunk {i//chunk_size + 1}/{(len(video_paths)-1)//chunk_size + 1}"):
+                frame_info['videos'].extend(await entries)
             
     return frame_info
 
