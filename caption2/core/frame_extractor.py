@@ -3,6 +3,7 @@ import json
 import argparse
 import asyncio
 import numpy as np
+import cv2
 from decord import VideoReader, cpu
 from pathlib import Path
 from typing import List, Dict, Any, Tuple
