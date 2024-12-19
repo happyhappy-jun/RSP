@@ -57,6 +57,8 @@ def process_split(split: str, replacement_dir: Path, output_base: Path, temp_dir
             label = id_to_label[video_id]
             
             # Create class directory if it doesn't exist
+            if not split_output.exists():
+                raise ValueError(f"Output directory {split_output} does not exist")
             class_dir = split_output / label
             class_dir.mkdir(parents=True, exist_ok=True)
             
