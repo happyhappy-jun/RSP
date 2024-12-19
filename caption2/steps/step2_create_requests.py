@@ -30,46 +30,19 @@ def main():
     requests = []
     for video in frame_info['videos']:
         try:
-            # Determine if this is paired sampling
-            is_paired = len(video['frame_paths']) % 2 == 0 and frame_info['config'].get('num_pairs', 0) > 0
+            metadata = {
+                'video_name': video['video_name'],
+                'class_label': video['class_label'],
+                'frame_indices': json.dumps(video['frame_indices']),
+                'sampling_seed': str(video['sampling_seed'])
+            }
             
-            if is_paired:
-                # Process each pair as a separate training sample
-                for pair_idx in range(0, len(video['frame_paths']), 2):
-                    # Get current pair
-                    pair_frames = video['frame_paths'][pair_idx:pair_idx + 2]
-                    pair_indices = video['frame_indices'][pair_idx:pair_idx + 2]
-                    
-                    # Create separate metadata for this pair only
-                    metadata = {
-                        'video_name': video['video_name'],
-                        'class_label': video['class_label'],
-                        'frame_indices': json.dumps(pair_indices),
-                        'sampling_seed': str(video['sampling_seed'])
-                    }
-                    
-                    # Create request for this pair
-                    request = builder.build_caption_request(
-                        frame_paths=pair_frames,
-                        custom_id=f"video_{video['video_idx']}_frame_{pair_indices[0]}_{pair_indices[1]}",
-                        metadata=metadata
-                    )
-                    requests.append(request)
-            else:
-                # Process all frames in single request
-                metadata = {
-                    'video_name': video['video_name'],
-                    'class_label': video['class_label'],
-                    'frame_indices': json.dumps(video['frame_indices']),
-                    'sampling_seed': str(video['sampling_seed'])
-                }
-                
-                request = builder.build_caption_request(
-                    frame_paths=video['frame_paths'],
-                    custom_id=f"video_{video['video_idx']}",
-                    metadata=metadata
-                )
-                requests.append(request)
+            request = builder.build_caption_request(
+                frame_paths=video['frame_paths'],
+                custom_id=f"video_{video['video_idx']}",
+                metadata=metadata
+            )
+            requests.append(request)
         except Exception as e:
             print(f"Error creating request for video {video['video_idx']}: {str(e)}")
             continue

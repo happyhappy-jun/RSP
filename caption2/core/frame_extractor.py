@@ -74,15 +74,31 @@ def extract_frames(
             
             cap.release()
                 
-            frame_info['videos'].append({
-                'video_idx': video_idx,
-                'video_path': str(video_path),
-                'video_name': video_name,
-                'class_label': class_label,
-                'frame_indices': frames,
-                'frame_paths': frame_paths,
-                'sampling_seed': seed
-            })
+            # For paired sampling, create separate entries for each pair
+            if sampler_type == "paired":
+                for pair_idx in range(0, len(frames), 2):
+                    pair_indices = frames[pair_idx:pair_idx + 2]
+                    pair_paths = frame_paths[pair_idx:pair_idx + 2]
+                    
+                    frame_info['videos'].append({
+                        'video_idx': f"{video_idx}_pair_{pair_idx//2}",
+                        'video_path': str(video_path),
+                        'video_name': video_name,
+                        'class_label': class_label,
+                        'frame_indices': pair_indices,
+                        'frame_paths': pair_paths,
+                        'sampling_seed': seed
+                    })
+            else:
+                frame_info['videos'].append({
+                    'video_idx': video_idx,
+                    'video_path': str(video_path),
+                    'video_name': video_name,
+                    'class_label': class_label,
+                    'frame_indices': frames,
+                    'frame_paths': frame_paths,
+                    'sampling_seed': seed
+                })
             
         except Exception as e:
             print(f"Error processing video {video_path}: {str(e)}")
