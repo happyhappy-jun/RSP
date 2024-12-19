@@ -30,7 +30,6 @@ def main():
     print(f"Found {len(video_paths)} videos")
     
     # Limit to first 100 videos for testing
-    video_paths = video_paths[:100]
     print(f"Processing first {len(video_paths)} videos for test run")
 
     # Extract frames
