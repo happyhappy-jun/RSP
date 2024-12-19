@@ -11,7 +11,7 @@ def main():
                        help='Root directory containing videos')
     parser.add_argument('--output_dir', type=str, required=True,
                        help='Output directory for extracted frames')
-    parser.add_argument('--sampler', type=str, default='uniform',
+    parser.add_argument('--sampler', type=str, default='paired',
                        choices=['uniform', 'paired'],
                        help='Frame sampling strategy')
     parser.add_argument('--config_path', type=str,
