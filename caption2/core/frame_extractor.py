@@ -1,9 +1,9 @@
-import cv2
 import os
 import json
 import argparse
 import asyncio
 import numpy as np
+from decord import VideoReader, cpu
 from pathlib import Path
 from typing import List, Dict, Any, Tuple
 from tqdm import tqdm
@@ -69,21 +69,10 @@ async def extract_frames(
                 cached_frames = np.load(cache_path)['frames']
                 batch_frames = [cached_frames[i] for i in range(len(frames))]
             else:
-                # Read frames in batches
-                cap = cv2.VideoCapture(str(video_path))
-                batch_size = 32
-                batch_frames = []
-                
-                for i in range(0, len(frames), batch_size):
-                    batch_indices = frames[i:i + batch_size]
-                    for frame_idx in batch_indices:
-                        cap.set(cv2.CAP_PROP_POS_FRAMES, frame_idx)
-                        ret, frame = cap.read()
-                        if not ret:
-                            raise ValueError(f"Could not read frame {frame_idx}")
-                        batch_frames.append(frame)
-                
-                cap.release()
+                # Read frames using Decord
+                vr = VideoReader(str(video_path), ctx=cpu(0))
+                # Get all frames at once efficiently
+                batch_frames = vr.get_batch(frames).asnumpy()
                 
                 # Cache the frames
                 np.savez_compressed(cache_path, frames=np.array(batch_frames))
@@ -99,15 +88,13 @@ async def extract_frames(
                     frame_path = video_dir / f"frame_{frame_idx}.jpg"
                 
                 # Write the frame we already have in memory
-                cv2.imwrite(str(frame_path), frame)
+                cv2.imwrite(str(frame_path), cv2.cvtColor(frame, cv2.COLOR_RGB2BGR))  # Decord returns RGB
                 if frame_path.exists():
                     # Store path relative to output_dir
                     rel_path = frame_path.relative_to(output_dir)
                     frame_paths.append(str(rel_path))
                 else:
                     raise FileNotFoundError(f"Failed to save frame to {frame_path}")
-            
-            cap.release()
             
             # For paired sampling, create separate entries for each pair
             video_entries = []
