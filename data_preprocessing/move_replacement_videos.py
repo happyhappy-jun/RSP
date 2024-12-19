@@ -7,6 +7,14 @@ import requests
 import tempfile
 import atexit
 import os
+from typing import Literal
+
+# Kinetics-400 annotation URLs
+ANNOTATION_URLS = {
+    'train': 'https://s3.amazonaws.com/kinetics/400/annotations/train.csv',
+    'val': 'https://s3.amazonaws.com/kinetics/400/annotations/val.csv',
+    'test': 'https://s3.amazonaws.com/kinetics/400/annotations/test.csv'
+}
 
 def download_csv(url, temp_dir):
     """Download CSV file to temporary directory"""
@@ -31,7 +39,8 @@ def cleanup_temp_dir(temp_dir):
 
 def main():
     parser = argparse.ArgumentParser(description='Move replacement videos to class directories')
-    parser.add_argument('--csv_url', type=str, required=True, help='URL to annotations CSV')
+    parser.add_argument('--split', type=str, choices=['train', 'val', 'test'], required=True,
+                       help='Dataset split to process (train/val/test)')
     parser.add_argument('--replacement_dir', type=str, required=True, 
                        help='Path to replacement videos directory')
     parser.add_argument('--output_base', type=str, required=True,
@@ -43,7 +52,7 @@ def main():
     atexit.register(cleanup_temp_dir, temp_dir)
     
     # Download CSV and load video ID to label mapping
-    csv_path = download_csv(args.csv_url, temp_dir)
+    csv_path = download_csv(ANNOTATION_URLS[args.split], temp_dir)
     id_to_label = load_annotations(csv_path)
     
     # Setup paths
