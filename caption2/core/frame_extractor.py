@@ -98,20 +98,14 @@ async def extract_frames(
                 else:
                     frame_path = video_dir / f"frame_{frame_idx}.jpg"
                 
-                # Set frame position
-                cap.set(cv2.CAP_PROP_POS_FRAMES, video_frame_idx)
-                ret, frame = cap.read()
-                
-                if ret:
-                    cv2.imwrite(str(frame_path), frame)
-                    if frame_path.exists():
-                        # Store path relative to output_dir
-                        rel_path = frame_path.relative_to(output_dir)
-                        frame_paths.append(str(rel_path))
-                    else:
-                        raise FileNotFoundError(f"Failed to save frame to {frame_path}")
+                # Write the frame we already have in memory
+                cv2.imwrite(str(frame_path), frame)
+                if frame_path.exists():
+                    # Store path relative to output_dir
+                    rel_path = frame_path.relative_to(output_dir)
+                    frame_paths.append(str(rel_path))
                 else:
-                    raise ValueError(f"Could not read frame {video_frame_idx} from video")
+                    raise FileNotFoundError(f"Failed to save frame to {frame_path}")
             
             cap.release()
             
