@@ -95,7 +95,6 @@ def extract_frames(
                         'class_label': class_label,
                         'frame_indices': pair_indices,
                         'frame_paths': pair_paths,
-                        'sampling_seed': seed
                     })
             else:
                 frame_info['videos'].append({
@@ -106,7 +105,6 @@ def extract_frames(
                     'class_label': class_label,
                     'frame_indices': frames,
                     'frame_paths': frame_paths,
-                    'sampling_seed': seed
                 })
             
         except Exception as e:
