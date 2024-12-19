@@ -3,6 +3,20 @@ from pathlib import Path
 import pandas as pd
 import shutil
 from tqdm import tqdm
+import requests
+import tempfile
+import atexit
+import os
+
+def download_csv(url, temp_dir):
+    """Download CSV file to temporary directory"""
+    response = requests.get(url)
+    response.raise_for_status()
+    
+    temp_path = Path(temp_dir) / "annotations.csv"
+    with open(temp_path, 'wb') as f:
+        f.write(response.content)
+    return temp_path
 
 def load_annotations(csv_path):
     """Load annotations CSV and create video_id to label mapping"""
@@ -11,17 +25,26 @@ def load_annotations(csv_path):
     df['label'] = df['label'].str.replace('"', '')
     return dict(zip(df['youtube_id'], df['label']))
 
+def cleanup_temp_dir(temp_dir):
+    """Clean up temporary directory"""
+    shutil.rmtree(temp_dir)
+
 def main():
     parser = argparse.ArgumentParser(description='Move replacement videos to class directories')
-    parser.add_argument('--csv', type=str, required=True, help='Path to annotations CSV')
+    parser.add_argument('--csv_url', type=str, required=True, help='URL to annotations CSV')
     parser.add_argument('--replacement_dir', type=str, required=True, 
                        help='Path to replacement videos directory')
     parser.add_argument('--output_base', type=str, required=True,
                        help='Base directory for class-organized videos')
     args = parser.parse_args()
 
-    # Load video ID to label mapping
-    id_to_label = load_annotations(args.csv)
+    # Create temporary directory and register cleanup
+    temp_dir = tempfile.mkdtemp()
+    atexit.register(cleanup_temp_dir, temp_dir)
+    
+    # Download CSV and load video ID to label mapping
+    csv_path = download_csv(args.csv_url, temp_dir)
+    id_to_label = load_annotations(csv_path)
     
     # Setup paths
     replacement_dir = Path(args.replacement_dir)
