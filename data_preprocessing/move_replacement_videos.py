@@ -68,7 +68,6 @@ def process_split(split: str, replacement_dir: Path, output_base: Path, temp_dir
             try:
                 # Use basic copy instead of copy2 to avoid permission issues with metadata
                 shutil.copy(video_path, dest_path)
-                print(f"Copied {video_path.name} to {split}/{label}/")
             except PermissionError:
                 print(f"Error: Permission denied when copying {video_path.name}")
                 print(f"Please ensure you have write permissions for: {dest_path.parent}")
