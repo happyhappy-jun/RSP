@@ -2,19 +2,22 @@ import cv2
 import os
 import json
 import argparse
+import asyncio
 from pathlib import Path
 from typing import List, Dict, Any
 from tqdm import tqdm
+from concurrent.futures import ThreadPoolExecutor
 
 from caption2.core.frame_sampler import UniformFrameSampler, PairedFrameSampler
 from caption2.core.config import Config
 
-def extract_frames(
+async def extract_frames(
     video_paths: List[str],
     output_dir: Path,
     sampler_type: str = "uniform",
     config: Config = None,
-    seed: int = 42
+    seed: int = 42,
+    max_workers: int = 4
 ) -> Dict[str, Any]:
     """Extract frames using configured sampler"""
     if config is None:
@@ -35,7 +38,7 @@ def extract_frames(
         'videos': []
     }
     
-    for video_idx, video_path in enumerate(tqdm(video_paths)):
+    async def process_video(video_idx: int, video_path: str) -> List[Dict[str, Any]]:
         try:
             # Get video metadata and make path relative to data root
             video_path = Path(video_path)
@@ -80,14 +83,15 @@ def extract_frames(
                     raise ValueError(f"Could not read frame {video_frame_idx} from video")
             
             cap.release()
-                
+            
             # For paired sampling, create separate entries for each pair
+            video_entries = []
             if sampler_type == "paired":
                 for pair_idx in range(0, len(frames), 2):
                     pair_indices = frames[pair_idx:pair_idx + 2]
                     pair_paths = frame_paths[pair_idx:pair_idx + 2]
                     
-                    frame_info['videos'].append({
+                    video_entries.append({
                         'video_idx': video_idx,
                         'pair_idx': pair_idx // 2,
                         'video_path': str(rel_video_path),
@@ -97,7 +101,7 @@ def extract_frames(
                         'frame_paths': pair_paths,
                     })
             else:
-                frame_info['videos'].append({
+                video_entries.append({
                     'video_idx': video_idx,
                     'pair_idx': None,
                     'video_path': str(rel_video_path),
@@ -106,10 +110,27 @@ def extract_frames(
                     'frame_indices': frames,
                     'frame_paths': frame_paths,
                 })
+                
+            return video_entries
             
         except Exception as e:
             print(f"Error processing video {video_path}: {str(e)}")
-            continue
+            return []
+
+    # Process videos in parallel using ThreadPoolExecutor
+    loop = asyncio.get_event_loop()
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        tasks = []
+        for video_idx, video_path in enumerate(video_paths):
+            task = loop.run_in_executor(
+                executor,
+                lambda idx=video_idx, path=video_path: asyncio.run(process_video(idx, path))
+            )
+            tasks.append(task)
+            
+        # Use tqdm to show progress
+        for entries in tqdm(asyncio.as_completed(tasks), total=len(tasks)):
+            frame_info['videos'].extend(await entries)
             
     return frame_info
 

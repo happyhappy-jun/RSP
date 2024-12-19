@@ -5,7 +5,7 @@ import os
 from caption2.core.frame_extractor import extract_frames
 from caption2.core.config import Config
 
-def main():
+async def main():
     parser = argparse.ArgumentParser(description='Step 1: Extract frames from videos')
     parser.add_argument('--data_root', type=str, required=True,
                        help='Root directory containing videos')
@@ -34,12 +34,13 @@ def main():
 
     # Extract frames
     config = Config(args.config_path, data_root=args.data_root) if args.config_path else Config(data_root=args.data_root)
-    frame_info = extract_frames(
+    frame_info = await extract_frames(
         video_paths,
         Path(args.output_dir),
         args.sampler,
         config,
-        seed=args.seed
+        seed=args.seed,
+        max_workers=os.cpu_count()
     )
 
     # Save frame info
@@ -53,4 +54,4 @@ def main():
     print(f"Frame info saved to: {frame_info_path}")
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
