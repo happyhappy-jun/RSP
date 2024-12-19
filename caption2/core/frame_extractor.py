@@ -45,7 +45,9 @@ async def extract_frames(
     def get_cache_path(video_path: str, frame_indices: List[int]) -> Path:
         """Generate cache path based on video path and frame indices"""
         cache_key = f"{video_path}_{','.join(map(str, frame_indices))}"
-        return Path("/tmp") / f"frame_cache_{hashlib.md5(cache_key.encode()).hexdigest()}.npz"
+        cache_dir = Path("/data/frame_cache")
+        cache_dir.mkdir(exist_ok=True, parents=True)
+        return cache_dir / f"frame_cache_{hashlib.md5(cache_key.encode()).hexdigest()}.npz"
 
     async def process_video(video_idx: int, video_path: str) -> List[Dict[str, Any]]:
         try:
