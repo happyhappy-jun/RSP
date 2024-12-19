@@ -201,13 +201,18 @@ def main(args):
     model = prepare_model(args, cfg)
     
     # Visualize reconstructions
-    batch = next(iter(dataloader))
+    # Convert dataloader to list to get random batch
+    batches = list(dataloader)
+    random_batch_idx = np.random.randint(0, len(batches))
+    batch = batches[random_batch_idx]
+    
     if isinstance(batch, dict):
         src_imgs, tgt_imgs = batch['src_images'], batch['tgt_images']
     else:
         src_imgs, tgt_imgs, _ = batch
+        
+    # Select random samples from the batch
     indices = np.random.choice(len(src_imgs), args.num_samples, replace=False)
-    indices = indices * 2
 
     src_imgs = src_imgs.view(-1, 3, src_imgs.size(-2), src_imgs.size(-1))
     tgt_imgs = tgt_imgs.view(-1, 3, tgt_imgs.size(-2), tgt_imgs.size(-1))
