@@ -64,7 +64,9 @@ def extract_frames(
                 if ret:
                     cv2.imwrite(str(frame_path), frame)
                     if frame_path.exists():
-                        frame_paths.append(str(frame_path))
+                        # Store path relative to output_dir
+                        rel_path = frame_path.relative_to(output_dir)
+                        frame_paths.append(str(rel_path))
                     else:
                         raise FileNotFoundError(f"Failed to save frame to {frame_path}")
                 else:

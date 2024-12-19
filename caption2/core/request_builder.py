@@ -26,8 +26,9 @@ class RequestBuilder:
 
         # Encode all images
         contents = []
-        for frame_path in frame_paths:
-            with open(frame_path, "rb") as img_file:
+        for rel_path in frame_paths:
+            full_path = Path(self.config.frame_output_dir) / rel_path
+            with open(full_path, "rb") as img_file:
                 img_base64 = base64.b64encode(img_file.read()).decode('utf-8')
             contents.append({
                 "type": "image_url",

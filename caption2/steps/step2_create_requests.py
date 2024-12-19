@@ -19,7 +19,7 @@ def main():
         frame_info = json.load(f)
 
     # Setup request builder
-    config = Config(args.config_path) if args.config_path else None
+    config = Config(args.config_path, frame_output_dir=str(Path(args.frame_info).parent)) if args.config_path else Config(frame_output_dir=str(Path(args.frame_info).parent))
     builder = RequestBuilder(config=config)
     
     # Create output directory
