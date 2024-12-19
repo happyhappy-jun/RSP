@@ -135,6 +135,7 @@ async def extract_frames(
     chunk_size = 10  # Process videos in chunks to manage memory
     
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        progress_bar = tqdm(total=len(video_paths), desc="Processing videos")
         for i in range(0, len(video_paths), chunk_size):
             chunk = video_paths[i:i + chunk_size]
             tasks = []
@@ -146,12 +147,11 @@ async def extract_frames(
                 )
                 tasks.append(task)
             
-            # Process chunk with progress bar
-            for entries in tqdm(asyncio.as_completed(tasks), 
-                              total=len(tasks),
-                              desc=f"Processing chunk {i//chunk_size + 1}/{(len(video_paths)-1)//chunk_size + 1}"):
+            # Process chunk
+            for entries in asyncio.as_completed(tasks):
                 frame_info['videos'].extend(await entries)
-            
+            progress_bar.update(len(chunk))
+        progress_bar.close()    
     return frame_info
 
 if __name__ == "__main__":
