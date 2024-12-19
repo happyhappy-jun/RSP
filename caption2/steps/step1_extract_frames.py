@@ -34,7 +34,7 @@ def main():
     print(f"Processing first {len(video_paths)} videos for test run")
 
     # Extract frames
-    config = Config(args.config_path) if args.config_path else None
+    config = Config(args.config_path, data_root=args.data_root) if args.config_path else Config(data_root=args.data_root)
     frame_info = extract_frames(
         video_paths,
         Path(args.output_dir),

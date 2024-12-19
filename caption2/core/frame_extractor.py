@@ -37,8 +37,9 @@ def extract_frames(
     
     for video_idx, video_path in enumerate(tqdm(video_paths)):
         try:
-            # Get video metadata
+            # Get video metadata and make path relative to data root
             video_path = Path(video_path)
+            rel_video_path = video_path.relative_to(Path(config.data_root))
             video_name = video_path.stem
             class_label = video_path.parent.name
             # Create class directory first, then video directory
@@ -81,8 +82,9 @@ def extract_frames(
                     pair_paths = frame_paths[pair_idx:pair_idx + 2]
                     
                     frame_info['videos'].append({
-                        'video_idx': f"{video_idx}_pair_{pair_idx//2}",
-                        'video_path': str(video_path),
+                        'video_idx': video_idx,
+                        'pair_idx': pair_idx // 2,
+                        'video_path': str(rel_video_path),
                         'video_name': video_name,
                         'class_label': class_label,
                         'frame_indices': pair_indices,
@@ -92,7 +94,8 @@ def extract_frames(
             else:
                 frame_info['videos'].append({
                     'video_idx': video_idx,
-                    'video_path': str(video_path),
+                    'pair_idx': None,
+                    'video_path': str(rel_video_path),
                     'video_name': video_name,
                     'class_label': class_label,
                     'frame_indices': frames,

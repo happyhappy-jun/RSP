@@ -53,11 +53,13 @@ class Config:
         config_path: str = None,
         frame_config: Dict[str, Any] = None,
         prompt_config: Dict[str, Any] = None,
-        frame_output_dir: str = None
+        frame_output_dir: str = None,
+        data_root: str = None
     ):
         self.frame_config = frame_config or DEFAULT_FRAME_CONFIG.copy()
         self.prompt_config = prompt_config or DEFAULT_PROMPT_CONFIG.copy()
         self.frame_output_dir = frame_output_dir
+        self.data_root = data_root
         
         if config_path:
             self.load_config(config_path)

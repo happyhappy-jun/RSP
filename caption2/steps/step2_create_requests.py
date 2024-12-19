@@ -37,9 +37,14 @@ def main():
                 'sampling_seed': str(video['sampling_seed'])
             }
             
+            # Create custom ID based on video_idx and optional pair_idx
+            custom_id = (f"video_{video['video_idx']}_pair_{video['pair_idx']}" 
+                        if video['pair_idx'] is not None 
+                        else f"video_{video['video_idx']}")
+            
             request = builder.build_caption_request(
                 frame_paths=video['frame_paths'],
-                custom_id=f"video_{video['video_idx']}",
+                custom_id=custom_id,
                 metadata=metadata
             )
             requests.append(request)
