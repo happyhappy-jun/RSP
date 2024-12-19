@@ -92,6 +92,8 @@ def create_requests(
 
 async def main():
     parser = argparse.ArgumentParser()
+    parser.add_argument('--log-file', type=str,
+                       help='Path to log file (optional)')
     parser.add_argument('--seed', type=int, default=42,
                        help='Random seed for reproducibility')
     parser.add_argument('--data_root', type=str, required=True,
