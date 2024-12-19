@@ -28,6 +28,10 @@ def main():
                 video_paths.append(os.path.join(root, file))
                 
     print(f"Found {len(video_paths)} videos")
+    
+    # Limit to first 100 videos for testing
+    video_paths = video_paths[:100]
+    print(f"Processing first {len(video_paths)} videos for test run")
 
     # Extract frames
     config = Config(args.config_path) if args.config_path else None
