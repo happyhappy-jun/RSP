@@ -54,6 +54,8 @@ def process_split(split: str, replacement_dir: Path, output_base: Path, temp_dir
         
         if video_id in id_to_label:
             label = id_to_label[video_id]
+            if " " in label:
+                label = label.replace(" ", "_").replace("(" , "").replace(")", "")
             
             # Create class directory if it doesn't exist
 
@@ -64,6 +66,7 @@ def process_split(split: str, replacement_dir: Path, output_base: Path, temp_dir
             # Move video to appropriate class directory
             dest_path = class_dir / video_path.name
             shutil.copy2(video_path, dest_path)
+            print(video_path, dest_path)
             print(f"Moved {video_path.name} to {split}/{label}/")
         else:
             print(f"Warning: No label found for video {video_path.name} in {split} split")
