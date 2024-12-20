@@ -59,28 +59,20 @@ def main():
     # List all batches
     print("\nListing batch requests...")
     all_batches = list(client.batches.list())
+    ids = [batch.id for batch in all_batches]
     
     # Convert start/end batch indices to integers
-    start_idx = int(args.start_batch)
-    end_idx = int(args.end_batch)
+    start_idx = ids.index(args.start_batch)
+    end_idx = ids.index(args.end_batch)
     
-    # Filter batches by index
-    if start_idx < 0 or end_idx >= len(all_batches):
-        print(f"Invalid batch range. Available range: 0 to {len(all_batches)-1}")
-        return
-        
-    relevant_batches = all_batches[start_idx:end_idx+1]
+    relevant_batch_ids = all_batches[end_idx:start_idx+1]
     
-    if not relevant_batches:
-        print("No batches found in the specified range")
-        return
-        
     print(f"Processing batches {start_idx} to {end_idx} " 
-          f"(IDs: {relevant_batches[0].id} to {relevant_batches[-1].id})")
+          f"(IDs: {args.start_batch} to {args.end_batch})")
 
     all_errors = []
     print("\nChecking batches for errors...")
-    for batch in tqdm(relevant_batches):
+    for batch in tqdm(relevant_batch_ids):
         # Check batch status
         try:
             status = client.batches.retrieve(batch.id)
