@@ -49,6 +49,7 @@ class APIRequest:
         retry_queue: asyncio.Queue,
         save_filepath: str,
         status_tracker: StatusTracker,
+        pbar: tqdm,
     ):
         """Calls the OpenAI API and saves results"""
         logging.debug(f"Starting request #{self.task_id}")
@@ -212,7 +213,8 @@ class EmbeddingCreator:
                                 request_header=request_header,
                                 retry_queue=retry_queue,
                                 save_filepath=output_file,
-                                status_tracker=status
+                                status_tracker=status,
+                                pbar=pbar
                             )
                         )
                         next_request = None
