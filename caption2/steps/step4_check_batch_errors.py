@@ -56,17 +56,27 @@ def main():
     with open(args.requests_file) as f:
         original_requests = json.load(f)
 
-    # List and filter batches
+    # List all batches
     print("\nListing batch requests...")
-    all_batches = client.batches.list()
-    relevant_batches = [
-        batch for batch in all_batches
-        if args.start_batch <= batch.id <= args.end_batch
-    ]
-
-    if not relevant_batches:
-        print("No matching batches found in the specified range")
+    all_batches = list(client.batches.list())
+    
+    # Convert start/end batch indices to integers
+    start_idx = int(args.start_batch)
+    end_idx = int(args.end_batch)
+    
+    # Filter batches by index
+    if start_idx < 0 or end_idx >= len(all_batches):
+        print(f"Invalid batch range. Available range: 0 to {len(all_batches)-1}")
         return
+        
+    relevant_batches = all_batches[start_idx:end_idx+1]
+    
+    if not relevant_batches:
+        print("No batches found in the specified range")
+        return
+        
+    print(f"Processing batches {start_idx} to {end_idx} " 
+          f"(IDs: {relevant_batches[0].id} to {relevant_batches[-1].id})")
 
     all_errors = []
     print("\nChecking batches for errors...")
