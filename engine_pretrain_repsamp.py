@@ -154,9 +154,7 @@ def train_one_epoch_llm(
 
         torch.cuda.synchronize()
 
-        for k, v in detailed_loss.items():
-            metric_logger.update(k, v.item())
-
+        metric_logger.update(**detailed_loss)
         metric_logger.update(loss=loss_value)
         lr = optimizer.param_groups[0]["lr"]
         metric_logger.update(lr=lr)
