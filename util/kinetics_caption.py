@@ -14,15 +14,17 @@ class PairedKineticsWithCaption(Dataset):
     """PairedKinetics dataset that loads from preprocessed JSON"""
     def __init__(
         self,
+        frame_root,
         frame_info_path,     # Path to frame_info.json
         embeddings_path,     # Path to combined_output.jsonl
         repeated_sampling=2  # Number of augmented samples per pair
     ):
         super().__init__()
+        self.frame_root = frame_root
         # Load frame info data
         with open(frame_info_path, 'r') as f:
             frame_info = json.load(f)
-            videos = frame_info['videos']
+            frames = frame_info['videos']
 
         # Load embeddings data
         self.embeddings = {}
@@ -30,51 +32,48 @@ class PairedKineticsWithCaption(Dataset):
             for line in f:
                 record = json.loads(line)
                 # Parse video_idx and pair_idx from custom_id (format: video_X_pair_Y)
-                parts = record['custom_id'].split('_')
+                parts = record[-1]['custom_id'].split('_')
                 video_idx = int(parts[1])
-                pair_idx = int(parts[3])
-                embedding = record['embedding']
+                pair_idx = int(parts[-1])
+                embedding = record[1]['data'][0]['embedding']
                 self.embeddings[(video_idx, pair_idx)] = np.array(embedding, dtype=np.float32)
-        
+
         # Process videos and create pairs
-        results = []
-        for video in videos:
-            video_idx = video['video_idx']
-            frame_paths = video['frame_paths']
-            # Process frames in pairs
-            for i in range(0, len(frame_paths), 2):
-                if i + 1 < len(frame_paths):  # Ensure we have a complete pair
-                    pair = {
-                        'video_idx': video_idx,
-                        'pair_idx': i // 2,
-                        'frame_cur_path': frame_paths[i],
-                        'frame_fut_path': frame_paths[i + 1]
-                    }
-                    results.append(pair)
+        self.results = defaultdict(list)
+        for frame in frames:
+            video_idx = frame['video_idx']
+            frame_paths = frame['frame_paths']
+            pair_idx = frame['pair_idx']
+            self.results[video_idx].extend([
+                {
+                    'pair_idx': pair_idx,
+                    'frame_cur_path': self._process_path(frame_paths[0]),
+                    'frame_fut_path': self._process_path(frame_paths[1]),
+                    "embedding": self.embeddings.get((video_idx, pair_idx))
+                }
+            ])
 
         # Filter and flatten pairs that have embeddings
         self.valid_pairs = []
         missing_embeddings = defaultdict(list)
-        
-        for pair in results:
-            video_idx, pair_idx = pair['video_idx'], pair['pair_idx']
-            if (video_idx, pair_idx) in self.embeddings:
-                self.valid_pairs.append(pair)
-            else:
-                missing_embeddings[video_idx].append(pair_idx)
-        
+
+        for video_idx, frame_data in self.results.items():
+            for pair in frame_data:
+                if (video_idx, pair["pair_idx"]) not in self.embeddings:
+                    missing_embeddings[video_idx].append(pair["pair_idx"])
+
         print(f"\nDataset Statistics:")
-        print(f"Total pairs found: {len(results)}")
+        print(f"Total pairs found: {len(self.results)}")
         print(f"Total embeddings found: {len(self.embeddings)}")
         print(f"Valid pairs after filtering: {len(self.valid_pairs)}")
         print(f"Videos with missing embeddings: {len(missing_embeddings)}")
-        
+
         # Print some example missing embeddings
         if missing_embeddings:
             print("\nExample videos with missing embeddings:")
-            for video_idx, pairs in list(missing_embeddings.items())[:5]:
-                print(f"Video {video_idx}: Missing {len(pairs)} pairs - {pairs[:5]}")
-            
+            for video_idx, pairs in list(missing_embeddings.items()):
+                print(f"Video {video_idx}: Missing {len(pairs)} pairs - {pairs}")
+
         self.repeated_sampling = repeated_sampling
         
         # Setup transforms with seed
@@ -85,53 +84,43 @@ class PairedKineticsWithCaption(Dataset):
                               std=[0.229, 0.224, 0.225])
         ])
 
+        del self.embeddings
+
     def __len__(self):
         return len(self.valid_pairs)
 
     def _process_path(self, frame_path):
-        """Remove environment-specific prefix from path"""
-        if '/RSP/' in frame_path:
-            return frame_path.split('/RSP/', 1)[1]
-        return frame_path
+        """add frame_root to frame_path"""
+        return f"{self.frame_root}/{frame_path}"
 
     def load_frame(self, frame_path):
         """Load and convert frame to RGB"""
-        processed_path = self._process_path(frame_path)
-        frame = cv2.imread(processed_path)
+        frame = cv2.imread(frame_path)
         if frame is None:
-            raise ValueError(f"Failed to load frame from path: {processed_path}")
+            raise ValueError(f"Failed to load frame from path: {frame_path}")
         return cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
     
     def __getitem__(self, index):
-        try:
-            pair = self.valid_pairs[index]
-            video_idx = pair['video_idx']
-            pair_idx = pair['pair_idx']
-            
-            # Verify embedding exists
-            if (video_idx, pair_idx) not in self.embeddings:
-                raise KeyError(f"Missing embedding for video_{video_idx}_pair_{pair_idx}")
-            
-            # Load and process frames
-            frame_cur = self.load_frame(pair['frame_cur_path'])
-            frame_fut = self.load_frame(pair['frame_fut_path'])
-        except Exception as e:
-            print(f"Error loading index {index}: {str(e)}")
-            # Re-raise to maintain DataLoader's error handling
-            raise
-            
-        # Apply transforms
-        src_image, tgt_image = self.transforms(frame_cur, frame_fut)
-        src_image = self.basic_transform(src_image)
-        tgt_image = self.basic_transform(tgt_image)
-        
-        # Get embedding
-        embedding = torch.from_numpy(self.embeddings[(video_idx, pair_idx)])
+        repeated_samples = self.results[index]
+
+        src_images = []
+        tgt_images = []
+        embeddings = []
+
+        for sample in repeated_samples:
+            frame_cur = self.load_frame(sample["frame_cur_path"])
+            frame_fut = self.load_frame(sample["frame_fut_path"])
+            src_image, tgt_image = self.transforms(frame_cur, frame_fut)
+            src_image = self.basic_transform(src_image)
+            tgt_image = self.basic_transform(tgt_image)
+            src_images.append(src_image)
+            tgt_images.append(tgt_image)
+            embeddings.append(torch.from_numpy(sample["embedding"]))
 
         return {
-            "src_images": src_image.unsqueeze(0),  # Add batch dimension
-            "tgt_images": tgt_image.unsqueeze(0),
-            "embeddings": embedding.unsqueeze(0),
+            "src_images": torch.stack(src_images, dim=0),
+            "tgt_images": torch.stack(tgt_images, dim=0),
+            "embeddings": torch.stack(embeddings, dim=0)
         }
             
 def collate_fn(batch):
@@ -145,8 +134,9 @@ def collate_fn(batch):
 if __name__ == "__main__":
     print("\nInitializing dataset...")
     dataset = PairedKineticsWithCaption(
-        frame_info_path="/home/junyoon/RSP/artifacts/frames/frame_info.json",
-        embeddings_path="/home/junyoon/RSP/artifacts/embeddings/embedding_results.jsonl",
+        frame_root="/data/kinetics400caption/frames",
+        frame_info_path="/data/kinetics400caption/frame_info.json",
+        embeddings_path="/data/kinetics400caption/embeddings.jsonl",
     )
     
     print(f"Total number of videos: {len(dataset)}")
