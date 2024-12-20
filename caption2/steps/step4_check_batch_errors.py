@@ -15,7 +15,7 @@ def load_error_file(batch_id: str, output_dir: Path, client: OpenAI) -> List[Dic
         if status.error_file_id:
             # Download error file from API
             error_content = client.files.content(status.error_file_id)
-            
+
             # Save error file locally
             with open(error_file, "wb") as f:
                 f.write(error_content.read())
@@ -65,6 +65,9 @@ def main():
 
     output_dir = Path(args.output_dir)
     client = OpenAI()
+
+    if not output_dir.exists():
+        os.makedirs(output_dir, exist_ok=True)
     
     # Load original requests for retry preparation
     with open(args.requests_file) as f:
