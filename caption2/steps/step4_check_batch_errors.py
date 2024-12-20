@@ -8,31 +8,23 @@ from tqdm import tqdm
 def load_error_file(batch_id: str, output_dir: Path, client: OpenAI) -> List[Dict]:
     """Load and parse error.jsonl file for a batch"""
     error_file = output_dir / f"output_{batch_id}_error.jsonl"
-    
-    try:
-        # Try to get batch status first
-        status = client.batches.retrieve(batch_id)
-        if status.error_file_id:
-            # Download error file from API
-            error_content = client.files.content(status.error_file_id)
-
-            # Save error file locally
-            with open(error_file, "wb") as f:
-                f.write(error_content.read())
-    except Exception as e:
-        print(f"Failed to download error file for batch {batch_id}: {str(e)}")
-        if not error_file.exists():
-            return []
-    
-    # Parse errors from local file
     errors = []
-    with open(error_file) as f:
-        for line in f:
-            try:
-                error = json.loads(line.strip())
-                errors.append(error)
-            except json.JSONDecodeError:
-                continue
+    
+    # Get batch status and error file
+    status = client.batches.retrieve(batch_id)
+    if status.error_file_id:
+        error_content = client.files.content(status.error_file_id)
+        with open(error_file, "wb") as f:
+            f.write(error_content.read())
+            
+        # Parse errors from file
+        with open(error_file) as f:
+            for line in f:
+                try:
+                    errors.append(json.loads(line.strip()))
+                except json.JSONDecodeError:
+                    continue
+                    
     return errors
 
 def create_retry_requests(errors: List[Dict], original_requests: List[Dict]) -> List[Dict]:
@@ -90,23 +82,15 @@ def main():
     all_errors = []
     print("\nChecking batches for errors...")
     for batch in tqdm(relevant_batch_ids):
-        # Check batch status
-        try:
-            status = client.batches.retrieve(batch.id)
-            
-            if status.status == "failed":
-                print(f"\nBatch {batch.id} failed completely")
-                continue
-                
-            # Check for error file
-            errors = load_error_file(batch.id, output_dir, client)
-            if errors:
-                print(f"\nFound {len(errors)} errors in batch {batch.id}")
-                all_errors.extend(errors)
-                
-        except Exception as e:
-            print(f"\nError checking batch {batch.id}: {str(e)}")
+        status = client.batches.retrieve(batch.id)
+        if status.status == "failed":
+            print(f"\nBatch {batch.id} failed completely")
             continue
+            
+        errors = load_error_file(batch.id, output_dir, client)
+        if errors:
+            print(f"\nFound {len(errors)} errors in batch {batch.id}")
+            all_errors.extend(errors)
 
     if all_errors:
         print(f"\nTotal errors found: {len(all_errors)}")
