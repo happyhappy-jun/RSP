@@ -92,20 +92,22 @@ class APIRequest:
                 append_to_jsonl(data, save_filepath)
                 status_tracker.num_tasks_in_progress -= 1
                 status_tracker.num_tasks_failed += 1
+                pbar.update(1)
         else:
             data = [self.request_json, response, self.metadata] if self.metadata else [self.request_json, response]
             append_to_jsonl(data, save_filepath)
             status_tracker.num_tasks_in_progress -= 1
             status_tracker.num_tasks_succeeded += 1
+            pbar.update(1)
             logging.debug(f"Request {self.task_id} completed successfully")
 
 class EmbeddingCreator:
     """Creates embeddings using OpenAI's text-embedding-3-small model with async processing"""
     
-    def __init__(self, max_requests_per_minute: int = 3000):
+    def __init__(self, max_requests_per_minute: int = 10000):
         """Initialize with rate limits"""
         self.max_requests_per_minute = max_requests_per_minute
-        self.max_tokens_per_minute = 250_000  # Conservative token limit
+        self.max_tokens_per_minute = 10_000_000  # text-embedding-3-small limit
         self.encoding = tiktoken.get_encoding("cl100k_base")
         self.api_key = os.getenv("OPENAI_API_KEY")
         if not self.api_key:
@@ -133,6 +135,9 @@ class EmbeddingCreator:
         status = StatusTracker(total_tasks=len(caption_results))
         retry_queue = asyncio.Queue()
         task_id_counter = 0
+        
+        # Initialize progress bar
+        pbar = tqdm(total=len(caption_results), desc="Creating embeddings")
         
         # Initialize rate limiting
         available_request_capacity = self.max_requests_per_minute
@@ -214,6 +219,7 @@ class EmbeddingCreator:
 
                 # Break if all tasks complete
                 if status.num_tasks_in_progress == 0:
+                    pbar.close()
                     break
 
                 # Sleep briefly
