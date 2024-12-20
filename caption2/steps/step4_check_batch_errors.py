@@ -5,12 +5,26 @@ from typing import List, Dict, Any
 from openai import OpenAI
 from tqdm import tqdm
 
-def load_error_file(batch_id: str, output_dir: Path) -> List[Dict]:
+def load_error_file(batch_id: str, output_dir: Path, client: OpenAI) -> List[Dict]:
     """Load and parse error.jsonl file for a batch"""
     error_file = output_dir / f"output_{batch_id}_error.jsonl"
-    if not error_file.exists():
-        return []
-        
+    
+    try:
+        # Try to get batch status first
+        status = client.batches.retrieve(batch_id)
+        if status.error_file_id:
+            # Download error file from API
+            error_content = client.files.content(status.error_file_id)
+            
+            # Save error file locally
+            with open(error_file, "wb") as f:
+                f.write(error_content.read())
+    except Exception as e:
+        print(f"Failed to download error file for batch {batch_id}: {str(e)}")
+        if not error_file.exists():
+            return []
+    
+    # Parse errors from local file
     errors = []
     with open(error_file) as f:
         for line in f:
@@ -82,7 +96,7 @@ def main():
                 continue
                 
             # Check for error file
-            errors = load_error_file(batch.id, output_dir)
+            errors = load_error_file(batch.id, output_dir, client)
             if errors:
                 print(f"\nFound {len(errors)} errors in batch {batch.id}")
                 all_errors.extend(errors)
