@@ -87,7 +87,7 @@ class PairedKineticsWithCaption(Dataset):
         del self.embeddings
 
     def __len__(self):
-        return len(self.valid_pairs)
+        return len(self.results)
 
     def _process_path(self, frame_path):
         """add frame_root to frame_path"""
