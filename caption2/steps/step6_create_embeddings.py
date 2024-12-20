@@ -49,7 +49,7 @@ async def main():
         print(f"Skipped {skipped} invalid/error results")
         
     print("\nProcessing captions...")
-    await creator.process_caption_results(caption_results, output_dir)
+    await creator.process_caption_results(caption_results[:100], output_dir)
 
 if __name__ == "__main__":
     asyncio.run(main())

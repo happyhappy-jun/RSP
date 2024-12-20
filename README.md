@@ -14,130 +14,26 @@
 
 <img width="100%" src="https://github.com/huiwon-jang/RSP/assets/69646951/7ee0066f-f1a5-4db1-84b5-8ccb3862475a"/>
 
+## Dataset
 
-### 1. Environment setup
-- We note that torch version >2.0 may work, but `conda install` with below version is recommended.
+### Kinetics400
 ```bash
-conda create -n rsp python=3.9.12 -y
-conda activate rsp
-conda install pytorch==1.13.1 torchvision==0.14.1 torchaudio==0.13.1 pytorch-cuda=11.7 -c pytorch -c nvidia
-pip install -r requirements.txt
+# Replace corrupted videos
+python data_preprocessing/move_replacement_videos.py --replacement_dir /data/kinetics400/original_train2/replacement_for_corrupted_k400 --output_base /data/kinetics400/original_train2
 ```
 
-### 2. Dataset
+Dataset generation procedure
 
-#### Dataset download
 ```bash
-sh data_preprocessing/download.sh
-sh data_preprocessing/extract.sh
+python -m caption2.steps.step1_extract_frames --data_root /data/kinetics400/original_train2 --output_dir /data/kinetics400/frames
+python -m caption2.steps.step2_create_requests --frame_info /data/kinetics400/frames/frame_info.json --output_dir /data/RSP/requests  
+python -m caption2.steps.step3_process_captions --requests /data/RSP/requests/caption_requests.json --output_dir /data/RSP/captions       
+python -m caption2.steps.step4_check_batch_errors --start_batch batch_676466b1154481908b8c98afebfe45e4 --end_batch batch_67647aeb024c8190a203cfb28332480c --output_dir /data/RSP/error_retry --requests_file /data/RSP/requests/caption_requests.json
+python -m caption2.steps.step3_process_captions --requests /data/RSP/error_retry/retry_requests.json --output_dir /data/RSP/error_retry_output
+python -m caption2.steps.step5_combine_results \
+  --original_results /data/RSP/captions/caption_results.json \
+  --retry_results /data/RSP/error_retry_output/caption_results.json \
+  --requests_file /data/RSP/requests/caption_requests.json \
+  --output_dir /data/RSP/captions
+python -m caption2.steps.step6_create_embeddings --caption_results /data/RSP/captions/kinetics400_captions.json --output_dir /data/RSP/captions/embeddings
 ```
-- We assume the root directory for the data: `$DATA_ROOT = /data/kinetics400`.
-- If you want to change the root directory, please change `root_dl` of `download.sh` and `extract.sh`.
-
-#### Dataset pre-processing
-- We resize the data into 256x256 for the efficient loading while training.
-```bash
-python data_preprocessing/make_256scale.py --datadir $DATA_ROOT
-```
-- We additionally provide the code to filter out several not-working videos.
-```bash
-python data_preprocessing/make_labels.py --datadir $DATA_ROOT --filedir train2
-```
-
-#### Kinetics-400
-```
-/data/kinetics400
-|-- train2
-    |-- abseiling
-        |-- xx.mp4
-        |-- ...
-    |-- air_drumming
-        |-- xx.mp4
-        |-- ...
-    |-- ...
-|-- labels
-    |-- label_full_1.0.pickle
-```
-
-### 3. Pre-training RSP on Kinetics-400
-- Note that `[N_NODE] x [BATCH_SIZE_PER_GPU] x [ACCUM_ITER] = 1536` to reproduce our results.
-- Default: `[DATA_PATH]=/data/kinetics400 `
-```bash
-python -m torch.distributed.launch --nproc_per_node=[N_NODE] main_pretrain_rsp.py \
-    --batch_size [BATCH_SIZE_PER_GPU] \
-    --accum_iter [ACCUM_ITER] \
-    --model rsp_vit_small_patch16 \
-    --epochs 400 \
-    --warmup_epochs 40 \
-    --data_path [DATA_PATH] \
-    --log_dir [LOG_DIR] \
-    --output_dir [LOG_DIR] \
-    --norm_pix_loss \
-    --repeated_sampling 2
-```
-
-### 4. Evaluation
-We provide the checkpoint in the below:
-- ViT-S/16 400 epochs: [[link](https://drive.google.com/file/d/1OZW7UWOLhBxjXukn8CAuCSA9mCV_d9R2/view?usp=drive_link)]
-- ViT-B/16 400 epochs: [[link](https://drive.google.com/file/d/1GsA9h1w4RZ4unpJ2td1GaI_yfZ3vB2Rm/view?usp=sharing)]
-
-### 4.1. Video Label Propagation
-The evaluation code is mainly built upon [Dino](https://github.com/facebookresearch/dino).
-
-#### 1. DAVIS 2017 video object segmentation
-- **Step 1: Dataset preparation**
-
-We note that the default root path is `[DATA_ROOT]=/data`. Additionally, we resize DAVIS of 480x(?) to 480x880 for a natural evaluation with patches.
-```bash
-sh data_preprocessing/eval/davis_download.sh
-python data_preprocessing/eval/davis_preprocessing.py --data_root [DATA_ROOT]
-```
-```
-[DATA_ROOT]/DAVIS_480_880
-|-- Annotations/480p
-    |-- bear
-        |-- 00000.png
-        |-- ...
-    |-- ...
-|-- ImageSets/2017/val.txt
-|-- JPEGImages/480p
-    |-- bear
-        |-- 00000.jpg
-        |-- ...
-    |-- ...
-```
-
-- **Step 2: Video object segmentation**
-```bash
-python eval_video_segmentation_davis.py \
-    --finetune [LOG_DIR]/checkpoint-199.pth \
-    --output_dir [LOG_DIR]/davis_seg \
-    --data_path [DATA_ROOT]/DAVIS_480_880 \
-    --topk 7 --size_mask_neighborhood 30 --n_last_frames 30 \
-    --model vit_small
-```
-
-- **Step 3: Evaluation the obtained segmentation**
-```bash
-git clone https://github.com/davisvideochallenge/davis2017-evaluation
-python ./davis2017-evaluation/evaluation_method.py \
-    --task semi-supervised \
-    --results_path [LOG_DIR]/davis_seg \
-    --davis_path [DATA_ROOT]/DAVIS_480_880
-```
-
-#### 2. JHMDB pose tracking
-TBD
-
-#### 3. VIP video part segmentation
-TBD
-
-### 4.2. Vision-based Robot Learning
-#### 1. CortexBench
-We will update the evaluation code at https://github.com/huiwon-jang/RSP/tree/eval_cortexbench.
-
-#### 2. RLBench
-TBD
-
-#### 3. Franka Kitchen
-TBD
