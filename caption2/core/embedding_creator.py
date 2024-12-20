@@ -151,12 +151,12 @@ class EmbeddingCreator:
                         logging.debug(f"Retrying request {next_request.task_id}")
                     elif task_id_counter < len(caption_results):
                         result = caption_results[task_id_counter]
-                        if 'response' not in result:
+                        if 'caption' not in result:
                             logging.error(f"Missing response field in result: {result}")
                             task_id_counter += 1
                             continue
                             
-                        caption = result['response']
+                        caption = result['caption']
                         custom_id = result['custom_id']
                         token_count = self.count_tokens(caption)
                         
