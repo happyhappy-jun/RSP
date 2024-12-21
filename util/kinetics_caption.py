@@ -117,6 +117,7 @@ class PairedKineticsWithCaption(Dataset):
             tgt_images.append(tgt_image)
             embeddings.append(torch.from_numpy(sample["embedding"]))
 
+
         return {
             "src_images": torch.stack(src_images, dim=0),
             "tgt_images": torch.stack(tgt_images, dim=0),
@@ -158,27 +159,20 @@ if __name__ == "__main__":
     total_samples = len(dataloader)
     failed_indices = []
 
-    try:
-        for idx, batch in tqdm.tqdm(enumerate(dataloader), total=total_samples):
-            # Verify batch contents
-            assert batch['src_images'].shape[0] == batch['tgt_images'].shape[0], \
-                f"Batch {idx}: Mismatched batch sizes between source and target images"
-            assert batch['embeddings'].shape[0] == batch['src_images'].shape[0], \
-                f"Batch {idx}: Mismatched batch sizes between images and embeddings"
-            
-            # Check for NaN values
-            if torch.isnan(batch['src_images']).any():
-                failed_indices.append((idx, "NaN in source images"))
-            if torch.isnan(batch['tgt_images']).any():
-                failed_indices.append((idx, "NaN in target images"))
-            if torch.isnan(batch['embeddings']).any():
-                failed_indices.append((idx, "NaN in embeddings"))
+    for idx, batch in tqdm.tqdm(enumerate(dataloader), total=total_samples):
+        # Verify batch contents
+        assert batch['src_images'].shape[0] == batch['tgt_images'].shape[0], \
+            f"Batch {idx}: Mismatched batch sizes between source and target images"
+        assert batch['embeddings'].shape[0] == batch['src_images'].shape[0], \
+            f"Batch {idx}: Mismatched batch sizes between images and embeddings"
 
-    except Exception as e:
-        print(f"\nError occurred at batch {idx}:")
-        print(f"Error type: {type(e).__name__}")
-        print(f"Error message: {str(e)}")
-        sys.exit(1)
+        # Check for NaN values
+        if torch.isnan(batch['src_images']).any():
+            failed_indices.append((idx, "NaN in source images"))
+        if torch.isnan(batch['tgt_images']).any():
+            failed_indices.append((idx, "NaN in target images"))
+        if torch.isnan(batch['embeddings']).any():
+            failed_indices.append((idx, "NaN in embeddings"))
 
     print("\nDataset validation complete!")
     print(f"Successfully processed {total_samples} batches")
