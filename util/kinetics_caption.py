@@ -132,6 +132,10 @@ def collate_fn(batch):
 
 
 if __name__ == "__main__":
+    import tqdm
+    import sys
+    from torch.utils.data import DataLoader
+
     print("\nInitializing dataset...")
     dataset = PairedKineticsWithCaption(
         frame_root="/data/kinetics400caption/frames",
@@ -139,41 +143,56 @@ if __name__ == "__main__":
         embeddings_path="/data/kinetics400caption/embeddings.jsonl",
     )
     
-    print(f"Total number of videos: {len(dataset)}")
-    a = dataset[0]['embeddings']
-    b = dataset[1]['embeddings']
-    c = dataset[500]['embeddings']
-    d = dataset[501]['embeddings']
-    e = dataset[999]['embeddings']
-    f = dataset[1000]['embeddings']
-
-    # Print cosine similarities between embeddings
-    print("\nComputing cosine similarities between embeddings:")
+    print(f"\nTotal number of videos: {len(dataset)}")
     
-    # List of embeddings to compare
-    embeddings = [a, b, c, d, e, f]
-    embedding_names = ['0-cur', '0-fut', '500-cur', '500-fut', '999-cur', '999-fut']
-    
-    # Compute cosine similarity for all pairs
-    for (e1, n1), (e2, n2) in combinations(zip(embeddings, embedding_names), 2):
-        sim = torch.nn.functional.cosine_similarity(e1, e2)
-        print(f"Cosine similarity between {n1} and {n2}: {sim.item():.4f}")
-
-    print(f"Embedding snippet {a[:30]}")
-    print(f"Embedding snippet {b[:30]}")
-    print(f"Embedding snippet {c[:30]}")
-    print(f"Embedding snippet {d[:30]}")
-
-    dataloader = torch.utils.data.DataLoader(
+    # Create dataloader with small batch size for validation
+    dataloader = DataLoader(
         dataset,
-        batch_size=2,
-        shuffle=True,
-        num_workers=0,
+        batch_size=4,
+        shuffle=False,
+        num_workers=2,
         collate_fn=collate_fn
     )
-    for i, batch in enumerate(dataloader):
-        if i == 10:
-            break
-        print(batch['src_images'].shape)
-        print(batch['tgt_images'].shape)
-        print(batch['embeddings'].shape)
+
+    print("\nValidating dataset by attempting to load all samples...")
+    total_samples = len(dataloader)
+    failed_indices = []
+
+    try:
+        for idx, batch in tqdm.tqdm(enumerate(dataloader), total=total_samples):
+            # Verify batch contents
+            assert batch['src_images'].shape[0] == batch['tgt_images'].shape[0], \
+                f"Batch {idx}: Mismatched batch sizes between source and target images"
+            assert batch['embeddings'].shape[0] == batch['src_images'].shape[0], \
+                f"Batch {idx}: Mismatched batch sizes between images and embeddings"
+            
+            # Check for NaN values
+            if torch.isnan(batch['src_images']).any():
+                failed_indices.append((idx, "NaN in source images"))
+            if torch.isnan(batch['tgt_images']).any():
+                failed_indices.append((idx, "NaN in target images"))
+            if torch.isnan(batch['embeddings']).any():
+                failed_indices.append((idx, "NaN in embeddings"))
+
+    except Exception as e:
+        print(f"\nError occurred at batch {idx}:")
+        print(f"Error type: {type(e).__name__}")
+        print(f"Error message: {str(e)}")
+        sys.exit(1)
+
+    print("\nDataset validation complete!")
+    print(f"Successfully processed {total_samples} batches")
+    
+    if failed_indices:
+        print("\nWarning: Found issues in the following batches:")
+        for idx, issue in failed_indices:
+            print(f"Batch {idx}: {issue}")
+    else:
+        print("No issues found. All samples are valid and accessible.")
+
+    # Print sample batch shapes
+    sample_batch = next(iter(dataloader))
+    print("\nSample batch shapes:")
+    print(f"Source images: {sample_batch['src_images'].shape}")
+    print(f"Target images: {sample_batch['tgt_images'].shape}")
+    print(f"Embeddings: {sample_batch['embeddings'].shape}")
