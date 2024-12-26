@@ -7,7 +7,7 @@ exp_name: rsp_fixed
 model_name: rsp_vit_small_patch16
 
 dataset:
-  _target_: util.kinetics.PairedKineticsFixed
+  _target_: util.kinetics_fixed.PairedKineticsFixed
   root: /data/kinetics400
 
 train_loop:
