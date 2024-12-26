@@ -72,4 +72,5 @@ python captioning/extract_frames.py \
     --results_path /home/bjyoon/RSP/outputs/fixed-gpt_emb_small-paired-type_embedding-noise_2024-11-24_12-16-04/davis_seg \
     --davis_path /data/DAVIS_480_880
 
-python -m torch.distributed.launch --nproc_per_node=1 --use_env --master_port 30100 main_pretrain_combined.py -cn mse exp_name=full-test batch_size=192 accum_iter=1
+python -m torch.distributed.launch --nproc_per_node=4 --use_env --master_port 30200 main_pretrain_combined.py -cn kinetics_fixed exp_name=full-test batch_size=96 accum_iter=4 model_params.kl_scale=0.01
+python -m torch.distributed.launch --nproc_per_node=4 --use_env --master_port 30100 main_pretrain_combined.py -cn mse exp_name=full-grad_clip batch_size=96 accum_iter=4 

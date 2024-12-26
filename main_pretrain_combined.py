@@ -33,6 +33,25 @@ from torch.distributed.elastic.multiprocessing.errors import record
 @record
 def main(cfg: DictConfig):
     misc.init_distributed_mode(cfg)
+    if cfg.distributed:
+        num_tasks = misc.get_world_size()
+        global_rank = misc.get_rank()
+
+    if not cfg.distributed or global_rank == 0:
+        if cfg.log_dir is not None:
+            os.makedirs(cfg.log_dir, exist_ok=True)
+            log_writer = SummaryWriter(log_dir=cfg.log_dir)
+        else:
+            log_writer = None
+            
+        # Initialize wandb
+        wandb.init(
+            name=cfg.run_name,
+            config=OmegaConf.to_container(cfg, resolve=True),
+            **cfg.wandb
+        )
+    else:
+        log_writer = None
 
     print("job dir: {}".format(os.path.dirname(os.path.realpath(__file__))))
     print("{}".format(cfg).replace(", ", ",\n"))
@@ -51,6 +70,17 @@ def main(cfg: DictConfig):
 
     cudnn.benchmark = True
 
+    eff_batch_size = cfg.batch_size * cfg.accum_iter * misc.get_world_size()
+
+    if cfg.lr is None:  # only base_lr is specified
+        cfg.lr = cfg.blr * eff_batch_size / 256
+
+    print("base lr: %.2e" % (cfg.lr * 256 / eff_batch_size))
+    print("actual lr: %.2e" % cfg.lr)
+
+    print("accumulate grad iterations: %d" % cfg.accum_iter)
+    print("effective batch size: %d" % eff_batch_size)
+    
     dataset_train = instantiate(cfg.dataset)
 
     print(dataset_train)
@@ -65,21 +95,7 @@ def main(cfg: DictConfig):
     else:
         sampler_train = torch.utils.data.RandomSampler(dataset_train)
 
-    if not cfg.distributed or global_rank == 0:
-        if cfg.log_dir is not None:
-            os.makedirs(cfg.log_dir, exist_ok=True)
-            log_writer = SummaryWriter(log_dir=cfg.log_dir)
-        else:
-            log_writer = None
-            
-        # Initialize wandb
-        wandb.init(
-            name=cfg.run_name,
-            config=OmegaConf.to_container(cfg, resolve=True),
-            **cfg.wandb
-        )
-    else:
-        log_writer = None
+
 
     data_loader_train = torch.utils.data.DataLoader(
         dataset_train,
@@ -99,16 +115,7 @@ def main(cfg: DictConfig):
     model.to(device)
     model_without_ddp = model
 
-    eff_batch_size = cfg.batch_size * cfg.accum_iter * misc.get_world_size()
 
-    if cfg.lr is None:  # only base_lr is specified
-        cfg.lr = cfg.blr * eff_batch_size / 256
-
-    print("base lr: %.2e" % (cfg.lr * 256 / eff_batch_size))
-    print("actual lr: %.2e" % cfg.lr)
-
-    print("accumulate grad iterations: %d" % cfg.accum_iter)
-    print("effective batch size: %d" % eff_batch_size)
 
     if cfg.distributed:
         model = torch.nn.parallel.DistributedDataParallel(

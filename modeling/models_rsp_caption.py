@@ -117,7 +117,7 @@ class RspCaption(nn.Module):
         )
         nn.init.normal_(self.image_type_embed, std=0.02)
         self.language_type_embed = nn.Parameter(
-            torch.zeros(1, 1, decoder_embed_dim), requires_grad=True
+            torch.zeros(1, 1, decoder_embed_dim),
         )
         nn.init.normal_(self.language_type_embed, std=0.02)
 
@@ -381,7 +381,7 @@ class RspCaption(nn.Module):
         if self.norm_pix_loss:
             mean = target.mean(dim=-1, keepdim=True)
             var = target.var(dim=-1, keepdim=True)
-            target = (target - mean) / (var + 1.0e-6) ** 0.5
+            target = (target - mean) / (var + 1.0e-4) ** 0.5
 
         recon_loss = (pred - target) ** 2
         if mask is not None:

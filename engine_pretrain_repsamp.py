@@ -21,7 +21,7 @@ def train_one_epoch(
     metric_logger = misc.MetricLogger(delimiter="  ")
     metric_logger.add_meter("lr", misc.SmoothedValue(window_size=1, fmt="{value:.6f}"))
     header = "Epoch: [{}]".format(epoch)
-    print_freq = 20
+    print_freq = 100
 
     accum_iter = args.accum_iter
     optimizer.zero_grad(set_to_none=True)
@@ -62,6 +62,7 @@ def train_one_epoch(
         loss_scaler(
             loss,
             optimizer,
+            clip_grad=1.0,
             parameters=model.parameters(),
             update_grad=(data_iter_step + 1) % accum_iter == 0,
         )
@@ -110,7 +111,7 @@ def train_one_epoch_llm(
     metric_logger = misc.MetricLogger(delimiter="  ")
     metric_logger.add_meter("lr", misc.SmoothedValue(window_size=1, fmt="{value:.6f}"))
     header = "Epoch: [{}]".format(epoch)
-    print_freq = 20
+    print_freq = 100
 
     accum_iter = args.accum_iter
     optimizer.zero_grad(set_to_none=True)
@@ -146,6 +147,7 @@ def train_one_epoch_llm(
         loss_scaler(
             loss,
             optimizer,
+            clip_grad=1.0,
             parameters=model.parameters(),
             update_grad=(data_iter_step + 1) % accum_iter == 0,
         )

@@ -61,7 +61,7 @@ class PairedKineticsWithCaption(Dataset):
             for pair in frame_data:
                 if (video_idx, pair["pair_idx"]) not in self.embeddings:
                     missing_embeddings[video_idx].append(pair["pair_idx"])
-
+        self.results = [v for k, v in self.results.items()]
         print(f"\nDataset Statistics:")
         print(f"Total pairs found: {len(self.results)}")
         print(f"Total embeddings found: {len(self.embeddings)}")

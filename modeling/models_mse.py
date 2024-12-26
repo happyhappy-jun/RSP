@@ -17,7 +17,7 @@ class RspCaptionMse(RspCaption):
         )
         nn.init.normal_(self.image_type_embed, std=0.02)
         self.language_type_embed = nn.Parameter(
-            torch.zeros(1, 1, self.decoder_embed_dim), requires_grad=True
+            torch.zeros(1, 1, self.decoder_embed_dim), 
         )
         nn.init.normal_(self.language_type_embed, std=0.02)
         self.rms_norm = RMSNorm(self.decoder_embed_dim, scale_factor=embed_scale_factor, eps=1e-6)
@@ -110,7 +110,7 @@ class RspCaptionMse(RspCaption):
         detailed_loss = {
             "loss_post": loss_post,
             "loss_prior": loss_prior,
-            "kl_loss": kl_loss,
+            "loss_kl": kl_loss,
             "kl": kl_value,
             "context_loss": context_loss,
             "loss_mae": mae_loss,
