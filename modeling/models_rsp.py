@@ -364,7 +364,7 @@ class RSP(nn.Module):
         if self.norm_pix_loss:
             mean = target.mean(dim=-1, keepdim=True)
             var = target.var(dim=-1, keepdim=True)
-            target = (target - mean) / (var + 1.0e-6) ** 0.5
+            target = (target - mean) / (var + 1.0e-4) ** 0.5
 
         recon_loss = (pred - target) ** 2
         if mask is not None:

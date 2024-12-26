@@ -64,6 +64,7 @@ def train_one_epoch(
             optimizer,
             clip_grad=1.0,
             parameters=model.parameters(),
+            clip_grad=1.0,
             update_grad=(data_iter_step + 1) % accum_iter == 0,
         )
         if (data_iter_step + 1) % accum_iter == 0:

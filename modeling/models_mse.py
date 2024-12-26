@@ -17,7 +17,7 @@ class RspCaptionMse(RspCaption):
         )
         nn.init.normal_(self.image_type_embed, std=0.02)
         self.language_type_embed = nn.Parameter(
-            torch.zeros(1, 1, self.decoder_embed_dim), 
+            torch.zeros(1, 1, self.decoder_embed_dim),
         )
         nn.init.normal_(self.language_type_embed, std=0.02)
         self.rms_norm = RMSNorm(self.decoder_embed_dim, scale_factor=embed_scale_factor, eps=1e-6)
@@ -28,6 +28,7 @@ class RspCaptionMse(RspCaption):
         h = self.decoder_embed_deter(h)  # [B, L, decoder_embed_dim]
         h = h + self.decoder_pos_embed  # Add positional embedding
         h = h + self.image_type_embed
+        h_context = h_context + self.language_type_embed
 
         # Concatenate along sequence dimension
         h_concat = torch.cat([h, h_context], dim=1)  # [B, L+1, decoder_embed_dim]
@@ -85,8 +86,7 @@ class RspCaptionMse(RspCaption):
         h_context = self.resize_embed(embedding, self.decoder_embed_dim)
         if self.enable_rms_norm:
             h_context = self.rms_norm(h_context)
-        
-        h_context_input = h_context + self.language_type_embed
+
         # Project context to prior space
         h_context_prime = self.to_language_prior(src_h[:, 0])
 
