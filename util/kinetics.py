@@ -1,13 +1,9 @@
 import os
-import random
-import pickle
-import numpy as np
-from decord import VideoReader, cpu
+import json
+import cv2
 import torch
 from torch.utils.data import Dataset
 from torchvision import transforms
-
-from util.misc import seed_everything
 from util.transform import PairedRandomResizedCrop
 
 
@@ -18,76 +14,61 @@ class PairedKinetics(Dataset):
         
     def __init__(
         self,
-        root,
-        max_distance=48,
+        frame_root,
+        frame_info_path,
         repeated_sampling=2,
-        seed=42,
-        timeout=30  # Add timeout parameter
+        seed=42
     ):
         super().__init__()
-        seed_everything(seed)
-        self.root = root
-        with open(
-            os.path.join(self.root, "labels", f"label_full_1.0.pickle"), "rb"
-        ) as f:
-            self.samples = pickle.load(f)
+        self.frame_root = frame_root
+        
+        # Load frame info data
+        with open(frame_info_path, 'r') as f:
+            frame_info = json.load(f)
+            self.frames = frame_info['videos']
 
         self.transforms = PairedRandomResizedCrop(seed=seed)
-        self.basic_transform = transforms.Compose(
-            [transforms.ToTensor(),
-             transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])]
-        )
-
-        self.max_distance = max_distance
+        self.basic_transform = transforms.Compose([
+            transforms.ToTensor(),
+            transforms.Normalize(mean=[0.485, 0.456, 0.406], 
+                              std=[0.229, 0.224, 0.225])
+        ])
+        
         self.repeated_sampling = repeated_sampling
 
     def __len__(self):
-        return len(self.samples)
+        return len(self.frames)
+
+    def _process_path(self, frame_path):
+        """add frame_root to frame_path"""
+        return f"{self.frame_root}/{frame_path}"
+
+    def load_frame(self, frame_path):
+        """Load and convert frame to RGB"""
+        frame = cv2.imread(frame_path)
+        if frame is None:
+            raise ValueError(f"Failed to load frame from path: {frame_path}")
+        return cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
     def __getitem__(self, index):
-        sample = os.path.join(self.root, self.samples[index][1])
-        try:
-            vr = VideoReader(sample, num_threads=1, ctx=cpu(0))
-            src_images = []
-            tgt_images = []
-        except Exception as e:
-            print(f"Error loading video {sample}: {str(e)}")
-            # Return a default/empty sample
-            return torch.zeros(self.repeated_sampling, 3, 224, 224), \
-                   torch.zeros(self.repeated_sampling, 3, 224, 224), 0
-        for i in range(self.repeated_sampling):
-            src_image, tgt_image = self.load_frames(vr)
-            src_image, tgt_image = self.transform(src_image, tgt_image)
+        frame_data = self.frames[index]
+        frame_paths = frame_data['frame_paths']
+        
+        src_images = []
+        tgt_images = []
+        
+        for _ in range(self.repeated_sampling):
+            frame_cur = self.load_frame(self._process_path(frame_paths[0]))
+            frame_fut = self.load_frame(self._process_path(frame_paths[1]))
+            
+            src_image, tgt_image = self.transforms(frame_cur, frame_fut)
+            src_image = self.basic_transform(src_image)
+            tgt_image = self.basic_transform(tgt_image)
+            
             src_images.append(src_image)
             tgt_images.append(tgt_image)
-        src_images = torch.stack(src_images, dim=0)
-        tgt_images = torch.stack(tgt_images, dim=0)
-        del vr  # Explicitly delete VideoReader object
-        return src_images, tgt_images, 0
 
-
-    def load_frames(self, vr):
-        # handle temporal segments
-        seg_len = len(vr)
-        least_frames_num = self.max_distance + 1
-        if seg_len >= least_frames_num:
-            idx_cur = random.randint(0, seg_len - least_frames_num)
-            interval = random.randint(4, self.max_distance)
-            idx_fut = idx_cur + interval
-        else:
-            indices = random.sample(range(seg_len), 2)
-            indices.sort()
-            idx_cur, idx_fut = indices
-        frame_cur = vr[idx_cur].asnumpy()
-        frame_fut = vr[idx_fut].asnumpy()
-
-        return frame_cur, frame_fut
-
-    def transform(self, src_image, tgt_image):
-        src_image, tgt_image = self.transforms(src_image, tgt_image)
-        src_image = self.basic_transform(src_image)
-        tgt_image = self.basic_transform(tgt_image)
-        return src_image, tgt_image
+        return torch.stack(src_images, dim=0), torch.stack(tgt_images, dim=0), 0
 
 
 
