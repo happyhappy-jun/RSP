@@ -37,10 +37,18 @@ class RspCaptionMseReg(RspCaption):
         self.enable_rms_norm = enable_rms_norm
 
         # register token for store extra information
+        # Initialize register tokens
         self.register_token = nn.Parameter(torch.randn(num_register_tokens, self.embed_dim))
+        self.num_register_tokens = num_register_tokens
 
     def forward_encoder(self, imgs, mask_ratio=0.0):
+        # Get batch size
+        batch = imgs.shape[0]
+        
+        # Patch embedding
         x = self.patch_embed(imgs)
+        
+        # Add positional embedding
         x = x + self.pos_embed[:, 1:, :]
 
         if mask_ratio != 0.0:
@@ -49,18 +57,28 @@ class RspCaptionMseReg(RspCaption):
         else:
             mask, ids_restore = None, None
 
+        # Add CLS token with position embedding
         cls_token = self.cls_token + self.pos_embed[:, :1, :]
-        cls_tokens = cls_token.expand(x.shape[0], -1, -1)
-        x = torch.cat((cls_tokens, x), dim=1)
+        cls_tokens = cls_token.expand(batch, -1, -1)
+        
+        # Expand register tokens for batch
+        register_tokens = self.register_token.unsqueeze(0).expand(batch, -1, -1)
+        
+        # Concatenate CLS token, patches, and register tokens
+        x = torch.cat([cls_tokens, x, register_tokens], dim=1)
 
+        # Apply transformer blocks
         for blk in self.blocks:
             x = blk(x)
         x = self.norm(x)
+        
         return x, mask, ids_restore
 
     def get_feat(self, h, h_context, z):
         # Process deterministic path
-        h = self.decoder_embed_deter(h)  # [B, L, decoder_embed_dim]
+        # Remove register tokens from h before embedding
+        h_without_register = h[:, :-self.num_register_tokens]
+        h = self.decoder_embed_deter(h_without_register)  # [B, L, decoder_embed_dim]
         h = h + self.decoder_pos_embed  # Add positional embedding
         h = h + self.image_type_embed
         h_context = h_context + self.language_type_embed
