@@ -90,7 +90,7 @@ class RspCaptionMse(RspCaption):
         # Project context to prior space
         h_context_prime = self.to_language_prior(src_h[:, 0])
 
-        tgt_pred = self.forward_decoder_fut(src_h, h_context_input, post_z)
+        tgt_pred = self.forward_decoder_fut(src_h, h_context, post_z)
         loss_post = self.forward_loss(tgt_imgs, tgt_pred)
         kl_loss, kl_value = self.compute_kl_loss(post_logits, prior_logits)
         h_context_prime = h_context_prime.view(h_context.shape)  # Ensure same shape as h_context
@@ -102,7 +102,7 @@ class RspCaptionMse(RspCaption):
         mae_loss = self.forward_loss(tgt_imgs, pred_masked, mask)
 
         with torch.no_grad():
-            tgt_pred_prior = self.forward_decoder_fut(src_h, h_context_input, prior_z)
+            tgt_pred_prior = self.forward_decoder_fut(src_h, h_context, prior_z)
             loss_prior = self.forward_loss(tgt_imgs, tgt_pred_prior)
 
         loss = loss_post + self.kl_scale * kl_loss + self.mse_scale * context_loss + mae_loss
