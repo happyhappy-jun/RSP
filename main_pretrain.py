@@ -119,7 +119,7 @@ def main(cfg: DictConfig):
 
     if cfg.distributed:
         model = torch.nn.parallel.DistributedDataParallel(
-            model, device_ids=[cfg.gpu], find_unused_parameters=True
+            model, device_ids=[cfg.gpu]
         )
         model_without_ddp = model.module
 

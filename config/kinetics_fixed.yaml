@@ -8,8 +8,8 @@ model_name: rsp_vit_small_patch16
 
 dataset:
   _target_: util.kinetics_fixed.PairedKineticsFixed
-  frame_root: /data/kinetics400/frames
-  frame_info_path: /data/kinetics400/frame_info.json
+  frame_root: /data/kinetics400caption/frames
+  frame_info_path: /data/kinetics400caption/frame_info.json
 
 train_loop:
   _target_: engine_pretrain_repsamp.train_one_epoch
