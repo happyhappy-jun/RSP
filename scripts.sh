@@ -72,5 +72,5 @@ CUDA_VISIBLE_DEVICES=4 python ./davis2017-evaluation/evaluation_method.py \
   --results_path  $OUTPUT_DIR/davis_seg3 \
   --davis_path /data/DAVIS_480_880
 
-python -m torch.distributed.launch --nproc_per_node=4 --use_env --master_port 30200 main_pretrain_combined.py -cn kinetics_fixed exp_name=full-test batch_size=96 accum_iter=4 model_params.kl_scale=0.01
+python -m torch.distributed.launch --nproc_per_node=8 --use_env --master_port 30200 main_pretrain_combined.py -cn mse exp_name=mse-kl_scall0.005 batch_size=48 accum_iter=4 model_params.kl_scale=0.005
 python -m torch.distributed.launch --nproc_per_node=4 --use_env --master_port 30100 main_pretrain_combined.py -cn mse exp_name=full-grad_clip batch_size=96 accum_iter=4 

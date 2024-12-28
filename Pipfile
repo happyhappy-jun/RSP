@@ -1,0 +1,21 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+torch = "==2.3.1"
+torchvision = "*"
+hydra-core = "*"
+pydantic = "*"
+opencv-python-headless = "*"
+openai = "*"
+aider-chat = "*"
+tensorboard = "*"
+matplotlib = "*"
+wandb = "*"
+
+[dev-packages]
+
+[requires]
+python_version = "3.10"
