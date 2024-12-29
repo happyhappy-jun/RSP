@@ -77,14 +77,20 @@ def test_decoder(model_config, sample_inputs):
         embed_dim = 384
         x = torch.randn(batch_size, num_patches, embed_dim)
         
-        # Get patches at indices 0 and 3
-        selected_patches = x[:, [0, 3], :]  # This will select patches 0 and 3 for all batches
-        assert selected_patches.shape == (batch_size, 2, embed_dim)
+        # Create indices [0, 3, 4, 5, ..., num_patches-1]
+        indices = torch.cat([torch.tensor([0]), torch.arange(3, num_patches)])
         
-        # Alternative way using fancy indexing
-        indices = torch.tensor([0, 3])
+        # Method 1: Using fancy indexing
+        selected_patches = x[:, indices, :]
+        assert selected_patches.shape == (batch_size, len(indices), embed_dim)
+        
+        # Method 2: Using index_select
         selected_patches_alt = x.index_select(1, indices)
         assert torch.equal(selected_patches, selected_patches_alt)
+        
+        # Verify first patch is 0 and subsequent patches start from 3
+        assert torch.equal(selected_patches[:, 0, :], x[:, 0, :])  # First patch is 0
+        assert torch.equal(selected_patches[:, 1:, :], x[:, 3:, :])  # Rest starts from 3
         
         return selected_patches
     
