@@ -21,19 +21,17 @@ def create_subset_dataset(frame_info_path, embeddings_path, output_dir, sample_r
     with open(frame_info_path, 'r') as f:
         frame_info = json.load(f)
     
-    # Get all video pairs
-    all_pairs = []
-    for video in frame_info['videos']:
-        all_pairs.append((video['video_idx'], video['pair_idx']))
+    # Get unique video IDs
+    video_ids = set(video['video_idx'] for video in frame_info['videos'])
     
-    # Sample pairs
-    num_samples = int(len(all_pairs) * sample_ratio)
-    sampled_pairs = set(random.sample(all_pairs, num_samples))
+    # Sample videos
+    num_samples = int(len(video_ids) * sample_ratio)
+    sampled_videos = set(random.sample(list(video_ids), num_samples))
     
-    # Create new frame info with only sampled pairs
+    # Create new frame info with all pairs from sampled videos
     new_frame_info = {'videos': []}
     for video in frame_info['videos']:
-        if (video['video_idx'], video['pair_idx']) in sampled_pairs:
+        if video['video_idx'] in sampled_videos:
             new_frame_info['videos'].append(video)
     
     # Save new frame info
@@ -46,12 +44,11 @@ def create_subset_dataset(frame_info_path, embeddings_path, output_dir, sample_r
     with open(embeddings_path, 'r') as f_in, open(output_embeddings, 'w') as f_out:
         for line in f_in:
             record = json.loads(line)
-            # Parse video_idx and pair_idx from custom_id (format: video_X_pair_Y)
+            # Parse video_idx from custom_id (format: video_X_pair_Y)
             parts = record[-1]['custom_id'].split('_')
             video_idx = int(parts[1])
-            pair_idx = int(parts[-1])
             
-            if (video_idx, pair_idx) in sampled_pairs:
+            if video_idx in sampled_videos:
                 f_out.write(line)
     
     print(f"Created subset dataset with {len(new_frame_info['videos'])} pairs")
