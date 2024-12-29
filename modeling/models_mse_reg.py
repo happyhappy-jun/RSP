@@ -38,19 +38,12 @@ class RspCaptionMseReg(RspCaption):
 
         # register token for store extra information
         # Initialize register tokens
-        self.register_token = nn.Parameter(torch.zeros(num_register_tokens, 1, self.embed_dim))
+        self.register_token = nn.Parameter(torch.zeros(1, num_register_tokens, self.embed_dim))
         nn.init.normal_(self.register_token, std=0.02)
         self.num_register_tokens = num_register_tokens
 
-
     def forward_encoder(self, imgs, mask_ratio=0.0):
-        # Get batch size
-        batch = imgs.shape[0]
-
-        # Patch embedding
         x = self.patch_embed(imgs)
-
-        # Add positional embedding
         x = x + self.pos_embed[:, 1:, :]
 
         if mask_ratio != 0.0:
@@ -61,19 +54,18 @@ class RspCaptionMseReg(RspCaption):
 
         # Add CLS token with position embedding
         cls_token = self.cls_token + self.pos_embed[:, :1, :]
-        cls_tokens = cls_token.expand(batch, -1, -1)
-
-        # Expand register tokens for batch
-        register_tokens = self.register_token.unsqueeze(0).expand(batch, -1, -1)
+        cls_tokens = cls_token.expand(x.shape[0], -1, -1)
 
         # Concatenate CLS token, patches, and register tokens
-        x = torch.cat([cls_tokens, register_tokens, x], dim=1)
+
+        register_token = self.register_token.expand(x.shape[0], -1, -1)
+        x = torch.cat([cls_tokens, register_token, x], dim=1)
 
         # Apply transformer blocks
         for blk in self.blocks:
             x = blk(x)
 
-        indices = torch.cat([torch.tensor([0]), torch.arange(1+self.num_register_tokens, x.shape[1])])
+        indices = torch.cat([torch.tensor([0]), torch.arange(1 + self.num_register_tokens, x.shape[1])])
         x = x[:, indices, :]
         x = self.norm(x)
 
@@ -176,8 +168,8 @@ class RspCaptionMseReg(RspCaption):
         return loss, tgt_pred, detailed_loss
 
 
-def rsp_mse_vit_small_patch8_dec512d8b(**kwargs):
-    model = RspCaptionMse(
+def rsp_mse_reg_vit_small_patch8_dec512d8b(**kwargs):
+    model = RspCaptionMseReg(
         patch_size=8,
         embed_dim=384,
         depth=12,
@@ -192,8 +184,8 @@ def rsp_mse_vit_small_patch8_dec512d8b(**kwargs):
     return model
 
 
-def rsp_mse_vit_small_patch16_dec512d8b(**kwargs):
-    model = RspCaptionMse(
+def rsp_mse_reg_vit_small_patch16_dec512d8b(**kwargs):
+    model = RspCaptionMseReg(
         patch_size=16,
         embed_dim=384,
         depth=12,
@@ -208,8 +200,8 @@ def rsp_mse_vit_small_patch16_dec512d8b(**kwargs):
     return model
 
 
-def rsp_mse_vit_base_patch16_dec512d8b(**kwargs):
-    model = RspCaptionMse(
+def rsp_mse_reg_vit_base_patch16_dec512d8b(**kwargs):
+    model = RspCaptionMseReg(
         patch_size=16,
         embed_dim=768,
         depth=12,
@@ -224,8 +216,8 @@ def rsp_mse_vit_base_patch16_dec512d8b(**kwargs):
     return model
 
 
-def rsp_mse_vit_large_patch16_dec512d8b(**kwargs):
-    model = RspCaptionMse(
+def rsp_mse_reg_vit_large_patch16_dec512d8b(**kwargs):
+    model = RspCaptionMseReg(
         patch_size=16,
         embed_dim=1024,
         depth=24,
@@ -241,7 +233,7 @@ def rsp_mse_vit_large_patch16_dec512d8b(**kwargs):
 
 
 # Aliases
-rsp_mse_vit_small_patch8 = rsp_mse_vit_small_patch8_dec512d8b
-rsp_mse_vit_small_patch16 = rsp_mse_vit_small_patch16_dec512d8b
-rsp_mse_vit_base_patch16 = rsp_mse_vit_base_patch16_dec512d8b
-rsp_mse_vit_large_patch16 = rsp_mse_vit_large_patch16_dec512d8b
+rsp_mse_reg_vit_small_patch8 = rsp_mse_reg_vit_small_patch8_dec512d8b
+rsp_mse_reg_vit_small_patch16 = rsp_mse_reg_vit_small_patch16_dec512d8b
+rsp_mse_reg_vit_base_patch16 = rsp_mse_reg_vit_base_patch16_dec512d8b
+rsp_mse_reg_vit_large_patch16 = rsp_mse_reg_vit_large_patch16_dec512d8b
