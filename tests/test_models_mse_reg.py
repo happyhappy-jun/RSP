@@ -69,6 +69,28 @@ def test_decoder(model_config, sample_inputs):
     model = RspCaptionMseReg(**model_config)
     src_imgs, _, embedding = sample_inputs
     
+    # Example of indexing specific patches
+    def test_patch_indexing():
+        # Create a sample tensor [Batch, patches, embed_dim]
+        batch_size = 2
+        num_patches = 10
+        embed_dim = 384
+        x = torch.randn(batch_size, num_patches, embed_dim)
+        
+        # Get patches at indices 0 and 3
+        selected_patches = x[:, [0, 3], :]  # This will select patches 0 and 3 for all batches
+        assert selected_patches.shape == (batch_size, 2, embed_dim)
+        
+        # Alternative way using fancy indexing
+        indices = torch.tensor([0, 3])
+        selected_patches_alt = x.index_select(1, indices)
+        assert torch.equal(selected_patches, selected_patches_alt)
+        
+        return selected_patches
+    
+    # Run the indexing test
+    patches = test_patch_indexing()
+    
     # Get encoded features
     h, _, _ = model.forward_encoder(src_imgs)
     
