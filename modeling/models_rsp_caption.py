@@ -102,6 +102,7 @@ class RspCaption(nn.Module):
         neftune_noise_alpha=5.0,
     ):
         super().__init__()
+        self.embed_dim = embed_dim
         self.patch_embed = PatchEmbed(img_size, patch_size, in_chans, embed_dim)
         self.num_patches = self.patch_embed.num_patches
         self.neftune_noise_alpha = neftune_noise_alpha

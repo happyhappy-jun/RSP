@@ -38,16 +38,18 @@ class RspCaptionMseReg(RspCaption):
 
         # register token for store extra information
         # Initialize register tokens
-        self.register_token = nn.Parameter(torch.randn(num_register_tokens, self.embed_dim))
+        self.register_token = nn.Parameter(torch.zeros(num_register_tokens, 1, self.embed_dim))
+        nn.init.normal_(self.register_token, std=0.02)
         self.num_register_tokens = num_register_tokens
+
 
     def forward_encoder(self, imgs, mask_ratio=0.0):
         # Get batch size
         batch = imgs.shape[0]
-        
+
         # Patch embedding
         x = self.patch_embed(imgs)
-        
+
         # Add positional embedding
         x = x + self.pos_embed[:, 1:, :]
 
@@ -60,25 +62,27 @@ class RspCaptionMseReg(RspCaption):
         # Add CLS token with position embedding
         cls_token = self.cls_token + self.pos_embed[:, :1, :]
         cls_tokens = cls_token.expand(batch, -1, -1)
-        
+
         # Expand register tokens for batch
         register_tokens = self.register_token.unsqueeze(0).expand(batch, -1, -1)
-        
+
         # Concatenate CLS token, patches, and register tokens
-        x = torch.cat([cls_tokens, x, register_tokens], dim=1)
+        x = torch.cat([cls_tokens, register_tokens, x], dim=1)
 
         # Apply transformer blocks
         for blk in self.blocks:
             x = blk(x)
+
+        indices = torch.cat([torch.tensor([0]), torch.arange(1+self.num_register_tokens, x.shape[1])])
+        x = x[:, indices, :]
         x = self.norm(x)
-        
+
         return x, mask, ids_restore
 
     def get_feat(self, h, h_context, z):
         # Process deterministic path
         # Remove register tokens from h before embedding
-        h_without_register = h[:, :-self.num_register_tokens]
-        h = self.decoder_embed_deter(h_without_register)  # [B, L, decoder_embed_dim]
+        h = self.decoder_embed_deter(h)  # [B, L, decoder_embed_dim]
         h = h + self.decoder_pos_embed  # Add positional embedding
         h = h + self.image_type_embed
         h_context = h_context + self.language_type_embed
