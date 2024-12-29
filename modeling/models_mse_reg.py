@@ -154,7 +154,9 @@ class RspCaptionMseReg(RspCaption):
             tgt_pred_prior = self.forward_decoder_fut(src_h, h_context, prior_z)
             loss_prior = self.forward_loss(tgt_imgs, tgt_pred_prior)
 
-        loss = loss_post + self.kl_scale * kl_loss + self.mse_scale * context_loss + mae_loss
+        # Add regularization loss for register tokens to ensure they're used
+        register_loss = torch.mean(self.register_token.pow(2))  # L2 regularization on register tokens
+        loss = loss_post + self.kl_scale * kl_loss + self.mse_scale * context_loss + mae_loss + 0.01 * register_loss
 
         detailed_loss = {
             "loss_post": loss_post,
@@ -163,6 +165,7 @@ class RspCaptionMseReg(RspCaption):
             "kl": kl_value,
             "context_loss": context_loss,
             "loss_mae": mae_loss,
+            "register_loss": register_loss,
         }
 
         return loss, tgt_pred, detailed_loss
