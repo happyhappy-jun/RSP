@@ -172,7 +172,6 @@ class RspCaption(nn.Module):
         self.decoder_embed_deter = nn.Linear(embed_dim, decoder_embed_dim, bias=True)
         self.decoder_embed_stoch = nn.Linear(stoch_size, decoder_embed_dim, bias=True)
         self.mask_token = nn.Parameter(torch.zeros(1, 1, decoder_embed_dim))
-        self.context_proj = nn.Linear(context_emb_dim, decoder_embed_dim, bias=True)
 
         self.decoder_pos_embed = nn.Parameter(
             torch.zeros(1, self.num_patches + 1, decoder_embed_dim),
@@ -408,7 +407,6 @@ class RspCaption(nn.Module):
         if self.training:
             h_context = self.add_noise(h_context)
         
-        # h_context = self.context_proj(h_context)  # [B, 1, decoder_embed_dim]
         h_context = self.resize_embed(h_context, self.decoder_embed_dim)
         h_context = h_context + self.language_type_embed  # Add type embedding
         
