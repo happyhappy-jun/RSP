@@ -171,7 +171,7 @@ def main(cfg: DictConfig):
                 epoch=epoch,
             )
             if epoch % 50 == 0 or epoch in [cfg.epochs - 2, cfg.epochs - 1, cfg.epochs]:
-                wandb.save(cfg.output_dir / ("checkpoint-%s.pth" % str(epoch)))
+                wandb.save(os.path.join(cfg.output_dir / ("checkpoint-%s.pth" % str(epoch))))
 
         log_stats = {
             **{f"train_{k}": v for k, v in train_stats.items()},
