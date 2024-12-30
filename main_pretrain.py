@@ -96,7 +96,6 @@ def main(cfg: DictConfig):
         sampler_train = torch.utils.data.RandomSampler(dataset_train)
 
 
-
     data_loader_train = torch.utils.data.DataLoader(
         dataset_train,
         sampler=sampler_train,
@@ -114,8 +113,6 @@ def main(cfg: DictConfig):
 
     model.to(device)
     model_without_ddp = model
-
-
 
     if cfg.distributed:
         model = torch.nn.parallel.DistributedDataParallel(
@@ -173,6 +170,8 @@ def main(cfg: DictConfig):
                 loss_scaler=loss_scaler,
                 epoch=epoch,
             )
+            if epoch % 50 == 0 or epoch in [cfg.epochs - 2, cfg.epochs - 1, cfg.epochs]:
+                wandb.save(cfg.output_dir / ("checkpoint-%s.pth" % str(epoch)))
 
         log_stats = {
             **{f"train_{k}": v for k, v in train_stats.items()},
