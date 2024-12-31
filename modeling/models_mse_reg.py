@@ -57,16 +57,14 @@ class RspCaptionMseReg(RspCaption):
         cls_tokens = cls_token.expand(x.shape[0], -1, -1)
 
         # Concatenate CLS token, patches, and register tokens
-
-        register_token = self.register_token.expand(x.shape[0], -1, -1)
+        
+        register_token = torch.repeat_interleave(self.register_token, x.shape[0], dim=0)
         x = torch.cat([cls_tokens, register_token, x], dim=1)
 
         # Apply transformer blocks
         for blk in self.blocks:
             x = blk(x)
 
-        indices = torch.cat([torch.tensor([0]), torch.arange(1 + self.num_register_tokens, x.shape[1])])
-        x = x[:, indices, :]
         x = self.norm(x)
 
         return x, mask, ids_restore
@@ -90,8 +88,15 @@ class RspCaptionMseReg(RspCaption):
         # Final concatenation
         feat = torch.cat([z, h_concat], dim=1)
         return feat
+    
+    def remove_register_token(self, h):
+        cls_output = h[:, 0, :] 
+        patch_outputs = h[:, 1+self.num_register_tokens:, :]
+        output = torch.cat([cls_output.unsqueeze(1), patch_outputs], dim=1)
+        return output
 
     def forward_decoder_fut(self, h, h_context, z):
+        h = self.remove_register_token(h)
         kvx_h = self.get_feat(h, h_context, z)
 
         mask_tokens = self.mask_token.repeat(h.shape[0], h.shape[1], 1)

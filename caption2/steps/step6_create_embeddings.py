@@ -13,6 +13,7 @@ async def main():
                        help='Path to combined_results.json from step 5')
     parser.add_argument('--output_dir', type=str, required=True,
                        help='Output directory for embeddings')
+    parser.add_argument('--model', type=str, default="text-embedding-3-small", help="OpenAI embedding model")
     args = parser.parse_args()
 
     creator = EmbeddingCreator()

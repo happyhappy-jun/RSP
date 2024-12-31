@@ -9,8 +9,8 @@ model_name: rsp_mse_reg_vit_small_patch16
 dataset:
   _target_: util.kinetics_caption.PairedKineticsWithCaption
   frame_root: /data/kinetics400caption/frames
-  frame_info_path: /data/kinetics400caption/frame_info.json
-  embeddings_path: /data/kinetics400caption/embeddings.jsonl
+  frame_info_path: /data/kinetics400caption/frame_info_20.json
+  embeddings_path: /data/kinetics400caption/embeddings_20.jsonl
 
 train_loop:
   _target_: engine_pretrain_repsamp.train_one_epoch_llm

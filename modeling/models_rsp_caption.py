@@ -398,19 +398,6 @@ class RspCaption(nn.Module):
         noise = torch.zeros_like(x).uniform_(-mag_norm, mag_norm)
         x = x + noise.detach()
         return x
-    
-
-    def forward_embedding(self, h_context):
-        """Process context embedding by reshaping, adding noise if training, and projecting to decoder dim"""
-        batch_size = h_context.size(0)
-        h_context = h_context.view(batch_size, -1, h_context.size(-1))  # [B, 1, context_emb_dim]
-        if self.training:
-            h_context = self.add_noise(h_context)
-        
-        h_context = self.resize_embed(h_context, self.decoder_embed_dim)
-        h_context = h_context + self.language_type_embed  # Add type embedding
-        
-        return h_context
 
     def get_feat(self, h, z):
         # Process deterministic path

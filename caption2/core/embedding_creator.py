@@ -105,8 +105,9 @@ class APIRequest:
 class EmbeddingCreator:
     """Creates embeddings using OpenAI's text-embedding-3-small model with async processing"""
     
-    def __init__(self, max_requests_per_minute: int = 10000):
+    def __init__(self, model="text-embedding-3-small", max_requests_per_minute: int = 10000):
         """Initialize with rate limits"""
+        self.model = model
         self.max_requests_per_minute = max_requests_per_minute
         self.max_tokens_per_minute = 10_000_000  # text-embedding-3-small limit
         self.encoding = tiktoken.get_encoding("cl100k_base")
@@ -167,7 +168,7 @@ class EmbeddingCreator:
                         token_count = self.count_tokens(caption)
                         
                         request_json = {
-                            "model": "text-embedding-3-small",
+                            "model": self.model,
                             "input": caption,
                             "encoding_format": "float"
                         }
