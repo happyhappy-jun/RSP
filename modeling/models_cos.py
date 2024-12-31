@@ -121,7 +121,7 @@ class RspCaptionCos(RspCaption):
         return loss, tgt_pred, detailed_loss
 
 def rsp_cos_vit_small_patch8_dec512d8b(**kwargs):
-    model = RSPCaptionCos(
+    model = RspCaptionCos(
         patch_size=8,
         embed_dim=384,
         depth=12,
@@ -136,7 +136,7 @@ def rsp_cos_vit_small_patch8_dec512d8b(**kwargs):
     return model
 
 def rsp_cos_vit_small_patch16_dec512d8b(**kwargs):
-    model = RSPCaptionCos(
+    model = RspCaptionCos(
         patch_size=16,
         embed_dim=384,
         depth=12,
@@ -151,7 +151,7 @@ def rsp_cos_vit_small_patch16_dec512d8b(**kwargs):
     return model
 
 def rsp_cos_vit_base_patch16_dec512d8b(**kwargs):
-    model = RSPCaptionCos(
+    model = RspCaptionCos(
         patch_size=16,
         embed_dim=768,
         depth=12,
@@ -166,7 +166,7 @@ def rsp_cos_vit_base_patch16_dec512d8b(**kwargs):
     return model
 
 def rsp_cos_vit_large_patch16_dec512d8b(**kwargs):
-    model = RSPCaptionCos(
+    model = RspCaptionCos(
         patch_size=16,
         embed_dim=1024,
         depth=24,
