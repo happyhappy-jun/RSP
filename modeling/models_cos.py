@@ -95,7 +95,7 @@ class RspCaptionCos(RspCaption):
         kl_loss, kl_value = self.compute_kl_loss(post_logits, prior_logits)
         h_context_prime = h_context_prime.view(h_context.shape)  # Ensure same shape as h_context
         print(h_context.shape, h_context_prime.shape)
-        context_loss = torch.nn.functional.cosine_similarity(h_context, h_context_prime)
+        context_loss = 1 - torch.nn.functional.cosine_similarity(h_context, h_context_prime, dim=1)
         print(context_loss)
 
         # MAE
