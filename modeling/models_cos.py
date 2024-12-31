@@ -94,9 +94,7 @@ class RspCaptionCos(RspCaption):
         loss_post = self.forward_loss(tgt_imgs, tgt_pred)
         kl_loss, kl_value = self.compute_kl_loss(post_logits, prior_logits)
         h_context_prime = h_context_prime.view(h_context.shape)  # Ensure same shape as h_context
-        print(h_context.shape, h_context_prime.shape)
-        context_loss = 1 - torch.nn.functional.cosine_similarity(h_context, h_context_prime, dim=1)
-        print(context_loss)
+        context_loss = 1 - torch.nn.functional.cosine_similarity(h_context.squeeze(1), h_context_prime.squeeze(1), dim=1)
 
         # MAE
         img_h, mask, ids_restore = self.forward_encoder(tgt_imgs, mask_ratio=self.mask_ratio)
