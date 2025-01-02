@@ -1,0 +1,7 @@
+defaults:
+ - _self_
+
+device: ???
+artifact: ???
+epoch: 199
+eval_dir: "davis_seg"
