@@ -29,6 +29,7 @@ def train_one_epoch(
     if log_writer is not None:
         print("log_dir: {}".format(log_writer.log_dir))
 
+
     for data_iter_step, batch in enumerate(
         metric_logger.log_every(data_loader, print_freq, header)
     ):
@@ -90,7 +91,7 @@ def train_one_epoch(
             log_writer.add_scalar("loss_kl", loss_kl.item(), epoch_1000x)
             log_writer.add_scalar("loss_mae", loss_mae.item(), epoch_1000x)
             log_writer.add_scalar("kl", value_kl.item(), epoch_1000x)
-            
+        
     metric_logger.synchronize_between_processes()
     print("Averaged stats:", metric_logger)
     return {k: meter.global_avg for k, meter in metric_logger.meters.items()}

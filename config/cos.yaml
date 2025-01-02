@@ -6,11 +6,13 @@ exp_name: rsp_cos
 
 model_name: rsp_cos_vit_small_patch16
 
+data_root: /data
+
 dataset:
   _target_: util.kinetics_caption.PairedKineticsWithCaption
-  frame_root: /data/kinetics400caption/frames
-  frame_info_path: /data/kinetics400caption/frame_info.json
-  embeddings_path: /data/kinetics400caption/embeddings.jsonl
+  frame_root: ${..data_root}/kinetics400caption/frames
+  frame_info_path: ${..data_root}/kinetics400caption/frame_info.json
+  embeddings_path: ${..data_root}/kinetics400caption/embeddings.jsonl
 
 train_loop:
   _target_: engine_pretrain_repsamp.train_one_epoch_llm

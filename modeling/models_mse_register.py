@@ -7,17 +7,11 @@ from modeling.models_rsp import RSP
 from modeling.models_rsp_caption import RspCaption
 
 
-class RspCaptionCos(RspCaption):
-    """RSP model variant that uses Cos loss instead of KL divergence"""
-    def __init__(self, 
-                 *args, 
-                 cos_scale=1.0, 
-                 enable_rms_norm=False, 
-                 embed_scale_factor=1.0, 
-                 context_embed_dim=3072,
-                 **kwargs):
+class RspCaptionMseReg(RspCaption):
+    """RSP model variant that uses MSE loss instead of KL divergence"""
+    def __init__(self, *args, mse_scale=1.0, enable_rms_norm=False, embed_scale_factor=1.0, **kwargs):
         super().__init__(*args, **kwargs)
-        self.cos_scale = cos_scale
+        self.mse_scale = mse_scale
         self.image_type_embed = nn.Parameter(
             torch.zeros(1, self.num_patches + 1, self.decoder_embed_dim),
         )
@@ -26,13 +20,8 @@ class RspCaptionCos(RspCaption):
             torch.zeros(1, 1, self.decoder_embed_dim),
         )
         nn.init.normal_(self.language_type_embed, std=0.02)
+        self.rms_norm = RMSNorm(self.decoder_embed_dim, scale_factor=embed_scale_factor, eps=1e-6)
         self.enable_rms_norm = enable_rms_norm
-        if enable_rms_norm:
-            self.rms_norm = RMSNorm(self.decoder_embed_dim, scale_factor=embed_scale_factor, eps=1e-6)
-        else:
-            self.rms_norm = nn.Identity()  # Use Identity when disabled
-        self.context_proj = nn.Linear(context_embed_dim, self.decoder_embed_dim)
-        nn.init.normal_(self.context_proj.weight, std=0.02)
 
     def get_feat(self, h, h_context, z):
         # Process deterministic path
@@ -94,9 +83,9 @@ class RspCaptionCos(RspCaption):
         prior_z = prior_dist.rsample()
 
         embedding = embedding.view(-1, 1, embedding.size(-1))
-        # h_context = self.resize_embed(embedding, self.decoder_embed_dim)
-        h_context = self.context_proj(embedding)
-        h_context = self.rms_norm(h_context)
+        h_context = self.resize_embed(embedding, self.decoder_embed_dim)
+        if self.enable_rms_norm:
+            h_context = self.rms_norm(h_context)
 
         # Project context to prior space
         h_context_prime = self.to_language_prior(src_h[:, 0])
@@ -105,8 +94,7 @@ class RspCaptionCos(RspCaption):
         loss_post = self.forward_loss(tgt_imgs, tgt_pred)
         kl_loss, kl_value = self.compute_kl_loss(post_logits, prior_logits)
         h_context_prime = h_context_prime.view(h_context.shape)  # Ensure same shape as h_context
-        context_loss = 1 - torch.nn.functional.cosine_similarity(h_context.squeeze(1), h_context_prime.squeeze(1), dim=1)
-        context_loss = context_loss.mean()
+        context_loss = torch.nn.functional.mse_loss(h_context, h_context_prime)
 
         # MAE
         img_h, mask, ids_restore = self.forward_encoder(tgt_imgs, mask_ratio=self.mask_ratio)
@@ -117,7 +105,7 @@ class RspCaptionCos(RspCaption):
             tgt_pred_prior = self.forward_decoder_fut(src_h, h_context, prior_z)
             loss_prior = self.forward_loss(tgt_imgs, tgt_pred_prior)
 
-        loss = loss_post + self.kl_scale * kl_loss + self.cos_scale * context_loss + mae_loss
+        loss = loss_post + self.kl_scale * kl_loss + self.mse_scale * context_loss + mae_loss
 
         detailed_loss = {
             "loss_post": loss_post,
@@ -130,8 +118,8 @@ class RspCaptionCos(RspCaption):
 
         return loss, tgt_pred, detailed_loss
 
-def rsp_cos_vit_small_patch8_dec512d8b(**kwargs):
-    model = RspCaptionCos(
+def rsp_mse_reg_vit_small_patch8_dec512d8b(**kwargs):
+    model = RspCaptionMseReg(
         patch_size=8,
         embed_dim=384,
         depth=12,
@@ -145,8 +133,8 @@ def rsp_cos_vit_small_patch8_dec512d8b(**kwargs):
     )
     return model
 
-def rsp_cos_vit_small_patch16_dec512d8b(**kwargs):
-    model = RspCaptionCos(
+def rsp_mse_reg_vit_small_patch16_dec512d8b(**kwargs):
+    model = RspCaptionMseReg(
         patch_size=16,
         embed_dim=384,
         depth=12,
@@ -160,8 +148,8 @@ def rsp_cos_vit_small_patch16_dec512d8b(**kwargs):
     )
     return model
 
-def rsp_cos_vit_base_patch16_dec512d8b(**kwargs):
-    model = RspCaptionCos(
+def rsp_mse_reg_vit_base_patch16_dec512d8b(**kwargs):
+    model = RspCaptionMseReg(
         patch_size=16,
         embed_dim=768,
         depth=12,
@@ -175,8 +163,8 @@ def rsp_cos_vit_base_patch16_dec512d8b(**kwargs):
     )
     return model
 
-def rsp_cos_vit_large_patch16_dec512d8b(**kwargs):
-    model = RspCaptionCos(
+def rsp_mse_reg_vit_large_patch16_dec512d8b(**kwargs):
+    model = RspCaptionMseReg(
         patch_size=16,
         embed_dim=1024,
         depth=24,
@@ -191,7 +179,7 @@ def rsp_cos_vit_large_patch16_dec512d8b(**kwargs):
     return model
 
 # Aliases
-rsp_cos_vit_small_patch8 = rsp_cos_vit_small_patch8_dec512d8b
-rsp_cos_vit_small_patch16 = rsp_cos_vit_small_patch16_dec512d8b
-rsp_cos_vit_base_patch16 = rsp_cos_vit_base_patch16_dec512d8b
-rsp_cos_vit_large_patch16 = rsp_cos_vit_large_patch16_dec512d8b
+rsp_mse_reg_vit_small_patch8 = rsp_mse_reg_vit_small_patch8_dec512d8b
+rsp_mse_reg_vit_small_patch16 = rsp_mse_reg_vit_small_patch16_dec512d8b
+rsp_mse_reg_vit_base_patch16 = rsp_mse_reg_vit_base_patch16_dec512d8b
+rsp_mse_reg_vit_large_patch16 = rsp_mse_reg_vit_large_patch16_dec512d8b

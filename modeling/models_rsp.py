@@ -320,9 +320,8 @@ class RSP(nn.Module):
         x = mask_tokens + self.decoder_pos_embed
 
         # apply Transformer blocks
-        with torch.cuda.amp.autocast(enabled=False):
-            for blk in self.decoder_blocks:
-                x = blk(x, kvx=kvx_h)
+        for blk in self.decoder_blocks:
+            x = blk(x, kvx=kvx_h)
         x = self.decoder_norm(x)
 
         # predictor projection
@@ -346,9 +345,8 @@ class RSP(nn.Module):
         x = mask_tokens + self.decoder_pos_embed
 
         # apply Transformer blocks
-        with torch.cuda.amp.autocast(enabled=False):
-            for blk in self.decoder_blocks:
-                x = blk(x, kvx=kvx_h)
+        for blk in self.decoder_blocks:
+            x = blk(x, kvx=kvx_h)
         x = self.decoder_norm(x)
 
         # predictor projection
