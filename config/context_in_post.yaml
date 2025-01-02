@@ -8,8 +8,9 @@ model_name: rsp_context_in_posterior_vit_small_patch16
 
 dataset:
   _target_: util.kinetics_caption.PairedKineticsWithCaption
-  frame_info_path: ${oc.env:HOME}/RSP/artifacts/frames/frame_info.json
-  embeddings_path: ${oc.env:HOME}/RSP/artifacts/embeddings/embedding_results.jsonl
+  frame_root: ${..data_root}/kinetics400caption/frames
+  frame_info_path: ${..data_root}/kinetics400caption/frame_info.json
+  embeddings_path: ${..data_root}/kinetics400caption/embeddings.jsonl
 
 train_loop:
   _target_: engine_pretrain_repsamp.train_one_epoch_llm
