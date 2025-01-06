@@ -9,15 +9,26 @@ from modeling.models_rsp_caption import RspCaption
 
 class RspContextInPosterior(RspCaption):
     """RSP model variant that uses MSE loss instead of KL divergence"""
-    def __init__(self, enable_rms_norm=False, embed_scale_factor=1.0, *args, **kwargs):
+    def __init__(self, 
+                 enable_rms_norm=False, 
+                 embed_scale_factor=1.0, 
+                 context_embed_dim=3072,
+                 *args, 
+                 **kwargs):
         super().__init__(*args, **kwargs)
         self.to_posterior = nn.Sequential(
             nn.Linear(self.embed_dim * 3, self.embed_dim * 3),
             nn.ReLU(),
             nn.Linear(self.embed_dim * 3, self.stoch_size),
         )
-        self.rms_norm = RMSNorm(self.embed_dim, scale_factor=embed_scale_factor, eps=1e-6)
         self.enable_rms_norm = enable_rms_norm
+        if self.enable_rms_norm:
+            self.rms_norm = RMSNorm(self.embed_dim, scale_factor=embed_scale_factor, eps=1e-6)
+        else:
+            self.rms_norm = nn.Identity()
+            
+        self.context_proj = nn.Linear(context_embed_dim, self.decoder_embed_dim)
+        nn.init.normal_(self.context_proj.weight, std=0.02)
 
     def forward(self, src_imgs, tgt_imgs, embedding, epoch):
         # Extract embeddings
@@ -29,9 +40,10 @@ class RspContextInPosterior(RspCaption):
         tgt_h, _, _ = self.forward_encoder(self.perturb(tgt_imgs), mask_ratio=0)
 
         # Posterior distribution from both images
-        h_context = self.resize_embed(embedding, self.embed_dim)
-        if self.enable_rms_norm:
-            h_context = self.rms_norm(h_context)
+        # h_context = self.resize_embed(embedding, self.embed_dim)
+        h_context = self.context_proj(embedding)
+        h_context = self.rms_norm(h_context)
+        
         post_h = torch.cat([src_h[:, 0], tgt_h[:, 0], h_context], -1)
         post_logits = self.to_posterior(post_h)
         post_dist = self.make_dist(post_logits)

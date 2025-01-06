@@ -57,20 +57,22 @@ python captioning/extract_frames.py \
     --batch_size 64 \
     --repeated_sampling 2
 
+DEVICE=5
+OUTPUT_DIR=/home/junyoon/RSP/outputs/mse-kl_scall0.005_2024-12-28_23-40-38
+EPOCH=100
 
-OUTPUT_DIR=/data/RSP/full-mse
-
-CUDA_VISIBLE_DEVICES=4 python eval/DAVIS/eval_video_segmentation_davis.py \
-  --finetune $OUTPUT_DIR/checkpoint-199.pth \
-  --output_dir  $OUTPUT_DIR/davis_seg3 \
+CUDA_VISIBLE_DEVICES=$DEVICE python eval/DAVIS/eval_video_segmentation_davis.py \
+  --finetune $OUTPUT_DIR/checkpoint-$EPOCH.pth \
+  --output_dir  $OUTPUT_DIR/davis_seg$EPOCH \
   --data_path /data/DAVIS_480_880 \
   --topk 7 --size_mask_neighborhood 30 --n_last_frames 30 \
   --model vit_small
 
-CUDA_VISIBLE_DEVICES=4 python ./davis2017-evaluation/evaluation_method.py \
+git clone https://github.com/davisvideochallenge/davis2017-evaluation
+CUDA_VISIBLE_DEVICES=3 python ./davis2017-evaluation/evaluation_method.py \
   --task semi-supervised \
-  --results_path  $OUTPUT_DIR/davis_seg3 \
+  --results_path  $OUTPUT_DIR/davis_seg$EPOCH \
   --davis_path /data/DAVIS_480_880
 
-python -m torch.distributed.launch --nproc_per_node=8 --use_env --master_port 30200 main_pretrain_combined.py -cn mse exp_name=mse-kl_scall0.005 batch_size=48 accum_iter=4 model_params.kl_scale=0.005
+python -m torch.distributed.launch --nproc_per_node=8 --use_env --master_port 30200 main_pretrain_combined.py -cn mse exp_name=mse-kl_scall0.001 batch_size=48 accum_iter=4 model_params.kl_scale=0.001
 python -m torch.distributed.launch --nproc_per_node=4 --use_env --master_port 30100 main_pretrain_combined.py -cn mse exp_name=full-grad_clip batch_size=96 accum_iter=4 

@@ -6,6 +6,8 @@ exp_name: rsp_context_in_post
 
 model_name: rsp_context_in_posterior_vit_small_patch16
 
+data_root: /root
+
 dataset:
   _target_: util.kinetics_caption.PairedKineticsWithCaption
   frame_root: ${..data_root}/kinetics400caption/frames
