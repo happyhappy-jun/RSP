@@ -71,7 +71,7 @@ val_dataset:
 
 # Model parameters
 model:
-  _target_: eval.action.linear_probe_model.LinearProbing
+  _target_: linear_probe_model.LinearProbing
   backbone:
     _target_: modeling.models_cos.rsp_cos_vit_small_patch16
     kl_scale: 0.001
