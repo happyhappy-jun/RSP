@@ -7,9 +7,10 @@ import torch.nn as nn
 import torch.distributions as td
 import torch.nn.functional as F
 
-from timm.models.vision_transformer import PatchEmbed, Block
-from timm.models.vision_transformer import CrossAttention, Attention, DropPath, Mlp
 
+from timm.models.vision_transformer import PatchEmbed
+from timm.layers import DropPath, Mlp
+from modeling.layers import Block, CrossAttention, Attention
 from util.pos_embed import get_2d_sincos_pos_embed
 
 
@@ -524,6 +525,13 @@ class RspCaption(nn.Module):
         }
 
         return loss, tgt_pred, detailed_loss
+
+    def get_num_layers(self):
+        return len(self.blocks)
+
+    @torch.jit.ignore
+    def no_weight_decay(self):
+        return {'pos_embed', 'cls_token'}
 
 
 def rsp_vit_small_patch8_dec512d8b(**kwargs):

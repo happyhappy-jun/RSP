@@ -1,7 +1,7 @@
 defaults:
   - _self_
-  - override hydra/hydra_logging: disabled
-  - override hydra/job_logging: disabled
+  - override hydra/hydra_logging: colorlog
+  - override hydra/job_logging: colorlog
 
 # Dataset parameters
 train_dataset:
@@ -46,10 +46,18 @@ model:
   num_classes: 174  # Something-Something V2 has 174 classes
 
 checkpoint_path: "/home/junyoon/RSP/outputs/cos-kl_scale0.001-cos_scale0.1_2024-12-31_11-25-56/checkpoint-199.pth"
+model_name: rsp_cos_vit_small_patch16
+
+model_params:
+  kl_scale: 0.005
+  cos_scale: 0.1
+  enable_rms_norm: false
+  embed_scale_factor: 1.0
+
 
 
 # Training parameters
-batch_size: 256  # Per GPU batch size
+batch_size: 256  # Per  GPU batch size
 epochs: 90
 lr: 0.1  # Base learning rate
 warmup_epochs: 10
@@ -62,9 +70,11 @@ prefetch_factor: 2
 distributed: true  # Enable distributed training
 dist_url: 'env://'  # Use environment variables for distributed setup
 dist_backend: 'nccl'
+gpu: null
 multiprocessing_distributed: true
 world_size: -1  # Auto-detect number of GPUs
 rank: -1  # Auto-detect rank
+dist_on_itp: false
 
 # Output parameters
 output_dir: "eval/action/outputs"

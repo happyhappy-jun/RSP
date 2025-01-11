@@ -6,8 +6,11 @@ import torch.nn as nn
 import torch.distributions as td
 import torch.nn.functional as F
 
-from timm.models.vision_transformer import PatchEmbed, Block
-from timm.models.vision_transformer import CrossAttention, Attention, DropPath, Mlp
+from modeling.layers import Block, CrossAttention, Attention
+
+from timm.models.vision_transformer import PatchEmbed
+from timm.layers import DropPath, Mlp
+
 from wandb.cli.cli import enabled
 
 from util.pos_embed import get_2d_sincos_pos_embed
