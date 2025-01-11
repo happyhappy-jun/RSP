@@ -12,6 +12,8 @@ from omegaconf import DictConfig, OmegaConf
 import torch.distributed as dist
 import subprocess
 
+from eval.action.optimizers.lars import LARS
+
 
 def setup_for_distributed(is_master):
     """
@@ -67,7 +69,7 @@ def init_distributed_mode(args):
         args.rank, args.dist_url, args.gpu), flush=True)
     torch.distributed.init_process_group(backend=args.dist_backend, init_method=args.dist_url,
                                          world_size=args.world_size, rank=args.rank)
-    torch.distributed.barrier()
+    torch.distributed.barrier(device_ids=[int(os.environ["LOCAL_RANK"])])
     # assert torch.distributed.is_initialized()
     setup_for_distributed(args.rank == 0)
 
@@ -212,12 +214,11 @@ def main(cfg: DictConfig):
         linear_probe = torch.nn.parallel.DistributedDataParallel(
             linear_probe,
             device_ids=[cfg.gpu],
-            find_unused_parameters=True
         )
 
     # Setup training
     criterion = nn.CrossEntropyLoss()
-    optimizer = optim.AdamW(linear_probe.parameters(), lr=cfg.lr)
+    optimizer = LARS(linear_probe.parameters(), lr=cfg.lr)
 
     # Instantiate datasets
     train_dataset = hydra.utils.instantiate(cfg.train_dataset, _convert_="all")

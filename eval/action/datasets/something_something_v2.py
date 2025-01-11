@@ -117,25 +117,15 @@ class SomethingSomethingV2(Dataset):
             frame_indices = random.sample(range(total_frames), self.frames_per_video)
             for idx in frame_indices:
                 pil_img = video_frames[idx].to_image()
-                if self.transform is not None:
-                    pil_img = self.transform(pil_img)
-                    if isinstance(pil_img, torch.Tensor):
-                        frames.append(pil_img)
-                    else:
-                        # Convert to tensor if transform doesn't do it
-                        frames.append(torch.from_numpy(np.array(pil_img)).permute(2, 0, 1).float() / 255.0)
+                pil_img = self.transform(pil_img)
+                frames.append(pil_img)
         else:
             # If video is too short, use all frames and pad with zeros
             for frame in video_frames:
                 pil_img = frame.to_image()
-                if self.transform is not None:
-                    pil_img = self.transform(pil_img)
-                    if isinstance(pil_img, torch.Tensor):
-                        frames.append(pil_img)
-                    else:
-                        # Convert to tensor if transform doesn't do it
-                        frames.append(torch.from_numpy(np.array(pil_img)).permute(2, 0, 1).float() / 255.0)
-            
+                pil_img = self.transform(pil_img)
+                frames.append(pil_img)
+
             # Pad remaining frames with zeros
             zero_frame = torch.zeros_like(frames[0])
             while len(frames) < self.frames_per_video:
@@ -147,8 +137,8 @@ class SomethingSomethingV2(Dataset):
         if self.frames_per_video == 1:
             frames = frames[0]  # Return single frame tensor
         else:
-            pass
-        assert torch.stack(frames).shape == (self.frames_per_video, 3, 224, 224), f"Invalid frame shape: {torch.stack(frames).shape}"
+            frames = torch.stack(frames)
+
         return frames, label
 
     def get_text_description(self, idx: int) -> str:
