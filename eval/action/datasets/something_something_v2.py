@@ -110,20 +110,36 @@ class SomethingSomethingV2(Dataset):
         # Convert video frames to list for direct indexing
         video_frames = list(video)
 
-        # Randomly sample frames
-        frame_indices = random.sample(range(total_frames), min(self.frames_per_video, total_frames))
+        # Handle frame sampling
         frames = []
-
-        # Process each frame
-        for idx in frame_indices:
-            pil_img = video_frames[idx].to_image()
-            if self.transform is not None:
-                pil_img = self.transform(pil_img)
-                if isinstance(pil_img, torch.Tensor):
-                    frames.append(pil_img)
-                else:
-                    # Convert to tensor if transform doesn't do it
-                    frames.append(torch.from_numpy(np.array(pil_img)).permute(2, 0, 1).float() / 255.0)
+        if total_frames >= self.frames_per_video:
+            # Randomly sample frames if we have enough
+            frame_indices = random.sample(range(total_frames), self.frames_per_video)
+            for idx in frame_indices:
+                pil_img = video_frames[idx].to_image()
+                if self.transform is not None:
+                    pil_img = self.transform(pil_img)
+                    if isinstance(pil_img, torch.Tensor):
+                        frames.append(pil_img)
+                    else:
+                        # Convert to tensor if transform doesn't do it
+                        frames.append(torch.from_numpy(np.array(pil_img)).permute(2, 0, 1).float() / 255.0)
+        else:
+            # If video is too short, use all frames and pad with zeros
+            for frame in video_frames:
+                pil_img = frame.to_image()
+                if self.transform is not None:
+                    pil_img = self.transform(pil_img)
+                    if isinstance(pil_img, torch.Tensor):
+                        frames.append(pil_img)
+                    else:
+                        # Convert to tensor if transform doesn't do it
+                        frames.append(torch.from_numpy(np.array(pil_img)).permute(2, 0, 1).float() / 255.0)
+            
+            # Pad remaining frames with zeros
+            zero_frame = torch.zeros_like(frames[0])
+            while len(frames) < self.frames_per_video:
+                frames.append(zero_frame)
 
         container.close()
 
