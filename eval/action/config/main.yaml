@@ -1,0 +1,178 @@
+# config/config.yaml
+
+defaults:
+  - _self_
+  - override hydra/job_logging: colorlog
+  - override hydra/hydra_logging: colorlog
+
+# Model parameters
+model_name: rsp_cos_vit_small_patch16
+model_params:
+  kl_scale: 0.005
+  cos_scale: 0.1
+  enable_rms_norm: false
+  embed_scale_factor: 1.0
+
+eval: false
+num_classes: 174
+num_frames: 1
+window_size: -1
+patch_size: -1
+
+auto_resume: ture
+resume: ""
+
+train_dataset:
+  _target_: eval.action.datasets.something_something_v2.SomethingSomethingV2
+  _convert_: all
+  split: train
+  transform:
+    _target_: torchvision.transforms.Compose
+    transforms:
+      - _target_: torchvision.transforms.RandomResizedCrop
+        size: 224
+      - _target_: torchvision.transforms.ToTensor
+      - _target_: torchvision.transforms.Normalize
+        mean: [0.485, 0.456, 0.406]
+        std: [0.229, 0.224, 0.225]
+  frames_per_video: 1
+
+val_dataset:
+  _target_: eval.action.datasets.something_something_v2.SomethingSomethingV2
+  _convert_: all
+  split: validation
+  transform:
+    _target_: torchvision.transforms.Compose
+    transforms:
+      - _target_: torchvision.transforms.RandomResizedCrop
+        size: 224
+      - _target_: torchvision.transforms.ToTensor
+      - _target_: torchvision.transforms.Normalize
+        mean: [0.485, 0.456, 0.406]
+        std: [0.229, 0.224, 0.225]
+  frames_per_video: 1
+
+test_dataset:
+  _target_: eval.action.datasets.something_something_v2.SomethingSomethingV2
+  _convert_: all
+  split: test
+  transform:
+    _target_: torchvision.transforms.Compose
+    transforms:
+      - _target_: torchvision.transforms.RandomResizedCrop
+        size: 224
+      - _target_: torchvision.transforms.ToTensor
+      - _target_: torchvision.transforms.Normalize
+        mean: [0.485, 0.456, 0.406]
+        std: [0.229, 0.224, 0.225]
+  frames_per_video: 1
+
+# Optimizer parameters
+opt: adamw
+opt_eps: 1e-8
+opt_betas: [0.9, 0.999]
+clip_grad: null
+momentum: 0.9
+weight_decay: 0.05
+weight_decay_end: null
+
+# Training parameters
+batch_size: 64
+start_epoch: 0
+epochs: 30
+update_freq: 1
+save_ckpt_freq: 100
+
+# Input parameters
+input_size: 224
+tubelet_size: 2
+
+# Dropout parameters
+fc_drop_rate: 0.0
+drop: 0.0
+attn_drop_rate: 0.0
+drop_path: 0.1
+
+# Training features
+disable_eval_during_finetuning: false
+model_ema: false
+model_ema_decay: 0.9999
+model_ema_force_cpu: false
+
+# Learning rate parameters
+lr: 1e-3
+warmup_lr: 1e-6
+min_lr: 1e-6
+warmup_epochs: 5
+warmup_steps: -1
+layer_decay: 0.75
+
+# Augmentation parameters
+color_jitter: 0.4
+num_sample: 2
+aa: rand-m7-n4-mstd0.5-inc1
+smoothing: 0.1
+train_interpolation: bicubic
+
+# Evaluation parameters
+crop_pct: null
+short_side_size: 224
+test_num_segment: 5
+test_num_crop: 3
+
+# Random Erase params
+reprob: 0.25
+remode: pixel
+recount: 1
+resplit: false
+
+# Mixup params
+mixup: 0.8
+cutmix: 1.0
+cutmix_minmax: null
+mixup_prob: 1.0
+mixup_switch_prob: 0.5
+mixup_mode: batch
+
+# Finetuning params
+finetune: ''
+model_key: model|module
+model_prefix: ''
+init_scale: 0.001
+use_checkpoint: false
+use_mean_pooling: true
+
+# Distributed training parameters
+distributed: true
+dist_backend: "nccl"
+world_size: -1
+gpu: -1
+rank: 0
+local_rank: -1
+dist_on_itp: false
+dist_url: "env://"
+dist_eval: true
+
+
+# System parameters
+device: cuda
+seed: 0
+num_workers: 10
+pin_mem: true
+
+# Output and logging
+output_dir: ${hydra:run.dir}/checkpoints
+log_dir: ${hydra:run.dir}/logs
+save_ckpt: true
+
+# DeepSpeed
+enable_deepspeed: false
+
+hydra:
+  run:
+    dir: outputs/${now:%Y-%m-%d}/${now:%H-%M-%S}
+  sweep:
+    dir: multirun/${now:%Y-%m-%d}/${now:%H-%M-%S}
+    subdir: ${hydra.job.num}
+  job:
+    chdir: true
