@@ -14,17 +14,20 @@ class LinearProbing(nn.Module):
         
         # Add linear classification head
         self.classifier = nn.Linear(self.feature_dim, num_classes)
+        self.classifier.weight.data.normal_(mean=0.0, std=0.01)
+        self.classifier.bias.data.zero_()
         
     def forward(self, x):
         # Get features from backbone
         with torch.no_grad():
             if len(x.shape) == 4:  # Single frame case (B, C, H, W)
                 x = x.unsqueeze(1)  # Add time dimension (B, 1, C, H, W)
-            
+
             B, T, C, H, W = x.shape
             x = x.reshape(-1, C, H, W)  # Reshape to (B*T, C, H, W)
-            features = self.backbone.forward_encoder(x, mask_ratio=0)[0][:, 0]  # Get CLS token
-            features = features.reshape(B, T, -1).mean(dim=1)  # Average over frames
+            features = self.backbone.forward_encoder(x, mask_ratio=0)[0]
+            cls_token = features[:, 0]
+            features = cls_token.reshape(B, T, -1).mean(dim=1)  # Average over frames
         
         # Pass through classifier
         return self.classifier(features)
