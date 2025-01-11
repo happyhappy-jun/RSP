@@ -235,7 +235,9 @@ def main(cfg: DictConfig):
         shuffle=(train_sampler is None),
         num_workers=cfg.num_workers,
         pin_memory=cfg.pin_memory,
-        sampler=train_sampler
+        sampler=train_sampler,
+        prefetch_factor=2,
+        persistent_workers=True
     )
 
     val_loader = DataLoader(

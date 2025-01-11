@@ -8,6 +8,10 @@ from torch.utils.data import Dataset
 import numpy as np
 import av
 from PIL import Image
+from functools import lru_cache
+import threading
+from queue import Queue
+import concurrent.futures
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +25,8 @@ class SomethingSomethingV2(Dataset):
             split: str = "train",
             transform: Optional[Callable] = None,
             frames_per_video: int = 1,
+            num_workers: int = 4,
+            cache_size: int = 512,
     ):
         """
         Args:
@@ -79,10 +85,29 @@ class SomethingSomethingV2(Dataset):
                 })
 
         logger.info(f"Loaded {len(self.processed_data)} samples for {split} split")
-
+        
+        # Initialize frame cache
+        self.frame_cache = lru_cache(maxsize=cache_size)(self._load_video_frames)
+        
+        # Initialize thread pool for parallel frame loading
+        self.thread_pool = concurrent.futures.ThreadPoolExecutor(max_workers=num_workers)
+        
     def __len__(self) -> int:
         return len(self.processed_data)
 
+    @staticmethod
+    def _load_video_frames(video_path):
+        """Load video frames with optimized decoding"""
+        with av.open(video_path) as container:
+            container.streams.video[0].thread_type = "AUTO"
+            container.streams.video[0].thread_count = 8
+            
+            frames = []
+            for frame in container.decode(video=0):
+                frames.append(frame)
+            
+            return frames, len(frames)
+            
     def __getitem__(self, idx: int):
         """
         Args:
@@ -97,18 +122,8 @@ class SomethingSomethingV2(Dataset):
         video_path = sample['video']
         label = torch.tensor(int(sample['label']))
 
-        # Open video file
-        container = av.open(video_path)
-        video = container.decode(video=0)
-
-        # Get total frames
-        total_frames = container.streams.video[0].frames
-        if total_frames == 0:
-            total_frames = sum(1 for _ in container.decode(video=0))
-            container.seek(0)
-
-        # Convert video frames to list for direct indexing
-        video_frames = list(video)
+        # Load frames from cache or disk
+        video_frames, total_frames = self.frame_cache(video_path)
 
         # Handle frame sampling
         frames = []
