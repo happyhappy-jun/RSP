@@ -12,7 +12,8 @@ class LinearProbing(nn.Module):
         # Get feature dimension from backbone
         self.feature_dim = backbone.embed_dim
         
-        # Add linear classification head
+        # Add batch norm and linear classification head
+        self.bn = nn.BatchNorm1d(self.feature_dim)
         self.classifier = nn.Linear(self.feature_dim, num_classes)
         self.classifier.weight.data.normal_(mean=0.0, std=0.01)
         self.classifier.bias.data.zero_()
@@ -29,5 +30,6 @@ class LinearProbing(nn.Module):
             cls_token = features[:, 0]
             features = cls_token.reshape(B, T, -1).mean(dim=1)  # Average over frames
         
-        # Pass through classifier
+        # Pass through batch norm and classifier
+        features = self.bn(features)
         return self.classifier(features)
