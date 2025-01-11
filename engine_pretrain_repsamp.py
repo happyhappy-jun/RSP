@@ -3,6 +3,9 @@ import math
 import wandb
 from typing import Iterable
 import torch
+import sys
+from pathlib import Path
+sys.path.append(str(Path(__file__).resolve().parents[2]))  # Add project root to path
 import util.misc as misc
 import util.lr_sched as lr_sched
 

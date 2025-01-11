@@ -3,9 +3,12 @@ url = "https://pypi.org/simple"
 verify_ssl = true
 name = "pypi"
 
+[[source]]
+name = "pytorch"
+url = "https://download.pytorch.org/whl/cu118"
+verify_ssl = false
+
 [packages]
-torch = "==2.3.1"
-torchvision = "*"
 hydra-core = "*"
 pydantic = "*"
 opencv-python-headless = "*"
@@ -17,6 +20,9 @@ wandb = "*"
 awscli = "*"
 pandas = "*"
 scikit-image = "*"
+torchvision = "*"
+torch = "*"
+bitsandbytes = {file = "https://github.com/bitsandbytes-foundation/bitsandbytes/releases/download/continuous-release_multi-backend-refactor/bitsandbytes-0.44.1.dev0-py3-none-manylinux_2_24_x86_64.whl"}
 
 [dev-packages]
 

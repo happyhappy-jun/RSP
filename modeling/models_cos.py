@@ -31,9 +31,9 @@ class RspCaptionCos(RspCaption):
             self.rms_norm = RMSNorm(self.decoder_embed_dim, scale_factor=embed_scale_factor, eps=1e-6)
         else:
             self.rms_norm = nn.Identity()  # Use Identity when disabled
-        self.context_proj = nn.Linear(context_embed_dim, self.decoder_embed_dim)
-        nn.init.normal_(self.context_proj.weight, std=0.02)
-
+        # self.context_proj = nn.Linear(context_embed_dim, self.decoder_embed_dim)
+        # nn.init.normal_(self.context_proj.weight, std=0.02)
+    #
     def get_feat(self, h, h_context, z):
         # Process deterministic path
         h = self.decoder_embed_deter(h)  # [B, L, decoder_embed_dim]
@@ -94,8 +94,8 @@ class RspCaptionCos(RspCaption):
         prior_z = prior_dist.rsample()
 
         embedding = embedding.view(-1, 1, embedding.size(-1))
-        # h_context = self.resize_embed(embedding, self.decoder_embed_dim)
-        h_context = self.context_proj(embedding)
+        h_context = self.resize_embed(embedding, self.decoder_embed_dim)
+        # h_context = self.context_proj(embedding)
         h_context = self.rms_norm(h_context)
 
         # Project context to prior space

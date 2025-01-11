@@ -19,9 +19,6 @@ setup(
         "tensorboard==2.17.0",
         "timm==0.3.2",
         "wandb",
-        "torch==1.13.1",
-        "torchvision==0.14.1",
-        "torchaudio==0.13.1"
     ],
     extras_require={
         'dev': [
