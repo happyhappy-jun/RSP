@@ -53,7 +53,7 @@ class SomethingSomethingV2(Dataset):
 
             for anno in annotations:
                 video_id = anno['id']
-                template = anno['template']
+                template = anno['template'].replace('[', '').replace(']', '')
 
                 self.processed_data.append({
                     'video_id': video_id,
@@ -95,7 +95,7 @@ class SomethingSomethingV2(Dataset):
         # Get preprocessed data
         sample = self.processed_data[idx]
         video_path = sample['video']
-        label = int(sample['label'])  # Convert label to int
+        label = torch.tensor(int(sample['label']))
 
         # Open video file
         container = av.open(video_path)
@@ -103,9 +103,9 @@ class SomethingSomethingV2(Dataset):
 
         # Get total frames
         total_frames = container.streams.video[0].frames
-        if total_frames == 0:  # Some videos don't report frames correctly
+        if total_frames == 0:
             total_frames = sum(1 for _ in container.decode(video=0))
-            container.seek(0)  # Reset to beginning
+            container.seek(0)
 
         # Convert video frames to list for direct indexing
         video_frames = list(video)
@@ -113,24 +113,26 @@ class SomethingSomethingV2(Dataset):
         # Randomly sample frames
         frame_indices = random.sample(range(total_frames), min(self.frames_per_video, total_frames))
         frames = []
+
+        # Process each frame
         for idx in frame_indices:
             pil_img = video_frames[idx].to_image()
             if self.transform is not None:
                 pil_img = self.transform(pil_img)
-            frames.append(pil_img)
+                if isinstance(pil_img, torch.Tensor):
+                    frames.append(pil_img)
+                else:
+                    # Convert to tensor if transform doesn't do it
+                    frames.append(torch.from_numpy(np.array(pil_img)).permute(2, 0, 1).float() / 255.0)
 
         container.close()
 
-        # Sample frames if needed
-        if len(frames) > self.frames_per_video:
-            indices = np.linspace(0, len(frames) - 1, self.frames_per_video, dtype=int)
-            frames = [frames[i] for i in indices]
-
+        # Stack frames
         if self.frames_per_video == 1:
             frames = frames[0]  # Return single frame tensor
         else:
-            frames = torch.stack(frames)  # Stack multiple frames
-
+            pass
+        assert torch.stack(frames).shape == (self.frames_per_video, 3, 224, 224), f"Invalid frame shape: {torch.stack(frames).shape}"
         return frames, label
 
     def get_text_description(self, idx: int) -> str:
