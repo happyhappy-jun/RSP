@@ -112,9 +112,10 @@ class Kinetics400(Dataset):
                 logger.warning(f"Video {video_path} has no frames")
                 return None
                 
-            # Calculate middle frame for single frame extraction
+            # Randomly sample frames
             if self.frames_per_video == 1:
-                target_frame = total_frames // 2
+                # Random single frame
+                target_frame = random.randint(0, total_frames - 1)
                 container.seek(int(target_frame * stream.time_base * 1000000))
                 
                 for frame in container.decode(video=0):
@@ -122,7 +123,7 @@ class Kinetics400(Dataset):
                     break
             else:
                 # Sample frames evenly
-                frame_indices = torch.linspace(0, total_frames-1, self.frames_per_video).long().tolist()
+                frame_indices = sorted(random.sample(range(total_frames), self.frames_per_video))
                 for i, frame in enumerate(container.decode(video=0)):
                     if i in frame_indices:
                         frames.append(frame.to_image())
