@@ -132,7 +132,7 @@ class Kinetics400(Dataset):
         end_time = row['time_end']
         
         # Load video frames
-        video_path = os.path.join(self.videos_dir, f"{video_id}.mp4")
+        video_path = os.path.join(self.videos_dir, f"{video_id}_{start_time:0>6}_{end_time:0>6}.mp4")
         frames = self._load_video_frames(video_path, start_time, end_time)
         
         # Apply transforms
