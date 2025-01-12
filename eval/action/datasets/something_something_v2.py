@@ -8,10 +8,6 @@ from torch.utils.data import Dataset
 import numpy as np
 import av
 from PIL import Image
-from functools import lru_cache
-import threading
-from queue import Queue
-import concurrent.futures
 
 logger = logging.getLogger(__name__)
 
@@ -25,8 +21,6 @@ class SomethingSomethingV2(Dataset):
             split: str = "train",
             transform: Optional[Callable] = None,
             frames_per_video: int = 1,
-            num_workers: int = 4,
-            cache_size: int = 128,
     ):
         """
         Args:
@@ -86,12 +80,6 @@ class SomethingSomethingV2(Dataset):
 
         logger.info(f"Loaded {len(self.processed_data)} samples for {split} split")
         
-        # Initialize frame cache
-        self.frame_cache = lru_cache(maxsize=cache_size)(self._load_video_frames)
-        
-        # Initialize thread pool for parallel frame loading
-        self.thread_pool = concurrent.futures.ThreadPoolExecutor(max_workers=num_workers)
-        
     def __len__(self) -> int:
         return len(self.processed_data)
 
@@ -122,8 +110,8 @@ class SomethingSomethingV2(Dataset):
         video_path = sample['video']
         label = torch.tensor(int(sample['label']))
 
-        # Load frames from cache or disk
-        video_frames, total_frames = self.frame_cache(video_path)
+        # Load frames from disk
+        video_frames, total_frames = self._load_video_frames(video_path)
 
         # Handle frame sampling
         frames = []
