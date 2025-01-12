@@ -6,7 +6,7 @@ import pandas as pd
 from typing import Optional, Callable
 import torch
 from torch.utils.data import Dataset
-import av
+from decord import VideoReader, cpu
 from PIL import Image
 
 logger = logging.getLogger(__name__)
@@ -98,49 +98,27 @@ class Kinetics400(Dataset):
             start_time (float): Start time in seconds
             end_time (float): End time in seconds
         """
-        frames = []
         try:
-            container = av.open(video_path)
-            # Check if video stream exists
-            if not container.streams.video:
-                logger.warning(f"No video stream found in {video_path}")
-                return None
-                
-            stream = container.streams.video[0]
-            stream.thread_type = "AUTO"
-            stream.thread_count = 4  # Reduced thread count
-            fps = float(stream.average_rate)
-            total_frames = stream.frames
+            # Load video with Decord
+            vr = VideoReader(video_path, ctx=cpu(0))
+            total_frames = len(vr)
             
             # If video is too short, return None
             if total_frames < 1:
                 logger.warning(f"Video {video_path} has no frames")
                 return None
-                
+            
             # Randomly sample frames
             if self.frames_per_video == 1:
                 # Random single frame
-                target_frame = random.randint(0, total_frames - 1)
-                container.seek(int(target_frame * stream.time_base * 1000000))
-                
-                for frame in container.decode(video=0):
-                    frames.append(frame.to_image())
-                    break
+                frame_idx = random.randint(0, total_frames - 1)
+                frame = vr[frame_idx].asnumpy()
+                return [Image.fromarray(frame)]
             else:
-                # Sample frames evenly
+                # Sample multiple frames
                 frame_indices = sorted(random.sample(range(total_frames), self.frames_per_video))
-                for i, frame in enumerate(container.decode(video=0)):
-                    if i in frame_indices:
-                        frames.append(frame.to_image())
-                    if len(frames) == self.frames_per_video:
-                        break
-                        
-            container.close()
-            
-            if len(frames) < self.frames_per_video:
-                logger.warning(f"Could only extract {len(frames)} frames from {video_path}")
-                return None
-                
+                frames = vr.get_batch(frame_indices).asnumpy()
+                return [Image.fromarray(frame) for frame in frames]
         except Exception as e:
             logger.warning(f"Error loading video {video_path}: {str(e)}")
             return None
