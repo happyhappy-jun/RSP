@@ -146,8 +146,6 @@ class SomethingSomethingV2(Dataset):
             while len(frames) < self.frames_per_video:
                 frames.append(zero_frame)
 
-        container.close()
-
         # Stack frames
         if self.frames_per_video == 1:
             frames = frames[0]  # Return single frame tensor
