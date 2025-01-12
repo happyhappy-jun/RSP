@@ -1,0 +1,87 @@
+defaults:
+  - _self_
+  - override hydra/hydra_logging: colorlog
+  - override hydra/job_logging: colorlog
+
+# Dataset parameters
+train_dataset:
+  _target_: eval.action.datasets.imagenet1k.ImageNet1K
+  _convert_: all
+  split: train
+  transform:
+    _target_: torchvision.transforms.Compose
+    transforms:
+      - _target_: torchvision.transforms.RandomResizedCrop
+        size: 224
+      - _target_: torchvision.transforms.RandomHorizontalFlip
+      - _target_: torchvision.transforms.ToTensor
+      - _target_: torchvision.transforms.Normalize
+        mean: [0.485, 0.456, 0.406]
+        std: [0.229, 0.224, 0.225]
+
+val_dataset:
+  _target_: eval.action.datasets.imagenet1k.ImageNet1K
+  _convert_: all
+  split: validation
+  transform:
+    _target_: torchvision.transforms.Compose
+    transforms:
+      - _target_: torchvision.transforms.Resize
+        size: 256
+      - _target_: torchvision.transforms.CenterCrop
+        size: 224
+      - _target_: torchvision.transforms.ToTensor
+      - _target_: torchvision.transforms.Normalize
+        mean: [0.485, 0.456, 0.406]
+        std: [0.229, 0.224, 0.225]
+
+# Model parameters
+model:
+  _target_: linear_probe_model.LinearProbing
+  backbone:
+    _target_: modeling.models_cos.rsp_cos_vit_small_patch16
+    kl_scale: 0.001
+    cos_scale: 0.1
+    enable_rms_norm: true
+    embed_scale_factor: 1.0
+  num_classes: 1000  # ImageNet-1K has 1000 classes
+
+checkpoint_path: "/home/junyoon/RSP/outputs/cos-kl_scale0.001-cos_scale0.1_2024-12-31_11-25-56/checkpoint-199.pth"
+model_name: rsp_cos_vit_small_patch16
+
+model_params:
+  kl_scale: 0.005
+  cos_scale: 0.1
+  enable_rms_norm: false
+  embed_scale_factor: 1.0
+
+# Training parameters
+batch_size: 256  # Per GPU batch size
+epochs: 90
+lr: 0.1  # Base learning rate
+warmup_epochs: 10
+weight_decay: 0.0
+momentum: 0.9
+device: cuda
+num_workers: 24  # Increased workers per GPU
+pin_memory: true
+prefetch_factor: 2
+distributed: true  # Enable distributed training
+dist_url: 'env://'  # Use environment variables for distributed setup
+dist_backend: 'nccl'
+gpu: null
+multiprocessing_distributed: true
+world_size: -1  # Auto-detect number of GPUs
+rank: -1  # Auto-detect rank
+dist_on_itp: false
+
+# Output parameters
+output_dir: "eval/action/outputs/imagenet1k"
+use_wandb: true
+project_name: rsp_linear_probing_imagenet
+run_name: imagenet1k-cos-kl_scale0.001-cos_scale0.1
+
+hydra:
+  output_subdir: null
+  run:
+    dir: .
