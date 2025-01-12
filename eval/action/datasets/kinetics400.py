@@ -49,7 +49,7 @@ class Kinetics400(Dataset):
         # Set random seed for reproducibility
         np.random.seed(random_seed)
         
-        # Filter out non-existent videos and create splits
+        # Filter out non-existent and invalid videos
         valid_videos = []
         for idx, row in all_annotations.iterrows():
             video_id = row['youtube_id']
@@ -57,7 +57,15 @@ class Kinetics400(Dataset):
             end_time = row['time_end']
             video_path = os.path.join(self.videos_dir, f"{video_id}_{start_time:0>6}_{end_time:0>6}.mp4")
             if os.path.exists(video_path):
-                valid_videos.append(idx)
+                try:
+                    # Try to open video with Decord to verify it's valid
+                    vr = VideoReader(video_path)
+                    if len(vr) > 0:  # Check if video has frames
+                        valid_videos.append(idx)
+                    else:
+                        logger.warning(f"Video has no frames: {video_path}")
+                except Exception as e:
+                    logger.warning(f"Invalid video file {video_path}: {str(e)}")
             
         filtered_annotations = all_annotations.iloc[valid_videos].reset_index(drop=True)
         total_size = len(filtered_annotations)
