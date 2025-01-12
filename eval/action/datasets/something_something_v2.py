@@ -128,31 +128,34 @@ class SomethingSomethingV2(Dataset):
         video_path = sample['video']
         label = torch.tensor(int(sample['label']))
 
-        # First get video info to determine frame indices
-        with av.open(video_path) as container:
-            total_frames = container.streams.video[0].frames
-
-        # Determine which frames to load
         frames = []
-        if total_frames >= self.frames_per_video:
-            # Randomly sample frame indices
-            frame_indices = sorted(random.sample(range(total_frames), self.frames_per_video))
-            # Load only the required frames
-            video_frames, _ = self._load_video_frames(video_path, frame_indices)
-            for frame in video_frames:
+        with av.open(video_path) as container:
+            stream = container.streams.video[0]
+            total_frames = stream.frames
+            stream.thread_type = "AUTO"
+            stream.thread_count = 8
+
+            if total_frames >= self.frames_per_video:
+                # Randomly sample frame indices
+                frame_indices = sorted(random.sample(range(total_frames), self.frames_per_video))
+                # Only decode requested frames
+                for i, frame in enumerate(container.decode(video=0)):
+                    if i in frame_indices:
+                        pil_img = frame.to_image()
+                        pil_img = self.transform(pil_img)
+                        frames.append(pil_img)
+                    if len(frames) == len(frame_indices):
+                        break
+            else:
+                # For short videos, get first frame and pad
+                frame = next(container.decode(video=0))
                 pil_img = frame.to_image()
                 pil_img = self.transform(pil_img)
                 frames.append(pil_img)
-        else:
-            # For short videos, load first frame and pad
-            video_frames, _ = self._load_video_frames(video_path)
-            pil_img = video_frames[0].to_image()
-            pil_img = self.transform(pil_img)
-            frames.append(pil_img)
-            
-            # Pad remaining frames by repeating the first frame
-            while len(frames) < self.frames_per_video:
-                frames.append(frames[0].clone())
+                
+                # Pad remaining frames by repeating the first frame
+                while len(frames) < self.frames_per_video:
+                    frames.append(frames[0].clone())
 
         # Stack frames
         if self.frames_per_video == 1:
