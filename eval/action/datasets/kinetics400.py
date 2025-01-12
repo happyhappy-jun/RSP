@@ -55,41 +55,35 @@ class Kinetics400(Dataset):
             end_time (float): End time in seconds
         """
         frames = []
-        try:
-            with av.open(video_path) as container:
-                stream = container.streams.video[0]
-                stream.thread_type = "AUTO"
-                stream.thread_count = 8
-                
-                # Calculate target frame indices
-                fps = float(stream.average_rate)
-                start_frame = int(start_time * fps)
-                end_frame = int(end_time * fps)
-                total_frames = end_frame - start_frame
-                
-                if self.frames_per_video == 1:
-                    # Take middle frame
-                    target_frame = start_frame + total_frames // 2
-                    container.seek(int(target_frame * stream.time_base * 1000000))
-                    for frame in container.decode(video=0):
+        with av.open(video_path) as container:
+            stream = container.streams.video[0]
+            stream.thread_type = "AUTO"
+            stream.thread_count = 8
+
+            # Calculate target frame indices
+            fps = float(stream.average_rate)
+            start_frame = int(start_time * fps)
+            end_frame = int(end_time * fps)
+            total_frames = end_frame - start_frame
+
+            if self.frames_per_video == 1:
+                # Take middle frame
+                target_frame = start_frame + total_frames // 2
+                container.seek(int(target_frame * stream.time_base * 1000000))
+                for frame in container.decode(video=0):
+                    frames.append(frame.to_image())
+                    break
+            else:
+                # Sample evenly spaced frames
+                frame_indices = torch.linspace(start_frame, end_frame-1, self.frames_per_video).long().tolist()
+                container.seek(int(start_frame * stream.time_base * 1000000))
+
+                for i, frame in enumerate(container.decode(video=0)):
+                    if i + start_frame in frame_indices:
                         frames.append(frame.to_image())
+                    if len(frames) == self.frames_per_video:
                         break
-                else:
-                    # Sample evenly spaced frames
-                    frame_indices = torch.linspace(start_frame, end_frame-1, self.frames_per_video).long().tolist()
-                    container.seek(int(start_frame * stream.time_base * 1000000))
-                    
-                    for i, frame in enumerate(container.decode(video=0)):
-                        if i + start_frame in frame_indices:
-                            frames.append(frame.to_image())
-                        if len(frames) == self.frames_per_video:
-                            break
-                            
-        except Exception as e:
-            logger.warning(f"Error loading video {video_path}: {str(e)}")
-            # Return black frame(s) in case of error
-            frames = [Image.new('RGB', (224, 224), (0, 0, 0)) for _ in range(self.frames_per_video)]
-            
+
         return frames
 
     def __getitem__(self, idx: int):
