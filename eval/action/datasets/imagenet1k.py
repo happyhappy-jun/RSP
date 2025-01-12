@@ -1,41 +1,34 @@
-import os
-import json
 import logging
 from typing import Optional, Callable
 import torch
 from torch.utils.data import Dataset
+from datasets import load_dataset
 from PIL import Image
-from torchvision.datasets import ImageFolder
 
 logger = logging.getLogger(__name__)
 
 class ImageNet1K(Dataset):
-    """Dataset wrapper for ImageNet-1K dataset"""
+    """Dataset wrapper for ImageNet-1K dataset using Hugging Face datasets"""
 
     def __init__(
             self,
-            data_root: str = '/data/imagenet',
             split: str = "train",
             transform: Optional[Callable] = None,
     ):
         """
         Args:
-            data_root (str): Path to ImageNet root directory
-            split (str): Which split to use ('train', 'val')
+            split (str): Which split to use ('train', 'validation')
             transform (callable, optional): Optional transform to be applied on images
         """
-        self.data_root = data_root
-        self.split = split
+        self.split = 'validation' if split == 'val' else split
         self.transform = transform
 
-        # Set up split-specific path
-        split_path = os.path.join(data_root, 'train' if split == 'train' else 'val')
+        # Load dataset from Hugging Face
+        logger.info(f"Loading ImageNet-1K {split} split from Hugging Face...")
+        self.dataset = load_dataset("imagenet-1k", split=self.split)
+        self.num_classes = 1000  # ImageNet-1K has 1000 classes
         
-        # Use ImageFolder to handle class subdirectories
-        self.dataset = ImageFolder(split_path)
-        self.num_classes = len(self.dataset.classes)
-        
-        logger.info(f"Loaded ImageNet-1K {split} split with {len(self.dataset)} images and {self.num_classes} classes")
+        logger.info(f"Loaded ImageNet-1K {split} split with {len(self.dataset)} images")
 
     def __len__(self) -> int:
         return len(self.dataset)
@@ -49,7 +42,9 @@ class ImageNet1K(Dataset):
             tuple: (image, label) where image is a transformed PIL Image
             and label is the class index
         """
-        img, label = self.dataset[idx]
+        sample = self.dataset[idx]
+        img = sample['image']  # Already a PIL Image
+        label = sample['label']
         
         if self.transform is not None:
             img = self.transform(img)
@@ -58,4 +53,4 @@ class ImageNet1K(Dataset):
 
     def get_class_name(self, idx: int) -> str:
         """Get the class name for a given index"""
-        return self.dataset.classes[idx]
+        return self.dataset.features['label'].names[idx]
