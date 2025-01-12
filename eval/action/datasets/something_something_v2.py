@@ -84,17 +84,35 @@ class SomethingSomethingV2(Dataset):
         return len(self.processed_data)
 
     @staticmethod
-    def _load_video_frames(video_path):
-        """Load video frames with optimized decoding"""
+    def _load_video_frames(video_path, frame_indices=None):
+        """Load specific video frames with optimized decoding
+        
+        Args:
+            video_path (str): Path to video file
+            frame_indices (list): List of frame indices to load
+        """
+        frames = []
         with av.open(video_path) as container:
-            container.streams.video[0].thread_type = "AUTO"
-            container.streams.video[0].thread_count = 8
+            stream = container.streams.video[0]
+            stream.thread_type = "AUTO"
+            stream.thread_count = 8
             
-            frames = []
-            for frame in container.decode(video=0):
+            # Get total frames
+            total_frames = stream.frames
+            
+            if frame_indices:
+                # Only decode requested frames
+                for i, frame in enumerate(container.decode(video=0)):
+                    if i in frame_indices:
+                        frames.append(frame)
+                    if len(frames) == len(frame_indices):
+                        break
+            else:
+                # If no indices specified, get first frame only
+                frame = next(container.decode(video=0))
                 frames.append(frame)
-            
-            return frames, len(frames)
+                
+            return frames, total_frames
             
     def __getitem__(self, idx: int):
         """
@@ -110,29 +128,31 @@ class SomethingSomethingV2(Dataset):
         video_path = sample['video']
         label = torch.tensor(int(sample['label']))
 
-        # Load frames from disk
-        video_frames, total_frames = self._load_video_frames(video_path)
+        # First get video info to determine frame indices
+        with av.open(video_path) as container:
+            total_frames = container.streams.video[0].frames
 
-        # Handle frame sampling
+        # Determine which frames to load
         frames = []
         if total_frames >= self.frames_per_video:
-            # Randomly sample frames if we have enough
-            frame_indices = random.sample(range(total_frames), self.frames_per_video)
-            for idx in frame_indices:
-                pil_img = video_frames[idx].to_image()
-                pil_img = self.transform(pil_img)
-                frames.append(pil_img)
-        else:
-            # If video is too short, use all frames and pad with zeros
+            # Randomly sample frame indices
+            frame_indices = sorted(random.sample(range(total_frames), self.frames_per_video))
+            # Load only the required frames
+            video_frames, _ = self._load_video_frames(video_path, frame_indices)
             for frame in video_frames:
                 pil_img = frame.to_image()
                 pil_img = self.transform(pil_img)
                 frames.append(pil_img)
-
-            # Pad remaining frames with zeros
-            zero_frame = torch.zeros_like(frames[0])
+        else:
+            # For short videos, load first frame and pad
+            video_frames, _ = self._load_video_frames(video_path)
+            pil_img = video_frames[0].to_image()
+            pil_img = self.transform(pil_img)
+            frames.append(pil_img)
+            
+            # Pad remaining frames by repeating the first frame
             while len(frames) < self.frames_per_video:
-                frames.append(zero_frame)
+                frames.append(frames[0].clone())
 
         # Stack frames
         if self.frames_per_video == 1:
