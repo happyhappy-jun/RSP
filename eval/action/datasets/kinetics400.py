@@ -101,10 +101,14 @@ class Kinetics400(Dataset):
         frames = []
         try:
             container = av.open(video_path)
-            container.streams.video[0].thread_type = "AUTO"
-            container.streams.video[0].thread_count = 4  # Reduced thread count
-            
+            # Check if video stream exists
+            if not container.streams.video:
+                logger.warning(f"No video stream found in {video_path}")
+                return None
+                
             stream = container.streams.video[0]
+            stream.thread_type = "AUTO"
+            stream.thread_count = 4  # Reduced thread count
             fps = float(stream.average_rate)
             total_frames = stream.frames
             
