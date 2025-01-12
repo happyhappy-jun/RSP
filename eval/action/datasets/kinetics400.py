@@ -47,10 +47,23 @@ class Kinetics400(Dataset):
         # Set random seed for reproducibility
         np.random.seed(random_seed)
         
-        # Create splits
-        total_size = len(all_annotations)
-        indices = np.random.permutation(total_size)
+        # Filter out non-existent videos and create splits
+        valid_videos = []
+        for idx, row in all_annotations.iterrows():
+            video_id = row['youtube_id']
+            start_time = row['time_start']
+            end_time = row['time_end']
+            video_path = os.path.join(self.videos_dir, f"{video_id}_{start_time:0>6}_{end_time:0>6}.mp4")
+            if os.path.exists(video_path):
+                valid_videos.append(idx)
+            
+        filtered_annotations = all_annotations.iloc[valid_videos].reset_index(drop=True)
+        total_size = len(filtered_annotations)
         
+        if total_size == 0:
+            raise RuntimeError(f"No valid videos found in {data_root}")
+            
+        indices = np.random.permutation(total_size)
         train_size = int(total_size * train_ratio)
         val_size = int(total_size * val_ratio)
         
@@ -60,11 +73,11 @@ class Kinetics400(Dataset):
         
         # Select the appropriate split
         if split == 'train':
-            self.annotations = all_annotations.iloc[train_indices].reset_index(drop=True)
+            self.annotations = filtered_annotations.iloc[train_indices].reset_index(drop=True)
         elif split == 'val':
-            self.annotations = all_annotations.iloc[val_indices].reset_index(drop=True)
+            self.annotations = filtered_annotations.iloc[val_indices].reset_index(drop=True)
         else:  # test
-            self.annotations = all_annotations.iloc[test_indices].reset_index(drop=True)
+            self.annotations = filtered_annotations.iloc[test_indices].reset_index(drop=True)
         
         # Create label to index mapping
         self.label_to_idx = {label: idx for idx, label in enumerate(sorted(self.annotations['label'].unique()))}
