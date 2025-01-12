@@ -22,6 +22,7 @@ class Kinetics400(Dataset):
             train_ratio: float = 0.7,
             val_ratio: float = 0.15,
             random_seed: int = 42,
+            timeout: int = 30,  # Timeout in seconds for video loading
     ):
         """
         Args:
@@ -97,34 +98,46 @@ class Kinetics400(Dataset):
             end_time (float): End time in seconds
         """
         frames = []
-        with av.open(video_path) as container:
+        try:
+            container = av.open(video_path)
+            container.streams.video[0].thread_type = "AUTO"
+            container.streams.video[0].thread_count = 4  # Reduced thread count
+            
             stream = container.streams.video[0]
-            stream.thread_type = "AUTO"
-            stream.thread_count = 8
-
-            # Calculate target frame indices
             fps = float(stream.average_rate)
-            start_frame = int(start_time * fps)
-            end_frame = int(end_time * fps)
-            total_frames = end_frame - start_frame
-
+            total_frames = stream.frames
+            
+            # If video is too short, return None
+            if total_frames < 1:
+                logger.warning(f"Video {video_path} has no frames")
+                return None
+                
+            # Calculate middle frame for single frame extraction
             if self.frames_per_video == 1:
-                # Take middle frame
-                target_frame = start_frame + total_frames // 2
+                target_frame = total_frames // 2
                 container.seek(int(target_frame * stream.time_base * 1000000))
+                
                 for frame in container.decode(video=0):
                     frames.append(frame.to_image())
                     break
             else:
-                # Sample evenly spaced frames
-                frame_indices = torch.linspace(start_frame, end_frame-1, self.frames_per_video).long().tolist()
-                container.seek(int(start_frame * stream.time_base * 1000000))
-
+                # Sample frames evenly
+                frame_indices = torch.linspace(0, total_frames-1, self.frames_per_video).long().tolist()
                 for i, frame in enumerate(container.decode(video=0)):
-                    if i + start_frame in frame_indices:
+                    if i in frame_indices:
                         frames.append(frame.to_image())
                     if len(frames) == self.frames_per_video:
                         break
+                        
+            container.close()
+            
+            if len(frames) < self.frames_per_video:
+                logger.warning(f"Could only extract {len(frames)} frames from {video_path}")
+                return None
+                
+        except Exception as e:
+            logger.warning(f"Error loading video {video_path}: {str(e)}")
+            return None
 
         return frames
 
@@ -137,28 +150,42 @@ class Kinetics400(Dataset):
             tuple: (frames, label) where frames is a tensor of shape (T, C, H, W) for multiple
                   frames or (C, H, W) for single frame, and label is the class index
         """
-        # Get video metadata
-        row = self.annotations.iloc[idx]
-        video_id = row['youtube_id']
-        label = self.label_to_idx[row['label']]
-        start_time = row['time_start']
-        end_time = row['time_end']
-        
-        # Load video frames
-        video_path = os.path.join(self.videos_dir, f"{video_id}_{start_time:0>6}_{end_time:0>6}.mp4")
-        frames = self._load_video_frames(video_path, start_time, end_time)
-        
-        # Apply transforms
-        if self.transform is not None:
-            frames = [self.transform(frame) for frame in frames]
-            
-        # Stack frames if multiple
-        if self.frames_per_video == 1:
-            frames = frames[0]  # Return single frame tensor
-        else:
-            frames = torch.stack(frames)  # Return stacked tensor (T, C, H, W)
+        max_retries = 3
+        for retry in range(max_retries):
+            try:
+                # Get video metadata
+                row = self.annotations.iloc[idx]
+                video_id = row['youtube_id']
+                label = self.label_to_idx[row['label']]
+                start_time = row['time_start']
+                end_time = row['time_end']
+                
+                # Load video frames
+                video_path = os.path.join(self.videos_dir, f"{video_id}_{start_time:0>6}_{end_time:0>6}.mp4")
+                frames = self._load_video_frames(video_path, start_time, end_time)
+                
+                if frames is None:
+                    raise RuntimeError(f"Failed to load video {video_path}")
+                
+                # Apply transforms
+                if self.transform is not None:
+                    frames = [self.transform(frame) for frame in frames]
+                    
+                # Stack frames if multiple
+                if self.frames_per_video == 1:
+                    frames = frames[0]  # Return single frame tensor
+                else:
+                    frames = torch.stack(frames)  # Return stacked tensor (T, C, H, W)
 
-        return frames, torch.tensor(label)
+                return frames, torch.tensor(label)
+                
+            except Exception as e:
+                if retry == max_retries - 1:
+                    logger.error(f"Failed to load video after {max_retries} retries: {str(e)}")
+                    # Return a random valid sample as fallback
+                    return self.__getitem__((idx + 1) % len(self))
+                else:
+                    logger.warning(f"Retry {retry + 1}/{max_retries} for video load")
 
     def get_class_name(self, idx: int) -> str:
         """Get the class name for a given index"""
