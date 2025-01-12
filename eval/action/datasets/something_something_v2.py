@@ -26,7 +26,7 @@ class SomethingSomethingV2(Dataset):
             transform: Optional[Callable] = None,
             frames_per_video: int = 1,
             num_workers: int = 4,
-            cache_size: int = 512,
+            cache_size: int = 128,
     ):
         """
         Args:
