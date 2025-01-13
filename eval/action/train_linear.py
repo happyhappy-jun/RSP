@@ -108,11 +108,25 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
             sys.exit(1)
 
         loss = loss / accum_iter
+        
+        # Log gradients before scaling
+        if log_writer is not None and (data_iter_step + 1) % print_freq == 0:
+            for name, param in model.named_parameters():
+                if param.requires_grad and param.grad is not None:
+                    log_writer.add_histogram(f'gradients/{name}', param.grad, data_iter_step)
+                    log_writer.add_histogram(f'weights/{name}', param, data_iter_step)
+
         loss_scaler(loss, optimizer, clip_grad=max_norm,
                    parameters=model.parameters(), create_graph=False,
                    update_grad=(data_iter_step + 1) % accum_iter == 0)
+        
         if (data_iter_step + 1) % accum_iter == 0:
             optimizer.zero_grad()
+
+        # Log learning rate
+        if log_writer is not None and (data_iter_step + 1) % print_freq == 0:
+            for i, param_group in enumerate(optimizer.param_groups):
+                log_writer.add_scalar(f'learning_rate/group_{i}', param_group['lr'], data_iter_step)
 
         torch.cuda.synchronize()
 
@@ -279,7 +293,12 @@ def main(cfg: DictConfig):
         model_without_ddp = model.module
 
     # following LARS optimizer setup from MoCo v3
-    optimizer = LARS(model_without_ddp.head.parameters(), lr=cfg.lr, weight_decay=cfg.weight_decay)
+    # Initialize optimizer with larger learning rate and proper weight decay
+    optimizer = LARS(model_without_ddp.head.parameters(), 
+                    lr=cfg.lr,
+                    weight_decay=cfg.weight_decay,
+                    momentum=0.9,
+                    trust_coefficient=0.001)
     loss_scaler = NativeScaler()
     criterion = torch.nn.CrossEntropyLoss()
 
