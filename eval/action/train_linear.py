@@ -45,7 +45,7 @@ class LinearProbing(torch.nn.Module):
         trunc_normal_(self.head[-1].weight, std=0.01)
         
     def forward(self, x):
-        x = self.backbone.forward_encoder(x)
+        x = self.backbone.forward_encoder(x)[0]
         # Apply pooling based on specified type
         if self.pool_type == 'mean':
             x = x[:, 1:].mean(dim=1)  # mean pool over patches
