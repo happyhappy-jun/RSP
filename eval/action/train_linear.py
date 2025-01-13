@@ -32,10 +32,12 @@ class LinearProbing(torch.nn.Module):
         # Freeze backbone
         for param in self.backbone.parameters():
             param.requires_grad = False
+        # Get embedding dimension from the model
+        embed_dim = backbone.embed_dim
         # Replace head with BN + Linear
         self.head = torch.nn.Sequential(
-            torch.nn.BatchNorm1d(backbone.head.in_features, affine=False, eps=1e-6),
-            torch.nn.Linear(backbone.head.in_features, num_classes)
+            torch.nn.BatchNorm1d(embed_dim, affine=False, eps=1e-6),
+            torch.nn.Linear(embed_dim, num_classes)
         )
         # Initialize head
         trunc_normal_(self.head[-1].weight, std=0.01)
