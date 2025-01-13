@@ -66,10 +66,7 @@ def main():
 
     print(f"\nSaved {len(results)} results to: {results_file}")
     
-    # Report any skipped entries
-    skipped = len(requests) - len(results)
-    if skipped > 0:
-        print(f"Warning: Skipped {skipped} entries due to missing video IDs")
+    print(f"\nCreated {len(results)} results")
 
 if __name__ == "__main__":
     main()
