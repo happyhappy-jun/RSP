@@ -11,23 +11,15 @@ def load_frame_info(file_path: Path) -> Dict[str, Any]:
     with open(file_path) as f:
         return json.load(f)
 
-def create_label_results(frame_info: Dict[str, Any], 
-                        requests: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+def create_label_results(frame_info: Dict[str, Any]) -> List[Dict[str, Any]]:
     """Create results using class labels from frame_info"""
     results = []
     
-    for req in tqdm(requests, desc="Creating label results"):
-        custom_id = req['custom_id']
+    for video_idx, (video_id, video_data) in enumerate(tqdm(frame_info.items(), desc="Creating label results")):
+        label = video_data['label']
         
-        # Extract video_id and frame_idx from custom_id (assuming format: video_id_frame_idx)
-        video_id, frame_idx = custom_id.rsplit('_', 1)
-        
-        # Get label from frame_info
-        if video_id not in frame_info:
-            print(f"Warning: Video ID {video_id} not found in frame info")
-            continue
-            
-        label = frame_info[video_id]['label']
+        # Create a result for each pair (assuming one pair per video for now)
+        custom_id = f"video_{video_idx}_pair_0"
         
         # Create result entry matching the schema expected by step6
         result = {
@@ -51,8 +43,6 @@ def main():
     parser = argparse.ArgumentParser(description='Step 5-1: Create results using class labels')
     parser.add_argument('--frame_info', type=str, required=True,
                        help='Path to frame_info.json containing class labels')
-    parser.add_argument('--requests_file', type=str, required=True,
-                       help='Original requests file to get sample IDs')
     parser.add_argument('--output_dir', type=str, required=True,
                        help='Output directory for results')
     args = parser.parse_args()
@@ -65,15 +55,9 @@ def main():
     frame_info = load_frame_info(Path(args.frame_info))
     print(f"Loaded info for {len(frame_info)} videos")
 
-    # Load original requests
-    print("\nLoading requests...")
-    with open(args.requests_file) as f:
-        requests = json.load(f)
-    print(f"Found {len(requests)} requests")
-
     # Create results using labels
     print("\nCreating results from class labels...")
-    results = create_label_results(frame_info, requests)
+    results = create_label_results(frame_info)
 
     # Save results
     results_file = output_dir / "combined_results.json"
