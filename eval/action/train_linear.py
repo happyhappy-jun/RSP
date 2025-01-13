@@ -9,12 +9,15 @@ import datetime
 import time
 import numpy as np
 from pathlib import Path
+from typing import Iterable
 
 import torch
 import torch.backends.cudnn as cudnn
 from torch.utils.tensorboard import SummaryWriter
 import hydra
 from omegaconf import DictConfig, OmegaConf
+
+import util.lr_sched as lr_sched
 
 from timm.models.layers import trunc_normal_
 
@@ -49,9 +52,11 @@ class LinearProbing(torch.nn.Module):
         x = self.head(x)
         return x
 
-def train_one_epoch(model, criterion, data_loader, optimizer, device, epoch, loss_scaler,
-                    max_norm=None, log_writer=None, args=None):
-    model.train()
+def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
+                    data_loader: Iterable, optimizer: torch.optim.Optimizer,
+                    device: torch.device, epoch: int, loss_scaler, max_norm: float = 0,
+                    log_writer=None, args=None):
+    model.train(True)
     metric_logger = misc.MetricLogger(delimiter="  ")
     metric_logger.add_meter('lr', misc.SmoothedValue(window_size=1, fmt='{value:.6f}'))
     header = 'Epoch: [{}]'.format(epoch)
@@ -68,7 +73,7 @@ def train_one_epoch(model, criterion, data_loader, optimizer, device, epoch, los
 
         # we use a per iteration (instead of per epoch) lr scheduler
         if data_iter_step % accum_iter == 0:
-            misc.adjust_learning_rate(optimizer, data_iter_step / len(data_loader) + epoch, args)
+            lr_sched.adjust_learning_rate(optimizer, data_iter_step / len(data_loader) + epoch, args)
 
         samples = samples.to(device, non_blocking=True)
         targets = targets.to(device, non_blocking=True)
@@ -124,7 +129,7 @@ def evaluate(data_loader, model, device):
 
     for batch in metric_logger.log_every(data_loader, 10, header):
         images = batch[0]
-        target = batch[1]
+        target = batch[-1]
         images = images.to(device, non_blocking=True)
         target = target.to(device, non_blocking=True)
 
