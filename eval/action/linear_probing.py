@@ -281,16 +281,16 @@ def main(cfg: DictConfig):
                 })
 
             # Save best model
-            if val_acc > best_acc:
-                best_acc = val_acc
-                if cfg.output_dir:
-                    state_dict = linear_probe.module.state_dict() if cfg.distributed else linear_probe.state_dict()
-                    torch.save({
-                        'epoch': epoch,
-                        'model_state_dict': state_dict,
-                        'optimizer_state_dict': optimizer.state_dict(),
-                        'best_acc': best_acc,
-                    }, os.path.join(cfg.output_dir, 'best_model.pth'))
+            # if val_acc > best_acc:
+            #     best_acc = val_acc
+            #     if cfg.output_dir:
+            #         state_dict = linear_probe.module.state_dict() if cfg.distributed else linear_probe.state_dict()
+            #         torch.save({
+            #             'epoch': epoch,
+            #             'model_state_dict': state_dict,
+            #             'optimizer_state_dict': optimizer.state_dict(),
+            #             'best_acc': best_acc,
+            #         }, os.path.join(cfg.output_dir, 'best_model.pth'))
 
     if is_main_process():
         print(f"Best validation accuracy: {best_acc:.2f}%")
