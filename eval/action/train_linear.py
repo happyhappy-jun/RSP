@@ -27,9 +27,10 @@ import modeling
 
 class LinearProbing(torch.nn.Module):
     """Linear probing model that freezes backbone and trains only the head"""
-    def __init__(self, backbone, num_classes=400):
+    def __init__(self, backbone, num_classes=400, pool_type='mean'):
         super().__init__()
         self.backbone = backbone
+        self.pool_type = pool_type
         # Freeze backbone
         for param in self.backbone.parameters():
             param.requires_grad = False
@@ -45,8 +46,11 @@ class LinearProbing(torch.nn.Module):
         
     def forward(self, x):
         x = self.backbone.forward_encoder(x)
-        if self.backbone.global_pool:
-            x = x[:, 1:].mean(dim=1) if self.backbone.global_pool == 'avg' else x[:, 0]
+        # Apply pooling based on specified type
+        if self.pool_type == 'mean':
+            x = x[:, 1:].mean(dim=1)  # mean pool over patches
+        elif self.pool_type == 'cls':
+            x = x[:, 0]  # use CLS token
         x = self.head(x)
         return x
 
@@ -92,7 +96,7 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
         samples = samples.to(device, non_blocking=True)
         targets = targets.to(device, non_blocking=True)
 
-        with torch.cuda.amp.autocast():
+        with torch.amp.autocast('cuda'):
             outputs = model(samples)
             loss = criterion(outputs, targets)
 
@@ -258,7 +262,7 @@ def main(cfg: DictConfig):
         print(msg)
 
     # Create linear probing model
-    model = LinearProbing(model, num_classes=cfg.num_classes)
+    model = LinearProbing(model, num_classes=cfg.num_classes, pool_type='mean')
     model.to(device)
 
     model_without_ddp = model
