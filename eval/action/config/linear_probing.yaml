@@ -11,37 +11,6 @@ train_dataset:
   transform:
     _target_: torchvision.transforms.Compose
     transforms:
-      - _target_: torchvision.transforms.RandomResizedCrop
-        size: 224
-      - _target_: torchvision.transforms.ToTensor
-      - _target_: torchvision.transforms.Normalize
-        mean: [0.485, 0.456, 0.406]
-        std: [0.229, 0.224, 0.225]
-  frames_per_video: 1
-
-val_dataset:
-  _target_: eval.action.datasets.something_something_v2.SomethingSomethingV2
-  _convert_: all
-  split: validation
-  transform:
-    _target_: torchvision.transforms.Compose
-    transforms:
-      - _target_: torchvision.transforms.RandomResizedCrop
-        size: 224
-      - _target_: torchvision.transforms.ToTensor
-      - _target_: torchvision.transforms.Normalize
-        mean: [0.485, 0.456, 0.406]
-        std: [0.229, 0.224, 0.225]
-  frames_per_video: 1
-
-# Dataset parameters
-train_dataset:
-  _target_: eval.action.datasets.something_something_v2.SomethingSomethingV2
-  _convert_: all
-  split: train
-  transform:
-    _target_: torchvision.transforms.Compose
-    transforms:
       - _target_: torchvision.transforms.Resize
         size: 256
       - _target_: torchvision.transforms.CenterCrop
@@ -80,7 +49,7 @@ model:
     embed_scale_factor: 1.0
   num_classes: 174  # Something-Something V2 has 174 classes
 
-checkpoint_path: "/home/junyoon/RSP/outputs/cos-kl_scale0.001-cos_scale0.1_2024-12-31_11-25-56/checkpoint-199.pth"
+checkpoint_path: "/home/junyoon/RSP/outputs/cos-kl_scall0.005-emblarge_2025-01-02_16-53-01/checkpoint-199.pth"
 model_name: rsp_cos_vit_small_patch16
 
 model_params:
@@ -88,8 +57,6 @@ model_params:
   cos_scale: 0.1
   enable_rms_norm: false
   embed_scale_factor: 1.0
-
-
 
 # Training parameters
 batch_size: 256  # Per  GPU batch size
