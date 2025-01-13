@@ -195,14 +195,14 @@ def main(cfg: DictConfig):
 
     # Load pretrained model
     model = modeling.__dict__[cfg.model_name](**cfg.model_params)
-    checkpoint = torch.load(cfg.checkpoint_path, map_location='cpu')
+    checkpoint = torch.load(cfg.checkpoint_path, map_location='cpu')["model"]
 
     # remove prefixes
-    state_dict = {k.replace("module.", ""): v for k, v in checkpoint.items()}
-    state_dict = {k.replace("backbone.", ""): v for k, v in state_dict.items()}
-    state_dict = {k.replace("base_encoder.", ""): v for k, v in state_dict.items()}
-    interpolate_pos_embed(model, state_dict)
-    msg = model.load_state_dict(state_dict, strict=False)
+    # state_dict = {k.replace("module.", ""): v for k, v in checkpoint.items()}
+    # state_dict = {k.replace("backbone.", ""): v for k, v in state_dict.items()}
+    # state_dict = {k.replace("base_encoder.", ""): v for k, v in state_dict.items()}
+    interpolate_pos_embed(model, checkpoint)
+    msg = model.load_state_dict(checkpoint, strict=False)
     if is_main_process():
         print(msg)
 
