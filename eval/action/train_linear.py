@@ -173,6 +173,7 @@ def main(cfg: DictConfig):
     dataset_train = hydra.utils.instantiate(cfg.train_dataset)
     dataset_val = hydra.utils.instantiate(cfg.val_dataset)
     
+    global_rank = 0  # Default for non-distributed
     if cfg.distributed:
         num_tasks = misc.get_world_size()
         global_rank = misc.get_rank()
