@@ -1,9 +1,12 @@
 import os
+import subprocess
 import torch
 import torch.nn as nn
 import torch.distributed as dist
 import torch.backends.cudnn as cudnn
 from torch.utils.data import DataLoader, DistributedSampler
+from torch.optim.lr_scheduler import CosineAnnealingLR
+from tqdm import tqdm
 import wandb
 import hydra
 from omegaconf import DictConfig, OmegaConf
@@ -19,6 +22,27 @@ from util.misc import NativeScalerWithGradNormCount as NativeScaler
 from eval.action.optimizers.lars import LARS
 
 import modeling
+
+class LinearProbing(nn.Module):
+    """Linear probing model that freezes backbone and trains only the head"""
+    def __init__(self, backbone, num_classes=400):
+        super().__init__()
+        self.backbone = backbone
+        # Freeze backbone
+        for param in self.backbone.parameters():
+            param.requires_grad = False
+        # Replace head
+        self.head = nn.Linear(backbone.head.in_features, num_classes)
+        # Initialize head
+        trunc_normal_(self.head.weight, std=0.02)
+        nn.init.zeros_(self.head.bias)
+        
+    def forward(self, x):
+        x = self.backbone.forward_features(x)
+        if self.backbone.global_pool:
+            x = x[:, 1:].mean(dim=1) if self.backbone.global_pool == 'avg' else x[:, 0]
+        x = self.head(x)
+        return x
 
 
 def setup_for_distributed(is_master):
