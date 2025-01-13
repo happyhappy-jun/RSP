@@ -153,7 +153,7 @@ def accuracy(output, target, topk=(1,)):
     correct = pred.eq(target.reshape(1, -1).expand_as(pred))
     return [correct[:k].reshape(-1).float().sum(0) * 100. / batch_size for k in topk]
 
-@hydra.main(config_path="../../config", config_name="linear_probing", version_base="1.2")
+@hydra.main(config_path="config", config_name="linear_probing", version_base="1.2")
 def main(cfg: DictConfig):
     misc.init_distributed_mode(cfg)
 
