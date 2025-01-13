@@ -17,8 +17,6 @@ from torch.utils.tensorboard import SummaryWriter
 import hydra
 from omegaconf import DictConfig, OmegaConf
 
-import util.lr_sched as lr_sched
-
 from timm.models.layers import trunc_normal_
 
 import util.misc as misc
@@ -46,11 +44,27 @@ class LinearProbing(torch.nn.Module):
         trunc_normal_(self.head[-1].weight, std=0.01)
         
     def forward(self, x):
-        x = self.backbone.forward_features(x)
+        x = self.backbone.forward_encoder(x)
         if self.backbone.global_pool:
             x = x[:, 1:].mean(dim=1) if self.backbone.global_pool == 'avg' else x[:, 0]
         x = self.head(x)
         return x
+
+import math
+
+def adjust_learning_rate(optimizer, epoch, args):
+    """Decay the learning rate with half-cycle cosine after warmup"""
+    if epoch < args.warmup_epochs:
+        lr = args.lr * epoch / args.warmup_epochs
+    else:
+        lr = args.min_lr + (args.lr - args.min_lr) * 0.5 * \
+            (1. + math.cos(math.pi * (epoch - args.warmup_epochs) / (args.epochs - args.warmup_epochs)))
+    for param_group in optimizer.param_groups:
+        if "lr_scale" in param_group:
+            param_group["lr"] = lr * param_group["lr_scale"]
+        else:
+            param_group["lr"] = lr
+    return lr
 
 def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
                     data_loader: Iterable, optimizer: torch.optim.Optimizer,
@@ -73,7 +87,7 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
 
         # we use a per iteration (instead of per epoch) lr scheduler
         if data_iter_step % accum_iter == 0:
-            lr_sched.adjust_learning_rate(optimizer, data_iter_step / len(data_loader) + epoch, args)
+            adjust_learning_rate(optimizer, data_iter_step / len(data_loader) + epoch, args)
 
         samples = samples.to(device, non_blocking=True)
         targets = targets.to(device, non_blocking=True)
@@ -276,7 +290,6 @@ def main(cfg: DictConfig):
         train_stats = train_one_epoch(
             model, criterion, data_loader_train,
             optimizer, device, epoch, loss_scaler,
-            max_norm=None,
             log_writer=log_writer,
             args=cfg
         )
