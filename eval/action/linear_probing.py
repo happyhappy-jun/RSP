@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader, DistributedSampler
+from torch.optim.lr_scheduler import CosineAnnealingLR
 from tqdm import tqdm
 import wandb
 import modeling
@@ -219,6 +220,7 @@ def main(cfg: DictConfig):
     # Setup training
     criterion = nn.CrossEntropyLoss()
     optimizer = LARS(linear_probe.parameters(), lr=cfg.lr)
+    scheduler = CosineAnnealingLR(optimizer, T_max=cfg.epochs, eta_min=0)
 
     # Instantiate datasets
     train_dataset = hydra.utils.instantiate(cfg.train_dataset, _convert_="all")
@@ -256,6 +258,9 @@ def main(cfg: DictConfig):
             linear_probe, train_loader, criterion, optimizer, device, epoch
         )
 
+        # Step the scheduler
+        scheduler.step()
+        
         val_loss, val_acc = evaluate(
             linear_probe, val_loader, criterion, device
         )
@@ -271,7 +276,8 @@ def main(cfg: DictConfig):
                     'train_loss': train_loss,
                     'train_acc': train_acc,
                     'val_loss': val_loss,
-                    'val_acc': val_acc
+                    'val_acc': val_acc,
+                    'learning_rate': scheduler.get_last_lr()[0]
                 })
 
             # Save best model
