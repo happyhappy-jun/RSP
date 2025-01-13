@@ -216,7 +216,7 @@ def main(cfg: DictConfig):
     )
 
     # Model setup
-    model_params = {k: v for k, v in cfg.model.items() if k != '_target_'}
+    model_params = {k: v for k, v in cfg.model.items() if k not in ['_target_', 'num_classes']}
     model = modeling.__dict__[cfg.model_name](**model_params)
 
     if cfg.checkpoint_path:
@@ -237,7 +237,7 @@ def main(cfg: DictConfig):
         print(msg)
 
     # Create linear probing model
-    model = LinearProbing(model, num_classes=cfg.model.num_classes)
+    model = LinearProbing(model, num_classes=cfg.num_classes)
     model.to(device)
 
     model_without_ddp = model
