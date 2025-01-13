@@ -216,7 +216,8 @@ def main(cfg: DictConfig):
     )
 
     # Model setup
-    model = modeling.__dict__[cfg.model_name](**cfg.model)
+    model_params = {k: v for k, v in cfg.model.items() if k != '_target_'}
+    model = modeling.__dict__[cfg.model_name](**model_params)
 
     if cfg.checkpoint_path:
         checkpoint = torch.load(cfg.checkpoint_path, map_location='cpu')
