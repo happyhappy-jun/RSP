@@ -51,7 +51,7 @@ def main():
     
     # Process videos in batches of 100
     print("\nProcessing videos and creating shards...")
-    batch_size = 100
+    batch_size = 300
     temp_requests = []
     
     for i, video in enumerate(tqdm(frame_info['videos'], desc="Processing videos")):
