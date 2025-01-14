@@ -9,10 +9,12 @@ from caption2.core.request_builder import RequestBuilder
 from caption2.core.config import Config
 
 def save_shard(shard, output_dir, shard_num):
-    """Save a shard of requests to disk"""
-    shard_file = output_dir / f"shard_{shard_num:04d}.json"
+    """Save a shard of requests to disk as JSONL"""
+    shard_file = output_dir / f"shard_{shard_num:04d}.jsonl"
     with open(shard_file, 'w') as f:
-        json.dump(shard, f, indent=2)
+        for request in shard:
+            json.dump(request, f)
+            f.write('\n')
     return shard_file
 
 def main():

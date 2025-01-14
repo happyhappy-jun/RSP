@@ -99,24 +99,10 @@ class BatchProcessor:
         }
         
     def _estimate_request_size(self, request: Dict[str, Any]) -> int:
-        """Estimate size of a request in bytes"""
-        # Base size for request structure
-        size = 1000  # Conservative base estimate
-        
-        # Add size of image data if present
-        if 'body' in request and 'messages' in request['body']:
-            for message in request['body']['messages']:
-                if 'content' in message:
-                    if isinstance(message['content'], list):
-                        for content in message['content']:
-                            if isinstance(content, dict) and 'image_url' in content:
-                                # Extract base64 length and convert to bytes
-                                img_url = content['image_url']['url']
-                                if img_url.startswith('data:image/jpeg;base64,'):
-                                    base64_str = img_url.split(',')[1]
-                                    size += len(base64_str) * 3 // 4  # Convert base64 to bytes
-                    
-        return size
+        """Calculate exact size of request JSON in bytes"""
+        # Convert request to JSON string and get its byte size
+        request_json = json.dumps(request) + '\n'  # Add newline for JSONL format
+        return len(request_json.encode('utf-8'))
 
     def process_requests(
         self,
