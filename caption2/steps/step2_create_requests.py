@@ -77,18 +77,19 @@ def main():
             
             # Process batch when we have enough requests or at the end
             if len(temp_requests) >= batch_size or i == len(frame_info['videos']) - 1:
-                # Calculate total size for all requests in batch
-                batch_size_total = 0
+                # Process each request in the batch
                 for req in temp_requests:
                     request_size = processor._estimate_request_size(req)
                     
-                    if current_size + request_size > max_shard_size and current_shard:
-                        # Save current shard and start a new one
-                        save_shard(current_shard, output_dir, shard_count)
-                        shard_count += 1
-                        current_shard = []
-                        current_size = 0
+                    # If adding this request would exceed max size, save current shard
+                    if current_size + request_size > max_shard_size:
+                        if current_shard:  # Only save if we have requests
+                            save_shard(current_shard, output_dir, shard_count)
+                            shard_count += 1
+                            current_shard = []
+                            current_size = 0
                     
+                    # Add request to current shard
                     current_shard.append(req)
                     current_size += request_size
                     total_requests += 1
