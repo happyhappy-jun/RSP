@@ -12,12 +12,12 @@ class RspCaptionJoint(RspCaption):
     def __init__(self,
                  *args,
                  context_emb_dim=3096,
-                 mse_scale=1.0,
+                 cos_scale=1.0,
                  embed_decoder_num_heads=8,
                  embed_decoder_depth=4,
                  **kwargs):
         super().__init__(*args, **kwargs)
-        self.mse_scale = mse_scale
+        self.cos_scale = cos_scale
         self.image_type_embed = nn.Parameter(
             torch.zeros(1, self.num_patches + 1, self.decoder_embed_dim),
         )
@@ -113,7 +113,8 @@ class RspCaptionJoint(RspCaption):
         loss_post = self.forward_loss(tgt_imgs, tgt_pred)
         kl_loss, kl_value = self.compute_kl_loss(post_logits, prior_logits)
         h_context_prime = h_context_prime.view(h_context.shape)  # Ensure same shape as h_context
-        context_loss = torch.nn.functional.mse_loss(h_context, h_context_prime)
+        context_loss = 1 - torch.nn.functional.cosine_similarity(h_context.squeeze(1), h_context_prime.squeeze(1), dim=1)
+        context_loss = context_loss.mean()
 
         # MAE
         img_h, mask, ids_restore = self.forward_encoder(tgt_imgs, mask_ratio=self.mask_ratio)
@@ -124,7 +125,7 @@ class RspCaptionJoint(RspCaption):
             tgt_pred_prior = self.forward_decoder_fut(src_h, h_context, prior_z)
             loss_prior = self.forward_loss(tgt_imgs, tgt_pred_prior)
 
-        loss = loss_post + self.kl_scale * kl_loss + self.mse_scale * context_loss + mae_loss
+        loss = loss_post + self.kl_scale * kl_loss + self.cos_scale * context_loss + mae_loss
 
         detailed_loss = {
             "loss_post": loss_post,
@@ -138,7 +139,7 @@ class RspCaptionJoint(RspCaption):
         return loss, tgt_pred, detailed_loss
 
 
-def rsp_mse_joint_vit_small_patch8_dec512d8b(**kwargs):
+def rsp_cos_joint_vit_small_patch8_dec512d8b(**kwargs):
     model = RspCaptionJoint(
         patch_size=8,
         embed_dim=384,
@@ -154,7 +155,7 @@ def rsp_mse_joint_vit_small_patch8_dec512d8b(**kwargs):
     return model
 
 
-def rsp_mse_joint_vit_small_patch16_dec512d8b(**kwargs):
+def rsp_cos_joint_vit_small_patch16_dec512d8b(**kwargs):
     model = RspCaptionJoint(
         patch_size=16,
         embed_dim=384,
@@ -170,7 +171,7 @@ def rsp_mse_joint_vit_small_patch16_dec512d8b(**kwargs):
     return model
 
 
-def rsp_mse_joint_vit_base_patch16_dec512d8b(**kwargs):
+def rsp_cos_joint_vit_base_patch16_dec512d8b(**kwargs):
     model = RspCaptionJoint(
         patch_size=16,
         embed_dim=768,
@@ -186,7 +187,7 @@ def rsp_mse_joint_vit_base_patch16_dec512d8b(**kwargs):
     return model
 
 
-def rsp_mse_joint_vit_large_patch16_dec512d8b(**kwargs):
+def rsp_cos_joint_vit_large_patch16_dec512d8b(**kwargs):
     model = RspCaptionJoint(
         patch_size=16,
         embed_dim=1024,
@@ -203,7 +204,7 @@ def rsp_mse_joint_vit_large_patch16_dec512d8b(**kwargs):
 
 
 # Aliases
-rsp_mse_joint_vit_small_patch8 = rsp_mse_joint_vit_small_patch8_dec512d8b
-rsp_mse_joint_vit_small_patch16 = rsp_mse_joint_vit_small_patch16_dec512d8b
-rsp_mse_joint_vit_base_patch16 = rsp_mse_joint_vit_base_patch16_dec512d8b
-rsp_mse_joint_vit_large_patch16 = rsp_mse_joint_vit_large_patch16_dec512d8b
+rsp_cos_joint_vit_small_patch8 = rsp_cos_joint_vit_small_patch8_dec512d8b
+rsp_cos_joint_vit_small_patch16 = rsp_cos_joint_vit_small_patch16_dec512d8b
+rsp_cos_joint_vit_base_patch16 = rsp_cos_joint_vit_base_patch16_dec512d8b
+rsp_cos_joint_vit_large_patch16 = rsp_cos_joint_vit_large_patch16_dec512d8b
