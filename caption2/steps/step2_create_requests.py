@@ -84,8 +84,24 @@ def main():
         
         print(f"Batch {batch_num + 1}/{num_batches} completed. Saved to: {batch_file}")
 
-    print(f"\nCreated {total_requests} caption requests across {num_batches} batches")
-    print(f"Request batches saved in: {output_dir}")
+    # Combine all batches into one file
+    print("\nCombining all batches into one file...")
+    all_requests = []
+    for batch_num in range(num_batches):
+        batch_file = output_dir / f"caption_requests_batch_{batch_num + 1}.json"
+        with open(batch_file) as f:
+            batch_requests = json.load(f)
+            all_requests.extend(batch_requests)
+        # Remove individual batch file
+        batch_file.unlink()
+
+    # Save combined requests
+    combined_file = output_dir / "caption_requests.json"
+    with open(combined_file, 'w') as f:
+        json.dump(all_requests, f, indent=2)
+
+    print(f"\nCreated {total_requests} caption requests")
+    print(f"Combined requests saved to: {combined_file}")
 
 if __name__ == "__main__":
     main()
