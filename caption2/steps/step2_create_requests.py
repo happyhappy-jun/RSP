@@ -1,6 +1,9 @@
 import argparse
 import json
 from pathlib import Path
+
+from tqdm import tqdm
+
 from caption2.core.request_builder import RequestBuilder
 from caption2.core.config import Config
 
@@ -28,17 +31,16 @@ def main():
 
     # Create requests
     requests = []
-    for video in frame_info['videos']:
+    for video in tqdm(frame_info['videos']):
         try:
             metadata = {
                 'video_name': video['video_name'],
                 'class_label': video['class_label'],
                 'frame_indices': json.dumps(video['frame_indices']),
-                'sampling_seed': str(video['sampling_seed'])
             }
             
             # Create custom ID based on video_idx and optional pair_idx
-            custom_id = (f"video_{video['video_idx']}_pair_{video['pair_idx']}" 
+            custom_id = (f"video_{video['video_idx']}_pair_{video['pair_idx']+2}"
                         if video['pair_idx'] is not None 
                         else f"video_{video['video_idx']}")
             
