@@ -49,9 +49,9 @@ def main():
     shard_count = 0
     total_requests = 0
     
-    # Process videos in batches of 100
+    # Process videos in smaller batches
     print("\nProcessing videos and creating shards...")
-    batch_size = 300
+    batch_size = 100  # Reduced batch size for better control
     temp_requests = []
     
     for i, video in enumerate(tqdm(frame_info['videos'], desc="Processing videos")):
@@ -81,14 +81,19 @@ def main():
                 for req in temp_requests:
                     request_size = processor._estimate_request_size(req)
                     
-                    # If adding this request would exceed max size, save current shard
-                    if current_size + request_size > max_shard_size:
-                        if current_shard:  # Only save if we have requests
+                    # Check if this request would fit in current shard
+                    if current_size + request_size >= max_shard_size:
+                        # Save current shard if it has any requests
+                        if current_shard:
                             save_shard(current_shard, output_dir, shard_count)
                             shard_count += 1
                             current_shard = []
                             current_size = 0
                     
+                    # If single request is too large (shouldn't happen), log warning
+                    if request_size > max_shard_size:
+                        print(f"Warning: Request size {request_size/(1024*1024):.2f}MB exceeds shard limit")
+                        
                     # Add request to current shard
                     current_shard.append(req)
                     current_size += request_size
