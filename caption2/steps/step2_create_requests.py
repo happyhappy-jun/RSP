@@ -47,7 +47,7 @@ def main():
     
     current_shard = []
     current_size = 0
-    max_shard_size = 180 * 1024 * 1024  # 180MB per shard
+    max_shard_size = 150 * 1024 * 1024  # 180MB per shard
     shard_count = 0
     total_requests = 0
     
@@ -80,31 +80,27 @@ def main():
             # Process batch when we have enough requests or at the end
             if len(temp_requests) >= batch_size or i == len(frame_info['videos']) - 1:
                 # Process each request in the batch
-                for req in temp_requests:
-                    request_size = processor._estimate_request_size(req)
+                request_size = sum([processor._estimate_request_size(req) for req in temp_requests])
                     
                     # Check if this request would fit in current shard
-                    if current_size + request_size >= max_shard_size:
-                        # Save current shard if it has any requests
-                        if current_shard:
-                            save_shard(current_shard, output_dir, shard_count)
-                            shard_count += 1
-                            current_shard = []
-                            current_size = 0
-                    
-                    # If single request is too large (shouldn't happen), log warning
-                    if request_size > max_shard_size:
-                        print(f"Warning: Request size {request_size/(1024*1024):.2f}MB exceeds shard limit")
-                        
-                    # Add request to current shard
-                    current_shard.append(req)
-                    current_size += request_size
-                    total_requests += 1
-                
+                if current_size + request_size >= max_shard_size:
+                    # Save current shard if it has any requests
+                    if current_shard:
+                        save_shard(current_shard, output_dir, shard_count)
+                        shard_count += 1
+                        current_shard = []
+                        current_size = 0
+
+
+                # Add request to current shard
+                current_shard.extend(temp_requests)
+                current_size += request_size
+                total_requests += 1
+
                 # Clear temporary batch
                 temp_requests = []
                 gc.collect()
-            
+
         except Exception as e:
             print(f"Error creating request for video {video['video_idx']}: {str(e)}")
             continue
