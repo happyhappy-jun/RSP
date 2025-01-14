@@ -37,3 +37,5 @@ python -m caption2.steps.step5_combine_results \
   --output_dir /data/RSP/captions
 python -m caption2.steps.step6_create_embeddings --caption_results /data/RSP/captions/kinetics400_captions.json --output_dir /data/RSP/captions/embeddings
 ```
+
+We use seed 42 when sampling first 2 pair of frames for each video. We use seed 43 when sampling additional 6 pair of frame for each video. 

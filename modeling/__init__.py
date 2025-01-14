@@ -1,4 +1,12 @@
-from modeling import models_rsp, models_rsp_caption, models_mse, models_context_in_posterior, models_cos, models_mse_reg
+from modeling import (
+    models_rsp,
+    models_rsp_caption,
+    models_mse,
+    models_context_in_posterior,
+    models_cos,
+    models_mse_reg,
+    models_joint_emb
+)
 
 # Original RSP models
 rsp_vit_small_patch8 = models_rsp.rsp_vit_small_patch8_dec512d8b
@@ -32,3 +40,8 @@ rsp_mse_reg_vit_small_patch8 = models_mse_reg.rsp_mse_reg_vit_small_patch8_dec51
 rsp_mse_reg_vit_small_patch16 = models_mse_reg.rsp_mse_reg_vit_small_patch16_dec512d8b
 rsp_mse_reg_vit_base_patch16 = models_mse_reg.rsp_mse_reg_vit_base_patch16_dec512d8b
 rsp_mse_reg_vit_large_patch16 = models_mse_reg.rsp_mse_reg_vit_large_patch16_dec512d8b
+
+rsp_mse_joint_vit_small_patch8 = models_joint_emb.rsp_mse_joint_vit_small_patch8_dec512d8b
+rsp_mse_joint_vit_small_patch16 = models_joint_emb.rsp_mse_joint_vit_small_patch16_dec512d8b
+rsp_mse_joint_vit_base_patch16 = models_joint_emb.rsp_mse_joint_vit_base_patch16_dec512d8b
+rsp_mse_joint_vit_large_patch16 = models_joint_emb.rsp_mse_joint_vit_large_patch16_dec512d8b

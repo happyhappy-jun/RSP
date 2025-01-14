@@ -9,17 +9,17 @@ def load_frame_info(file_path: Path) -> Dict[str, Any]:
     if not file_path.exists():
         raise FileNotFoundError(f"Frame info file not found: {file_path}")
     with open(file_path) as f:
-        return json.load(f)
+        return json.load(f)['videos']
 
 def create_label_results(frame_info: Dict[str, Any]) -> List[Dict[str, Any]]:
     """Create results using class labels from frame_info"""
     results = []
     
-    for video_idx, (video_id, video_data) in enumerate(tqdm(frame_info.items(), desc="Creating label results")):
-        label = video_data['label']
+    for frame in tqdm(frame_info, desc="Creating label results"):
+        label = frame['class_label']
         
         # Create a result for each pair (assuming one pair per video for now)
-        custom_id = f"video_{video_idx}_pair_0"
+        custom_id = f'video_{frame["video_idx"]}_pair_{frame["pair_idx"]}'
         
         # Create result entry matching the schema expected by step6
         result = {

@@ -25,7 +25,7 @@ class ImageNet1K(Dataset):
 
         # Load dataset from Hugging Face
         logger.info(f"Loading ImageNet-1K {split} split from Hugging Face...")
-        self.dataset = load_dataset("imagenet-1k", split=self.split)
+        self.dataset = load_dataset("ILSVRC/imagenet-1k", split=self.split, cache_dir="/data")
         self.num_classes = 1000  # ImageNet-1K has 1000 classes
         
         logger.info(f"Loaded ImageNet-1K {split} split with {len(self.dataset)} images")

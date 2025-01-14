@@ -46,7 +46,7 @@ model:
     embed_scale_factor: 1.0
   num_classes: 1000  # ImageNet-1K has 1000 classes
 
-checkpoint_path: "/home/junyoon/RSP/outputs/cos-kl_scale0.001-cos_scale0.1_2024-12-31_11-25-56/checkpoint-199.pth"
+checkpoint_path: "/home/junyoon/RSP/outputs/cos-kl_scall0.005-emblarge_2025-01-02_16-53-01/checkpoint-199.pth"
 model_name: rsp_cos_vit_small_patch16
 
 model_params:
@@ -77,7 +77,7 @@ dist_on_itp: false
 
 # Output parameters
 output_dir: "eval/action/outputs/imagenet1k"
-use_wandb: true
+use_wandb: false
 project_name: rsp_linear_probing_imagenet
 run_name: imagenet1k-cos-kl_scale0.001-cos_scale0.1
 

@@ -57,7 +57,7 @@ class PairedFrameSampler(BaseFrameSampler):
       - Randomly sample any two frames in order
     """
     
-    def __init__(self, min_gap=4, max_distance=48, num_pairs=2, seed=None):
+    def __init__(self, min_gap=4, max_distance=48, num_pairs=6, seed=None):
         super().__init__(seed)
         self.min_gap = min_gap
         self.max_distance = max_distance

@@ -133,7 +133,7 @@ class SomethingSomethingV2(Dataset):
             stream = container.streams.video[0]
             total_frames = stream.frames
             stream.thread_type = "AUTO"
-            stream.thread_count = 8
+            stream.thread_count = 1
 
             if total_frames >= self.frames_per_video:
                 # Randomly sample frame indices

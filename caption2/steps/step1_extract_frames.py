@@ -47,7 +47,7 @@ async def main():
     # Save frame info
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
-    frame_info_path = output_dir / "frame_info.json"
+    frame_info_path = output_dir / "frame_info_additional.json"
     with open(frame_info_path, 'w') as f:
         json.dump(frame_info, f, indent=2)
 

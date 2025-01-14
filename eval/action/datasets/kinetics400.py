@@ -59,11 +59,11 @@ class Kinetics400(Dataset):
             if os.path.exists(video_path):
                 try:
                     # Try to open video with Decord to verify it's valid
-                    vr = VideoReader(video_path)
-                    if len(vr) > 0:  # Check if video has frames
-                        valid_videos.append(idx)
-                    else:
-                        logger.warning(f"Video has no frames: {video_path}")
+                    # vr = VideoReader(video_path)
+                    # if len(vr) > 0:  # Check if video has frames
+                    valid_videos.append(idx)
+                    # else:
+                    #     logger.warning(f"Video has no frames: {video_path}")
                 except Exception as e:
                     logger.warning(f"Invalid video file {video_path}: {str(e)}")
             

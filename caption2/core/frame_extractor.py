@@ -21,7 +21,7 @@ async def extract_frames(
     sampler_type: str = "uniform",
     config: Config = None,
     seed: int = 42,
-    max_workers: int = 4
+    max_workers: int = 32
 ) -> Dict[str, Any]:
     """Extract frames using configured sampler"""
     if config is None:
@@ -65,7 +65,7 @@ async def extract_frames(
             # Sample frames
             frames = sampler.sample_frames(str(video_path))
             frame_paths = []
-            
+
             # Check cache
             cache_path = get_cache_path(str(video_path), frames)
             if cache_path.exists():
@@ -84,7 +84,7 @@ async def extract_frames(
             for frame_idx, frame in enumerate(batch_frames):
                 # For paired sampling, use pair_X_frameY format
                 if sampler_type == "paired":
-                    pair_idx = frame_idx // 2
+                    pair_idx = frame_idx // 2 + 2
                     frame_in_pair = frame_idx % 2
                     frame_path = video_dir / f"pair_{pair_idx}_frame{frame_in_pair}.jpg"
                 else:
@@ -134,7 +134,7 @@ async def extract_frames(
 
     # Process videos in parallel using ThreadPoolExecutor
     loop = asyncio.get_event_loop()
-    chunk_size = 100  # Process videos in chunks to manage memory
+    chunk_size = 1000  # Process videos in chunks to manage memory
     
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         progress_bar = tqdm(total=len(video_paths), desc="Processing videos")

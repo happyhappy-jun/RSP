@@ -17,6 +17,9 @@ class LinearProbing(nn.Module):
         self.classifier = nn.Linear(self.feature_dim, num_classes)
         self.classifier.weight.data.normal_(mean=0.0, std=0.01)
         self.classifier.bias.data.zero_()
+        self.head = nn.Sequential(self.bn, self.classifier)
+        for _, p in self.bn.named_parameters():
+            p.requires_grad = True
         
     def forward(self, x):
         # Get features from backbone
@@ -31,5 +34,5 @@ class LinearProbing(nn.Module):
             features = cls_token.reshape(B, T, -1).mean(dim=1)  # Average over frames
         
         # Pass through batch norm and classifier
-        features = self.bn(features)
-        return self.classifier(features)
+        logits = self.head(features)
+        return logits

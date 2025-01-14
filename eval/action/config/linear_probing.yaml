@@ -42,22 +42,24 @@ val_dataset:
   frames_per_video: 1
 
 # Model parameters
-model:
-  kl_scale: 0.001
-  cos_scale: 0.1
-  enable_rms_norm: true
-  embed_scale_factor: 1.0
+model: {}
+#  kl_scale: 0.001
+#  cos_scale: 0.1
+#  enable_rms_norm: true
+#  embed_scale_factor: 1.0
 
 num_classes: 174  # Something-Something V2 has 174 classes
 
-checkpoint_path: "/home/junyoon/RSP/outputs/cos-kl_scall0.005-emblarge_2025-01-02_16-53-01/checkpoint-199.pth"
-model_name: rsp_cos_vit_small_patch16
+checkpoint_path: "/home/junyoon/RSP/outputs/baseline/rsp_vits16.pth"
+model_name: rsp_vit_small_patch16
 
-model_params:
-  kl_scale: 0.005
-  cos_scale: 0.1
-  enable_rms_norm: false
-  embed_scale_factor: 1.0
+model_params: null
+
+#model_params:
+#  kl_scale: 0.005
+#  cos_scale: 0.1
+#  enable_rms_norm: false
+#  embed_scale_factor: 1.0
 
 # Training parameters
 batch_size: 256  # Per GPU batch size
