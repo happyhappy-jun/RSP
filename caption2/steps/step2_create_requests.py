@@ -47,14 +47,13 @@ def main():
     
     current_shard = []
     current_size = 0
-    max_shard_size = 150 * 1024 * 1024  # 150MB per shard
+    max_shard_size = 200_000_000
     shard_count = 0
     total_requests = 0
     
     # Process videos in smaller batches
     print("\nProcessing videos and creating shards...")
-    batch_size = 100  # Process 100 videos at a time
-    
+
     for i, video in enumerate(tqdm(frame_info['videos'], desc="Processing videos")):
         try:
             metadata = {
@@ -89,10 +88,6 @@ def main():
             current_shard.append(request)
             current_size += request_size
             total_requests += 1
-            
-            # Optional batch-based garbage collection
-            if i > 0 and i % batch_size == 0:
-                gc.collect()
 
         except Exception as e:
             print(f"Error creating request for video {video['video_idx']}: {str(e)}")
