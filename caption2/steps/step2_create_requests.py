@@ -47,14 +47,13 @@ def main():
     
     current_shard = []
     current_size = 0
-    max_shard_size = 150 * 1024 * 1024  # 180MB per shard
+    max_shard_size = 150 * 1024 * 1024  # 150MB per shard
     shard_count = 0
     total_requests = 0
     
     # Process videos in smaller batches
     print("\nProcessing videos and creating shards...")
-    batch_size = 100  # Reduced batch size for better control
-    temp_requests = []
+    batch_size = 100  # Process 100 videos at a time
     
     for i, video in enumerate(tqdm(frame_info['videos'], desc="Processing videos")):
         try:
@@ -75,30 +74,24 @@ def main():
                 metadata=metadata
             )
             
-            temp_requests.append(request)
+            # Calculate size of this single request
+            request_size = processor._estimate_request_size(request)
             
-            # Process batch when we have enough requests or at the end
-            if len(temp_requests) >= batch_size or i == len(frame_info['videos']) - 1:
-                # Process each request in the batch
-                request_size = sum([processor._estimate_request_size(req) for req in temp_requests])
-                    
-                    # Check if this request would fit in current shard
-                if current_size + request_size >= max_shard_size:
-                    # Save current shard if it has any requests
-                    if current_shard:
-                        save_shard(current_shard, output_dir, shard_count)
-                        shard_count += 1
-                        current_shard = []
-                        current_size = 0
-
-
-                # Add request to current shard
-                current_shard.extend(temp_requests)
-                current_size += request_size
-                total_requests += 1
-
-                # Clear temporary batch
-                temp_requests = []
+            # If adding this request would exceed max size, save current shard
+            if current_size + request_size >= max_shard_size and current_shard:
+                save_shard(current_shard, output_dir, shard_count)
+                shard_count += 1
+                current_shard = []
+                current_size = 0
+                gc.collect()
+            
+            # Add request to current shard
+            current_shard.append(request)
+            current_size += request_size
+            total_requests += 1
+            
+            # Optional batch-based garbage collection
+            if i > 0 and i % batch_size == 0:
                 gc.collect()
 
         except Exception as e:
