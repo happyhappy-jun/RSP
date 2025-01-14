@@ -6,17 +6,30 @@ from openai import OpenAI
 
 def main():
     parser = argparse.ArgumentParser(description='Step 3: Process caption requests')
-    parser.add_argument('--requests_file', type=str, required=True,
-                       help='Path to caption_requests.json from step 2')
+    parser.add_argument('--requests_dir', type=str, required=True,
+                       help='Directory containing sharded request files from step 2')
     parser.add_argument('--output_dir', type=str, required=True,
                        help='Output directory for results')
     parser.add_argument('--sanity_check', action='store_true',
                        help='Run sanity check with single request only')
     args = parser.parse_args()
 
-    # Load requests
-    with open(args.requests_file) as f:
-        requests = json.load(f)
+    # Get list of all shard files
+    requests_dir = Path(args.requests_dir)
+    shard_files = sorted(list(requests_dir.glob("shard_*.json")))
+    if not shard_files:
+        raise ValueError(f"No shard files found in {args.requests_dir}")
+
+    # For sanity check, only process first shard
+    if args.sanity_check:
+        with open(shard_files[0]) as f:
+            requests = json.load(f)
+    else:
+        # Load all requests from shards
+        requests = []
+        for shard_file in shard_files:
+            with open(shard_file) as f:
+                requests.extend(json.load(f))
 
     # Setup output directory
     output_dir = Path(args.output_dir)

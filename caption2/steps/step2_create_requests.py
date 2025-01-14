@@ -58,50 +58,44 @@ def main():
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    # Process videos in batches
-    total_requests = 0
-    videos = frame_info['videos']
-    num_batches = (len(videos) + args.batch_size - 1) // args.batch_size
+    # Process all videos
+    print("\nProcessing all videos...")
+    all_requests = process_batch(frame_info['videos'], builder, 1)
+    total_requests = len(all_requests)
 
-    for batch_num in range(num_batches):
-        start_idx = batch_num * args.batch_size
-        end_idx = min((batch_num + 1) * args.batch_size, len(videos))
+    # Estimate size and create shards
+    from caption2.core.batch_api import BatchProcessor
+    processor = BatchProcessor(client=None, output_dir=str(output_dir))
+    
+    shards = []
+    current_shard = []
+    current_size = 0
+    max_shard_size = 100 * 1024 * 1024  # 100MB per shard
+    
+    print("\nCreating size-based shards...")
+    for request in tqdm(all_requests, desc="Sharding requests"):
+        request_size = processor._estimate_request_size(request)
         
-        # Process current batch
-        batch_videos = videos[start_idx:end_idx]
-        batch_requests = process_batch(batch_videos, builder, batch_num + 1)
+        if current_size + request_size > max_shard_size and current_shard:
+            shards.append(current_shard)
+            current_shard = []
+            current_size = 0
+            
+        current_shard.append(request)
+        current_size += request_size
         
-        # Save batch requests
-        batch_file = output_dir / f"caption_requests_batch_{batch_num + 1}.json"
-        with open(batch_file, 'w') as f:
-            json.dump(batch_requests, f, indent=2)
-        
-        total_requests += len(batch_requests)
-        
-        # Force garbage collection
-        del batch_requests
-        gc.collect()
-        
-        print(f"Batch {batch_num + 1}/{num_batches} completed. Saved to: {batch_file}")
+    if current_shard:
+        shards.append(current_shard)
 
-    # Combine all batches into one file
-    print("\nCombining all batches into one file...")
-    all_requests = []
-    for batch_num in range(num_batches):
-        batch_file = output_dir / f"caption_requests_batch_{batch_num + 1}.json"
-        with open(batch_file) as f:
-            batch_requests = json.load(f)
-            all_requests.extend(batch_requests)
-        # Remove individual batch file
-        batch_file.unlink()
-
-    # Save combined requests
-    combined_file = output_dir / "caption_requests.json"
-    with open(combined_file, 'w') as f:
-        json.dump(all_requests, f, indent=2)
+    # Save shards
+    print(f"\nSaving {len(shards)} shards...")
+    for i, shard in enumerate(tqdm(shards, desc="Saving shards")):
+        shard_file = output_dir / f"shard_{i:04d}.json"
+        with open(shard_file, 'w') as f:
+            json.dump(shard, f, indent=2)
 
     print(f"\nCreated {total_requests} caption requests")
-    print(f"Combined requests saved to: {combined_file}")
+    print(f"Split into {len(shards)} shards in: {output_dir}")
 
 if __name__ == "__main__":
     main()
