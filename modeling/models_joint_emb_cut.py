@@ -160,7 +160,7 @@ class RspCaptionJointCut(RspCaption):
         return loss, tgt_pred, detailed_loss
 
 
-def rsp_cos_joint_vit_small_patch8_dec512d8b(**kwargs):
+def rsp_cos_joint_cut_vit_small_patch8_dec512d8b(**kwargs):
     model = RspCaptionJointCut(
         patch_size=8,
         embed_dim=384,
@@ -176,7 +176,7 @@ def rsp_cos_joint_vit_small_patch8_dec512d8b(**kwargs):
     return model
 
 
-def rsp_cos_joint_vit_small_patch16_dec512d8b(**kwargs):
+def rsp_cos_joint_cut_vit_small_patch16_dec512d8b(**kwargs):
     model = RspCaptionJointCut(
         patch_size=16,
         embed_dim=384,
@@ -192,7 +192,7 @@ def rsp_cos_joint_vit_small_patch16_dec512d8b(**kwargs):
     return model
 
 
-def rsp_cos_joint_vit_base_patch16_dec512d8b(**kwargs):
+def rsp_cos_joint_cut_vit_base_patch16_dec512d8b(**kwargs):
     model = RspCaptionJointCut(
         patch_size=16,
         embed_dim=768,
@@ -208,7 +208,7 @@ def rsp_cos_joint_vit_base_patch16_dec512d8b(**kwargs):
     return model
 
 
-def rsp_cos_joint_vit_large_patch16_dec512d8b(**kwargs):
+def rsp_cos_joint_cut_vit_large_patch16_dec512d8b(**kwargs):
     model = RspCaptionJointCut(
         patch_size=16,
         embed_dim=1024,
@@ -225,7 +225,7 @@ def rsp_cos_joint_vit_large_patch16_dec512d8b(**kwargs):
 
 
 # Aliases
-rsp_cos_joint_vit_small_patch8 = rsp_cos_joint_vit_small_patch8_dec512d8b
-rsp_cos_joint_vit_small_patch16 = rsp_cos_joint_vit_small_patch16_dec512d8b
-rsp_cos_joint_vit_base_patch16 = rsp_cos_joint_vit_base_patch16_dec512d8b
-rsp_cos_joint_vit_large_patch16 = rsp_cos_joint_vit_large_patch16_dec512d8b
+rsp_cos_joint_cut_vit_small_patch8 = rsp_cos_joint_cut_vit_small_patch8_dec512d8b
+rsp_cos_joint_cut_vit_small_patch16 = rsp_cos_joint_cut_vit_small_patch16_dec512d8b
+rsp_cos_joint_cut_vit_base_patch16 = rsp_cos_joint_cut_vit_base_patch16_dec512d8b
+rsp_cos_joint_cut_vit_large_patch16 = rsp_cos_joint_cut_vit_large_patch16_dec512d8b
