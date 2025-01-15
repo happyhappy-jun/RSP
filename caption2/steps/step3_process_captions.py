@@ -69,13 +69,14 @@ def main():
         print(json.dumps(all_results, indent=2))
 
     if not args.sanity_check:
-        # Save all results
-        results_file = output_dir / "caption_results.json"
-        with open(results_file, 'w') as f:
-            json.dump(all_results, f, indent=2)
+        # Save raw results
+        for i, result in enumerate(all_results):
+            shard_results_file = output_dir / f"caption_results_{i:04d}.json"
+            with open(shard_results_file, 'w') as f:
+                json.dump(result, f, indent=2)
 
         print(f"\nProcessed {len(all_results)} caption requests")
-        print(f"Results saved to: {results_file}")
+        print(f"Results saved as individual files in: {output_dir}")
 
 if __name__ == "__main__":
     main()
