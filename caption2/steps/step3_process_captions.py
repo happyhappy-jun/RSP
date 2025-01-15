@@ -87,7 +87,8 @@ def main():
                 shard_requests,
                 description=f"Processing {shard_file.name}",
                 sanity_check=False,
-                shard_idx=shard_idx
+                shard_idx=shard_idx,
+                original_shard_file=shard_file.name
             )
             submitted_batches.append({
                 'batch_ids': batch_ids,

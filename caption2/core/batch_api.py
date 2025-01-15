@@ -56,8 +56,8 @@ class BatchProcessor:
         retry_failed: bool = True
     ) -> str:
         """Submit a batch job from requests"""
-        # Save requests to JSONL
-        shard_path = self.output_dir / f"shard_{shard_idx}.jsonl"
+        # Save requests to JSONL using original shard filename if provided
+        shard_path = self.output_dir / (original_shard_file or f"shard_{shard_idx}.jsonl")
         with open(shard_path, "w") as f:
             for request in requests:
                 json.dump(request, f)
@@ -166,7 +166,8 @@ class BatchProcessor:
         num_workers: int = 4,
         description: str = None,
         sanity_check: bool = False,
-        shard_idx: Optional[int] = None
+        shard_idx: Optional[int] = None,
+        original_shard_file: Optional[str] = None
     ) -> List[str]:
         """Process large number of requests with concurrent batch processing"""
         # Initialize metadata store
