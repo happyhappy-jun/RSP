@@ -209,7 +209,7 @@ class BatchProcessor:
             future = submit_executor.submit(
                 self.submit_batch,
                 requests,
-                shard_idx=shard_idx if shard_idx is not None else 0,
+                shard_idx=int(shard_idx) if shard_idx is not None else 0,
                 description=description or "Batch processing"
             )
             batch_futures.append(future)

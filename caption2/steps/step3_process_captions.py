@@ -65,6 +65,7 @@ def main():
         # First submit all shards
         submitted_batches = []
         for shard_idx, shard_file in enumerate(tqdm(shard_files, desc="Submitting shards")):
+            print(shard_file)
             results_file = output_dir / f"caption_results_{shard_idx:04d}.json"
             
             # Skip if already processed
