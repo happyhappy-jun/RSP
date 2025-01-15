@@ -25,4 +25,5 @@ model_params:
   cos_scale: 0.1
   enable_rms_norm: true
   embed_scale_factor: 1.0
+  context_in_decoder: true
 
