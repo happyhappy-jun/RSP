@@ -78,11 +78,15 @@ def main():
                 for line in f:
                     shard_requests.append(json.loads(line))
             
+            # Extract shard index from filename (e.g. "shard_0421.jsonl" -> 421)
+            shard_idx = int(shard_file.stem.split('_')[1])
+            
             # Submit shard for processing
             batch_ids = processor.submit_requests(
                 shard_requests,
                 description=f"Processing {shard_file.name}",
-                sanity_check=False
+                sanity_check=False,
+                shard_idx=shard_idx
             )
             submitted_batches.append({
                 'batch_ids': batch_ids,

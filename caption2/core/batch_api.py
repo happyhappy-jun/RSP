@@ -165,7 +165,8 @@ class BatchProcessor:
         max_batch_size: int = 100 * 1024 * 1024,  # 100MB in bytes
         num_workers: int = 4,
         description: str = None,
-        sanity_check: bool = False
+        sanity_check: bool = False,
+        shard_idx: Optional[int] = None
     ) -> List[str]:
         """Process large number of requests with concurrent batch processing"""
         # Initialize metadata store
@@ -208,7 +209,7 @@ class BatchProcessor:
             future = submit_executor.submit(
                 self.submit_batch,
                 requests,
-                shard_idx=0,
+                shard_idx=shard_idx if shard_idx is not None else 0,
                 description=description or "Batch processing"
             )
             batch_futures.append(future)
