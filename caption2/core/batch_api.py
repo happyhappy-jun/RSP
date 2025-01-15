@@ -8,6 +8,8 @@ from tqdm import tqdm
 from openai import OpenAI
 from .metadata_store import MetadataStore
 
+__all__ = ['BatchProcessor']
+
 class BatchProcessor:
     """Wrapper for OpenAI's batch API"""
     
