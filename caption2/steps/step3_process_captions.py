@@ -49,9 +49,11 @@ def main():
             print(json.dumps(results, indent=2))
             total_processed = 1
     else:
-        print("\nProcessing shards...")
-        for shard_idx, shard_file in enumerate(tqdm(shard_files, desc="Processing shards")):
-            # Process and save results for current shard
+        print("\nSubmitting all shards...")
+        batch_futures = []
+        
+        # First submit all shards
+        for shard_idx, shard_file in enumerate(tqdm(shard_files, desc="Submitting shards")):
             results_file = output_dir / f"caption_results_{shard_idx:04d}.json"
             
             # Skip if already processed
@@ -59,28 +61,41 @@ def main():
                 print(f"Skipping existing results file: {results_file}")
                 continue
                 
-            # Load and process current shard
+            # Load current shard
             shard_requests = []
             with open(shard_file) as f:
                 for line in f:
                     shard_requests.append(json.loads(line))
             
-            # Process current shard
-            results = processor.process_requests(
-                shard_requests,
-                description=f"Processing {shard_file.name}",
-                sanity_check=False
-            )
+            # Submit shard for processing
+            batch_future = {
+                'requests': shard_requests,
+                'results_file': results_file,
+                'future': processor.process_requests(
+                    shard_requests,
+                    description=f"Processing {shard_file.name}",
+                    sanity_check=False
+                )
+            }
+            batch_futures.append(batch_future)
             
-            # Save results immediately
-            with open(results_file, 'w') as f:
-                json.dump(results, f, indent=2)
-            
-            total_processed += len(results)
-            
-            # Clear memory
-            del results
-            del shard_requests
+        # Then wait for and save all results
+        print("\nWaiting for results...")
+        for batch in tqdm(batch_futures, desc="Processing results"):
+            try:
+                results = batch['future']
+                
+                # Save results immediately
+                with open(batch['results_file'], 'w') as f:
+                    json.dump(results, f, indent=2)
+                
+                total_processed += len(results)
+                
+                # Clear memory
+                del results
+                del batch['requests']
+            except Exception as e:
+                print(f"Error processing batch {batch['results_file']}: {str(e)}")
             
     if not args.sanity_check:
         print(f"\nProcessed {total_processed} caption requests")
