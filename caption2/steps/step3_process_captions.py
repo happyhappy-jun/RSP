@@ -15,6 +15,8 @@ def main():
                        help='Output directory for results')
     parser.add_argument('--sanity_check', action='store_true',
                        help='Run sanity check with single request only')
+    parser.add_argument('--start_shard', type=str,
+                       help='Start processing from this shard file (e.g. shard_0421.jsonl)')
     args = parser.parse_args()
 
     # Get list of all shard files
@@ -22,6 +24,14 @@ def main():
     shard_files = sorted(list(requests_dir.glob("shard_*.jsonl")))
     if not shard_files:
         raise ValueError(f"No shard files found in {args.requests_dir}")
+        
+    # If start_shard is specified, filter shard files
+    if args.start_shard:
+        start_idx = next((i for i, f in enumerate(shard_files) if f.name == args.start_shard), None)
+        if start_idx is None:
+            raise ValueError(f"Start shard {args.start_shard} not found in {args.requests_dir}")
+        print(f"\nStarting from shard: {args.start_shard}")
+        shard_files = shard_files[start_idx:]
 
     # Setup output directory
     output_dir = Path(args.output_dir)
