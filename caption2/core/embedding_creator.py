@@ -129,7 +129,7 @@ class EmbeddingCreator:
         """Process caption results and create embeddings asynchronously"""
         
         output_dir.mkdir(parents=True, exist_ok=True)
-        output_file = output_dir / "embedding_results.jsonl"
+        output_file = output_dir / "embedding_6_pair.jsonl"
         request_url = "https://api.openai.com/v1/embeddings"
         request_header = {"Authorization": f"Bearer {self.api_key}"}
         

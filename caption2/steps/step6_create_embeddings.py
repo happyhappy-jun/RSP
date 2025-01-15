@@ -26,7 +26,7 @@ async def main():
     # Load caption results
     print(f"\nLoading caption results from: {caption_results_path}")
     with open(caption_results_path) as f:
-        results = json.load(f)
+        results = [json.loads(line) for line in f.readlines()]
     
     # Process results
     caption_results = []
