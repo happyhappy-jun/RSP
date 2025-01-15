@@ -5,7 +5,7 @@ from modeling import (
     models_context_in_posterior,
     models_cos,
     models_mse_reg,
-    models_joint_emb
+    models_joint_emb, models_joint_emb_cut
 )
 
 # Original RSP models
@@ -45,3 +45,5 @@ rsp_cos_joint_vit_small_patch8 = models_joint_emb.rsp_cos_joint_vit_small_patch8
 rsp_cos_joint_vit_small_patch16 = models_joint_emb.rsp_cos_joint_vit_small_patch16_dec512d8b
 rsp_cos_joint_vit_base_patch16 = models_joint_emb.rsp_cos_joint_vit_base_patch16_dec512d8b
 rsp_cos_joint_vit_large_patch16 = models_joint_emb.rsp_cos_joint_vit_large_patch16_dec512d8b
+
+rsp_cos_joint_cut_vit_small_patch16 = models_joint_emb_cut.rsp_cos_joint_cut_vit_small_patch16_dec512d8b

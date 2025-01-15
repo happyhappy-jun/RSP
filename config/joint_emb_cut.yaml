@@ -2,9 +2,9 @@ defaults:
   - main
   - _self_
 
-exp_name: rsp_cos_joint_emb
+exp_name: rsp_cos_joint_emb_cut
 
-model_name: rsp_cos_joint_vit_small_patch16
+model_name: rsp_cos_joint_cut_vit_small_patch16
 
 data_root: /data
 
