@@ -50,10 +50,11 @@ class BatchProcessor:
         
     def submit_batch(
         self,
-        requests: List[Dict[str, Any]],
+        requests: List[Dict[str, Any]], 
         shard_idx: int,
         description: str = None,
-        retry_failed: bool = True
+        retry_failed: bool = True,
+        original_shard_file: Optional[str] = None
     ) -> str:
         """Submit a batch job from requests"""
         # Save requests to JSONL using original shard filename if provided
@@ -211,7 +212,8 @@ class BatchProcessor:
                 self.submit_batch,
                 requests,
                 shard_idx=int(shard_idx) if shard_idx is not None else 0,
-                description=description or "Batch processing"
+                description=description or "Batch processing",
+                original_shard_file=original_shard_file
             )
             batch_futures.append(future)
 
