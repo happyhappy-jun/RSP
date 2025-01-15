@@ -1,6 +1,9 @@
 import argparse
 import json
 from pathlib import Path
+
+from tqdm import tqdm
+
 from caption2.core.batch_api import BatchProcessor
 from openai import OpenAI
 
@@ -32,7 +35,7 @@ def main():
     )
     
     all_results = []
-    for shard_file in shard_files:
+    for shard_file in tqdm(shard_files):
         # Load requests from shard
         requests = []
         with open(shard_file) as f:
