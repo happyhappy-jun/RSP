@@ -15,7 +15,6 @@ class RspCaptionCos(RspCaption):
                  enable_rms_norm=False, 
                  embed_scale_factor=1.0, 
                  context_embed_dim=3072,
-                 context_in_decoder=True,
                  **kwargs):
         super().__init__(*args, **kwargs)
         self.cos_scale = cos_scale
@@ -23,12 +22,10 @@ class RspCaptionCos(RspCaption):
             torch.zeros(1, self.num_patches + 1, self.decoder_embed_dim),
         )
         nn.init.normal_(self.image_type_embed, std=0.02)
-        self.context_in_decoder = context_in_decoder
-        if self.context_in_decoder:
-            self.language_type_embed = nn.Parameter(
-                torch.zeros(1, 1, self.decoder_embed_dim),
-            )
-            nn.init.normal_(self.language_type_embed, std=0.02)
+        self.language_type_embed = nn.Parameter(
+            torch.zeros(1, 1, self.decoder_embed_dim),
+        )
+        nn.init.normal_(self.language_type_embed, std=0.02)
         self.enable_rms_norm = enable_rms_norm
         if enable_rms_norm:
             self.rms_norm = RMSNorm(self.decoder_embed_dim, scale_factor=embed_scale_factor, eps=1e-6)
@@ -40,12 +37,9 @@ class RspCaptionCos(RspCaption):
         h = self.decoder_embed_deter(h)  # [B, L, decoder_embed_dim]
         h = h + self.decoder_pos_embed  # Add positional embedding
         h = h + self.image_type_embed
-        if self.context_in_decoder:
-            h_context = h_context + self.language_type_embed
-            # Concatenate along sequence dimension
-            h_concat = torch.cat([h, h_context], dim=1)  # [B, L+1, decoder_embed_dim]
-        else:
-            h_concat = h
+        h_context = h_context + self.language_type_embed
+        # Concatenate along sequence dimension
+        h_concat = torch.cat([h, h_context], dim=1)  # [B, L+1, decoder_embed_dim]
 
         # Process stochastic path
         if self.discrete != 0:
