@@ -53,6 +53,7 @@ def main():
         batch_futures = []
         
         # First submit all shards
+        submitted_batches = []
         for shard_idx, shard_file in enumerate(tqdm(shard_files, desc="Submitting shards")):
             results_file = output_dir / f"caption_results_{shard_idx:04d}.json"
             
@@ -68,22 +69,21 @@ def main():
                     shard_requests.append(json.loads(line))
             
             # Submit shard for processing
-            batch_future = {
-                'requests': shard_requests,
-                'results_file': results_file,
-                'future': processor.process_requests(
-                    shard_requests,
-                    description=f"Processing {shard_file.name}",
-                    sanity_check=False
-                )
-            }
-            batch_futures.append(batch_future)
+            batch_ids = processor.submit_requests(
+                shard_requests,
+                description=f"Processing {shard_file.name}",
+                sanity_check=False
+            )
+            submitted_batches.append({
+                'batch_ids': batch_ids,
+                'results_file': results_file
+            })
             
-        # Then wait for and save all results
-        print("\nWaiting for results...")
-        for batch in tqdm(batch_futures, desc="Processing results"):
+        # Then monitor and save results
+        print("\nMonitoring batches...")
+        for batch in tqdm(submitted_batches, desc="Processing results"):
             try:
-                results = batch['future']
+                results = processor.monitor_batches(batch['batch_ids'])
                 
                 # Save results immediately
                 with open(batch['results_file'], 'w') as f:
@@ -93,7 +93,6 @@ def main():
                 
                 # Clear memory
                 del results
-                del batch['requests']
             except Exception as e:
                 print(f"Error processing batch {batch['results_file']}: {str(e)}")
             

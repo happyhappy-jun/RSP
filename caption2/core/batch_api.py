@@ -25,14 +25,15 @@ class BatchProcessor:
         self.max_retries = max_retries
         self.check_interval = check_interval
         self.output_dir.mkdir(parents=True, exist_ok=True)
+        self.batch_ids = []  # Track submitted batch IDs
         
-    def create_batch(
+    def submit_batch(
         self,
         requests: List[Dict[str, Any]],
         shard_idx: int,
         description: str = None
     ) -> str:
-        """Create a batch job from requests"""
+        """Submit a batch job from requests"""
         # Save requests to JSONL
         shard_path = self.output_dir / f"shard_{shard_idx}.jsonl"
         with open(shard_path, "w") as f:
@@ -50,14 +51,16 @@ class BatchProcessor:
         # Create batch
         batch = self.client.batches.create(
             input_file_id=batch_file.id,
-            endpoint=requests[0]["url"],  # Use endpoint from first request
+            endpoint="/v1/chat/completions",  # Use standard endpoint
             completion_window="24h",
             metadata={
                 "description": description or f"Batch shard {shard_idx}"
             }
         )
         
-        return batch.id
+        batch_id = batch.id
+        self.batch_ids.append(batch_id)  # Track the batch ID
+        return batch_id
         
     def monitor_batch(self, batch_id: str) -> Dict[str, Any]:
         """Monitor batch status until completion"""
@@ -106,14 +109,14 @@ class BatchProcessor:
         request_json = json.dumps(request) + '\n'  # Add newline for JSONL format
         return len(request_json.encode('utf-8'))
 
-    def process_requests(
+    def submit_requests(
         self,
         requests: List[Dict[str, Any]],
         max_batch_size: int = 100 * 1024 * 1024,  # 100MB in bytes
         num_workers: int = 4,
         description: str = None,
         sanity_check: bool = False
-    ) -> List[Dict[str, Any]]:
+    ) -> List[str]:
         """Process large number of requests with concurrent batch processing"""
         # Initialize metadata store
         metadata_store = MetadataStore(self.output_dir)
@@ -153,7 +156,7 @@ class BatchProcessor:
             # Submit single batch
             batch_futures = []
             future = submit_executor.submit(
-                self.create_batch,
+                self.submit_batch,
                 requests,
                 shard_idx=0,
                 description=description or "Batch processing"
@@ -169,7 +172,20 @@ class BatchProcessor:
                 except Exception as e:
                     print(f"Error submitting batch: {str(e)}")
 
-        # Monitor batches and return results directly
+        return batch_ids
+
+    def monitor_batches(
+        self,
+        batch_ids: Optional[List[str]] = None,
+        num_workers: int = 4
+    ) -> List[Dict[str, Any]]:
+        """Monitor and collect results from submitted batches"""
+        if batch_ids is None:
+            batch_ids = self.batch_ids
+
+        if not batch_ids:
+            raise ValueError("No batch IDs provided or stored for monitoring")
+
         results = []
         print("\nMonitoring batch progress...")
         with ThreadPoolExecutor(max_workers=num_workers) as monitor_executor:
