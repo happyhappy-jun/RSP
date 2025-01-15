@@ -263,9 +263,10 @@ def init_distributed_mode(args):
         init_method=args.dist_url,
         world_size=args.world_size,
         rank=args.rank,
-        timeout=datetime.timedelta(seconds=5400)
+        timeout=datetime.timedelta(seconds=5400),
     )
-    torch.distributed.barrier()
+
+    torch.distributed.barrier(device_ids=[args.gpu])
     setup_for_distributed(args.rank == 0)
 
 

@@ -133,6 +133,7 @@ class RSP(nn.Module):
         # For continuous latents:
         # - It is M-dimenisonal gaussian. Thus it has M * 2 for mean and std
         stoch_size = stoch * discrete if discrete != 0 else stoch * 2
+        self.stoch_size = stoch_size
 
         # Posterior takes both src_h and tgt_h
         # Thus it has embed_dim * 2 as an input dimension

@@ -12,16 +12,18 @@ dataset:
   _target_: util.kinetics_caption.PairedKineticsWithCaption
   frame_root: ${..data_root}/kinetics400caption/frames
   frame_info_path: ${..data_root}/kinetics400caption/frame_info.json
-  embeddings_path: ${..data_root}/kinetics400caption/embeddings.jsonl
+  embeddings_path: ${..data_root}/kinetics400caption/embedding_large.jsonl
 
 train_loop:
   _target_: engine_pretrain_repsamp.train_one_epoch_llm
   _partial_: true
 
 num_workers: 2
+batch_size: 24
+accum_iter: 8
 
 model_params:
-  context_emb_dim: 3096
+  context_emb_dim: 3072
   embed_decoder_num_heads: 8
   embed_decoder_depth: 4
   kl_scale: 0.005

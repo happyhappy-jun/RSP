@@ -11,7 +11,7 @@ class RspCaptionJoint(RspCaption):
 
     def __init__(self,
                  *args,
-                 context_emb_dim=3096,
+                 context_emb_dim=3072,
                  cos_scale=1.0,
                  embed_decoder_num_heads=8,
                  embed_decoder_depth=4,
@@ -30,12 +30,18 @@ class RspCaptionJoint(RspCaption):
         self.joint_context_proj = nn.Linear(context_emb_dim, self.decoder_embed_dim)
         self.decoder_embed_deter = nn.Linear(self.embed_dim, self.decoder_embed_dim)
 
-        self.image_cls_proj = nn.Linear(self.embed_dim * 2, self.decoder_embed_dim)
+        # self.image_cls_proj = nn.Linear(self.embed_dim * 2, self.decoder_embed_dim)
         self.joint_emb_decoder = nn.ModuleList([
             CrossAttentionBlock(self.decoder_embed_dim, self.decoder_embed_dim, embed_decoder_num_heads)
         for _ in range(embed_decoder_depth)
         ])
         self.joint_emb_norm = nn.LayerNorm(self.decoder_embed_dim)
+
+        self.to_posterior = nn.Sequential(
+            nn.Linear(self.decoder_embed_dim, self.decoder_embed_dim),
+            nn.ReLU(),
+            nn.Linear(self.decoder_embed_dim, self.stoch_size),
+        )
 
     def get_feat(self, h, h_context, z):
         # Process deterministic path
@@ -76,12 +82,27 @@ class RspCaptionJoint(RspCaption):
         return x
 
     def forward_joint_emb(self, src_cls, tgt_cls, embedding):
-        h = self.joint_emb_proj(torch.cat([src_cls, tgt_cls], dim=-1))
-        for blk in self.joint_emb_decoder:
-            h = blk(h, embedding)
+        # Add sequence dimension if not present
+        if len(src_cls.shape) == 2:
+            src_cls = src_cls.unsqueeze(1)  # [B, 1, C]
+        if len(tgt_cls.shape) == 2:
+            tgt_cls = tgt_cls.unsqueeze(1)  # [B, 1, C]
 
-        h = self.joint_emb_norm(h)
-        return h
+        # Concatenate features and project
+        # h = self.image_cls_proj(torch.cat([src_cls, tgt_cls], dim=-1))  # [B, 1, decoder_embed_dim]
+        kv = torch.cat([src_cls, tgt_cls], dim=1) # [B, 2, C]
+
+        # Add sequence dimension to embedding if needed
+        if len(embedding.shape) == 2:
+            embedding = embedding.unsqueeze(1)  # [B, 1, C]
+
+        # Apply cross attention blocks
+        for blk in self.joint_emb_decoder:
+            embedding = blk(embedding, kv)
+
+        embedding = self.joint_emb_norm(embedding)
+        return embedding
+
 
     def forward(self, src_imgs, tgt_imgs, embedding, epoch):
         # Extract embeddings

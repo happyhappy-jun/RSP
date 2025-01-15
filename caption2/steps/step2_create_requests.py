@@ -47,7 +47,7 @@ def main():
     
     current_shard = []
     current_size = 0
-    max_shard_size = 200_000_000
+    max_shard_size = 100_000_000
     shard_count = 0
     total_requests = 0
     

@@ -64,8 +64,9 @@ def main():
         
         # First submit all shards
         submitted_batches = []
-        for shard_idx, shard_file in enumerate(tqdm(shard_files, desc="Submitting shards")):
+        for shard_file in tqdm(shard_files, desc="Submitting shards"):
             print(shard_file)
+            shard_idx = int(shard_file.stem.split('_')[1])
             results_file = output_dir / f"caption_results_{shard_idx:04d}.json"
             
             # Skip if already processed
@@ -78,9 +79,6 @@ def main():
             with open(shard_file) as f:
                 for line in f:
                     shard_requests.append(json.loads(line))
-            
-            # Extract shard index from filename (e.g. "shard_0421.jsonl" -> 421)
-            shard_idx = int(shard_file.stem.split('_')[1])
             
             # Submit shard for processing
             batch_ids = processor.submit_requests(

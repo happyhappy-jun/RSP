@@ -51,7 +51,7 @@ class BatchProcessor:
     def submit_batch(
         self,
         requests: List[Dict[str, Any]], 
-        shard_idx: int,
+        shard_idx: str,
         description: str = None,
         retry_failed: bool = True,
         original_shard_file: Optional[str] = None
@@ -211,7 +211,7 @@ class BatchProcessor:
             future = submit_executor.submit(
                 self.submit_batch,
                 requests,
-                shard_idx=int(shard_idx) if shard_idx is not None else 0,
+                shard_idx=str(shard_idx) if shard_idx is not None else str(0),
                 description=description or "Batch processing",
                 original_shard_file=original_shard_file
             )
