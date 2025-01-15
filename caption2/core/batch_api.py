@@ -107,17 +107,18 @@ class BatchProcessor:
     def process_requests(
         self,
         requests: List[Dict[str, Any]],
-        max_batch_size: int = 100 * 1024 * 1024,  # 512MB in bytes
+        max_batch_size: int = 100 * 1024 * 1024,  # 100MB in bytes
         num_workers: int = 4,
         description: str = None,
         sanity_check: bool = False
     ) -> List[Dict[str, Any]]:
-        """Process large number of requests with sharding based on size limit"""
+        """Process large number of requests with concurrent batch processing"""
         # Initialize metadata store
         metadata_store = MetadataStore(self.output_dir)
         
         # Store metadata for each request
-        for request in requests:
+        print("\nProcessing metadata...")
+        for request in tqdm(requests, desc="Storing metadata"):
             if 'metadata' in request['body']:
                 metadata_store.add_metadata(request['custom_id'], request['body'].pop('metadata'))
         
@@ -143,21 +144,22 @@ class BatchProcessor:
             except Exception as e:
                 print(f"Sanity check failed: {str(e)}")
                 return []
-                
-        # Process batches normally
+
+        # Split requests into shards based on size
         shards = []
         current_shard = []
         current_size = 0
         
-        print("\nCalculating request sizes...")
-        for request in tqdm(requests):
+        print("\nSplitting requests into size-based shards...")
+        for request in tqdm(requests, desc="Creating shards"):
             request_size = self._estimate_request_size(request)
             
+            # If adding this request would exceed max size, start new shard
             if current_size + request_size > max_batch_size and current_shard:
                 shards.append(current_shard)
                 current_shard = []
                 current_size = 0
-                
+            
             current_shard.append(request)
             current_size += request_size
             

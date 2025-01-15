@@ -34,29 +34,27 @@ def main():
         output_dir=output_dir
     )
     
-    all_results = []
+    # Load all requests from shards
+    all_requests = []
+    print("\nLoading requests from shards...")
     for shard_file in tqdm(shard_files):
-        # Load requests from shard
-        requests = []
         with open(shard_file) as f:
             for line in f:
-                requests.append(json.loads(line))
-                
-        if args.sanity_check:
-            requests = requests[:1]  # Only process first request for sanity check
-            
-        # Process this shard
-        results = processor.process_requests(
-            requests,
-            description=f"Processing {shard_file.name}",
-            sanity_check=args.sanity_check
-        )
-        all_results.extend(results)
+                all_requests.append(json.loads(line))
+
+    if args.sanity_check:
+        all_requests = all_requests[:1]  # Only process first request for sanity check
         
-        if args.sanity_check:
-            print("\nSanity check results:")
-            print(json.dumps(results, indent=2))
-            break
+    # Process all requests
+    all_results = processor.process_requests(
+        all_requests,
+        description="Processing all requests",
+        sanity_check=args.sanity_check
+    )
+    
+    if args.sanity_check:
+        print("\nSanity check results:")
+        print(json.dumps(all_results, indent=2))
 
     if not args.sanity_check:
         # Save all results
