@@ -109,7 +109,7 @@ class RspCaptionJointCut(RspCaption):
         src_imgs = src_imgs.reshape(-1, *src_imgs.shape[2:])
         tgt_imgs = tgt_imgs.reshape(-1, *tgt_imgs.shape[2:])
         embedding = embedding.reshape(-1, embedding.size(-1))
-
+        embedding = embedding.unsqueeze(1)
         h_context = self.resize_embed(embedding, self.decoder_embed_dim)
         src_h, _, _ = self.forward_encoder(src_imgs, mask_ratio=0)
         tgt_h, _, _ = self.forward_encoder(self.perturb(tgt_imgs), mask_ratio=0)
