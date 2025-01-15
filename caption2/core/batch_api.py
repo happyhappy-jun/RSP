@@ -164,25 +164,41 @@ class BatchProcessor:
         if current_shard:
             shards.append(current_shard)
 
-        # Create batches
-        batch_ids = []
-        print(f"\nCreating {len(shards)} batch shard{'s' if len(shards) > 1 else ''}...")
-        for i, shard in enumerate(tqdm(shards)):
-            batch_id = self.create_batch(
-                shard,
-                shard_idx=i,
-                description=f"{description or 'Batch'} shard {i}"
-            )
-            batch_ids.append(batch_id)
-            
-        # Monitor batches
+        # Submit all batches concurrently
+        print(f"\nSubmitting {len(shards)} batch shard{'s' if len(shards) > 1 else ''}...")
+        with ThreadPoolExecutor(max_workers=num_workers) as submit_executor:
+            # Submit all batches
+            batch_futures = []
+            for i, shard in enumerate(tqdm(shards)):
+                future = submit_executor.submit(
+                    self.create_batch,
+                    shard,
+                    shard_idx=i,
+                    description=f"{description or 'Batch'} shard {i}"
+                )
+                batch_futures.append(future)
+
+            # Wait for all batch submissions to complete
+            batch_ids = []
+            for future in tqdm(batch_futures, desc="Waiting for batch submissions"):
+                try:
+                    batch_id = future.result()
+                    batch_ids.append(batch_id)
+                except Exception as e:
+                    print(f"Error submitting batch: {str(e)}")
+
+        # Monitor all batches concurrently
         all_results = []
         print("\nMonitoring batch progress...")
-        with ThreadPoolExecutor(max_workers=num_workers) as executor:
-            futures = [executor.submit(self.monitor_batch, batch_id) 
-                      for batch_id in batch_ids]
+        with ThreadPoolExecutor(max_workers=num_workers) as monitor_executor:
+            # Start monitoring all batches
+            monitor_futures = [
+                monitor_executor.submit(self.monitor_batch, batch_id)
+                for batch_id in batch_ids
+            ]
             
-            for future in tqdm(futures):
+            # Collect results as they complete
+            for future in tqdm(monitor_futures, desc="Processing results"):
                 try:
                     result = future.result()
                     if result:
