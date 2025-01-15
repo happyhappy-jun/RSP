@@ -23,7 +23,7 @@ num_workers: 2
 model_params:
   kl_scale: 0.01
   mse_scale: 0.1
-  enable_rms_norm: true
+  enable_rms_norm: false
   embed_scale_factor: 1.0
   context_in_decoder: true
 
