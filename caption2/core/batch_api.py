@@ -145,40 +145,18 @@ class BatchProcessor:
                 print(f"Sanity check failed: {str(e)}")
                 return []
 
-        # Split requests into shards based on size
-        shards = []
-        current_shard = []
-        current_size = 0
-        
-        print("\nSplitting requests into size-based shards...")
-        for request in tqdm(requests, desc="Creating shards"):
-            request_size = self._estimate_request_size(request)
-            
-            # If adding this request would exceed max size, start new shard
-            if current_size + request_size > max_batch_size and current_shard:
-                shards.append(current_shard)
-                current_shard = []
-                current_size = 0
-            
-            current_shard.append(request)
-            current_size += request_size
-            
-        if current_shard:
-            shards.append(current_shard)
-
-        # Submit all batches concurrently
-        print(f"\nSubmitting {len(shards)} batch shard{'s' if len(shards) > 1 else ''}...")
+        # Treat input requests as a single batch
+        print("\nSubmitting batch...")
         with ThreadPoolExecutor(max_workers=num_workers) as submit_executor:
-            # Submit all batches
+            # Submit single batch
             batch_futures = []
-            for i, shard in enumerate(tqdm(shards)):
-                future = submit_executor.submit(
-                    self.create_batch,
-                    shard,
-                    shard_idx=i,
-                    description=f"{description or 'Batch'} shard {i}"
-                )
-                batch_futures.append(future)
+            future = submit_executor.submit(
+                self.create_batch,
+                requests,
+                shard_idx=0,
+                description=description or "Batch processing"
+            )
+            batch_futures.append(future)
 
             # Wait for all batch submissions to complete
             batch_ids = []
