@@ -26,12 +26,34 @@ class BatchProcessor:
         self.check_interval = check_interval
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.batch_ids = []  # Track submitted batch IDs
+        self.status_file = self.output_dir / "batch_status.json"
+        self._load_batch_status()
+
+    def _load_batch_status(self):
+        """Load or initialize batch status tracking"""
+        if self.status_file.exists():
+            with open(self.status_file) as f:
+                self.batch_status = json.load(f)
+        else:
+            self.batch_status = {
+                'submitted': [],    # Successfully submitted batch IDs
+                'completed': [],    # Successfully completed batch IDs
+                'failed': [],       # Failed batch IDs with errors
+                'pending': []       # Batches waiting to be submitted
+            }
+            self._save_batch_status()
+
+    def _save_batch_status(self):
+        """Save current batch status to file"""
+        with open(self.status_file, 'w') as f:
+            json.dump(self.batch_status, f, indent=2)
         
     def submit_batch(
         self,
         requests: List[Dict[str, Any]],
         shard_idx: int,
-        description: str = None
+        description: str = None,
+        retry_failed: bool = True
     ) -> str:
         """Submit a batch job from requests"""
         # Save requests to JSONL
@@ -41,26 +63,54 @@ class BatchProcessor:
                 json.dump(request, f)
                 f.write("\n")
                 
-        # Upload file
-        with open(shard_path, "rb") as f:
-            batch_file = self.client.files.create(
-                file=f,
-                purpose="batch"
+        try:
+            # Upload file
+            with open(shard_path, "rb") as f:
+                batch_file = self.client.files.create(
+                    file=f,
+                    purpose="batch"
+                )
+                
+            # Create batch
+            batch = self.client.batches.create(
+                input_file_id=batch_file.id,
+                endpoint="/v1/chat/completions",  # Use standard endpoint
+                completion_window="24h",
+                metadata={
+                    "description": description or f"Batch shard {shard_idx}",
+                    "shard_idx": shard_idx
+                }
             )
             
-        # Create batch
-        batch = self.client.batches.create(
-            input_file_id=batch_file.id,
-            endpoint="/v1/chat/completions",  # Use standard endpoint
-            completion_window="24h",
-            metadata={
-                "description": description or f"Batch shard {shard_idx}"
+            batch_id = batch.id
+            self.batch_ids.append(batch_id)  # Track the batch ID
+            
+            # Update status
+            if batch_id not in self.batch_status['submitted']:
+                self.batch_status['submitted'].append(batch_id)
+                if batch_id in self.batch_status['failed']:
+                    self.batch_status['failed'].remove(batch_id)
+                self._save_batch_status()
+                
+            print(f"Successfully submitted batch {batch_id} for shard {shard_idx}")
+            return batch_id
+            
+        except Exception as e:
+            error_msg = f"Error submitting batch for shard {shard_idx}: {str(e)}"
+            print(error_msg)
+            
+            # Track failed batch
+            failed_info = {
+                'shard_idx': shard_idx,
+                'error': str(e),
+                'timestamp': time.strftime('%Y-%m-%d %H:%M:%S')
             }
-        )
-        
-        batch_id = batch.id
-        self.batch_ids.append(batch_id)  # Track the batch ID
-        return batch_id
+            
+            if shard_idx not in [f.get('shard_idx') for f in self.batch_status['failed']]:
+                self.batch_status['failed'].append(failed_info)
+                self._save_batch_status()
+                
+            raise Exception(error_msg)
         
     def monitor_batch(self, batch_id: str) -> Dict[str, Any]:
         """Monitor batch status until completion"""
