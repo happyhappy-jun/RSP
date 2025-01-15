@@ -167,8 +167,8 @@ class BatchProcessor:
                 except Exception as e:
                     print(f"Error submitting batch: {str(e)}")
 
-        # Monitor all batches concurrently
-        all_results = []
+        # Monitor batches and return results directly
+        results = []
         print("\nMonitoring batch progress...")
         with ThreadPoolExecutor(max_workers=num_workers) as monitor_executor:
             # Start monitoring all batches
@@ -177,13 +177,17 @@ class BatchProcessor:
                 for batch_id in batch_ids
             ]
             
-            # Collect results as they complete
+            # Process results as they complete
             for future in tqdm(monitor_futures, desc="Processing results"):
                 try:
                     result = future.result()
-                    if result:
-                        all_results.extend(result['results'])
+                    if result and 'results' in result:
+                        results.extend(result['results'])
+                        # Clear memory
+                        del result['results']
                 except Exception as e:
                     print(f"Error processing batch: {str(e)}")
-                    
-        return sorted(all_results, key=lambda x: x['custom_id'])
+        
+        # Sort results before returning
+        results.sort(key=lambda x: x['custom_id'])
+        return results

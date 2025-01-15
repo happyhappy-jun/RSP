@@ -34,8 +34,7 @@ def main():
         output_dir=output_dir
     )
     
-    # Process each shard
-    all_results = []
+    total_processed = 0
     
     if args.sanity_check:
         # For sanity check, just process first request from first shard
@@ -46,36 +45,45 @@ def main():
                 description="Sanity check",
                 sanity_check=True
             )
-            all_results.extend(results)
+            print("\nSanity check results:")
+            print(json.dumps(results, indent=2))
+            total_processed = 1
     else:
         print("\nProcessing shards...")
-        for shard_file in tqdm(shard_files, desc="Processing shards"):
-            # Load requests from current shard
+        for shard_idx, shard_file in enumerate(tqdm(shard_files, desc="Processing shards")):
+            # Process and save results for current shard
+            results_file = output_dir / f"caption_results_{shard_idx:04d}.json"
+            
+            # Skip if already processed
+            if results_file.exists():
+                print(f"Skipping existing results file: {results_file}")
+                continue
+                
+            # Load and process current shard
             shard_requests = []
             with open(shard_file) as f:
                 for line in f:
                     shard_requests.append(json.loads(line))
-                    
+            
             # Process current shard
             results = processor.process_requests(
                 shard_requests,
                 description=f"Processing {shard_file.name}",
                 sanity_check=False
             )
-            all_results.extend(results)
-    
-    if args.sanity_check:
-        print("\nSanity check results:")
-        print(json.dumps(all_results, indent=2))
-
+            
+            # Save results immediately
+            with open(results_file, 'w') as f:
+                json.dump(results, f, indent=2)
+            
+            total_processed += len(results)
+            
+            # Clear memory
+            del results
+            del shard_requests
+            
     if not args.sanity_check:
-        # Save raw results
-        for i, result in enumerate(all_results):
-            shard_results_file = output_dir / f"caption_results_{i:04d}.json"
-            with open(shard_results_file, 'w') as f:
-                json.dump(result, f, indent=2)
-
-        print(f"\nProcessed {len(all_results)} caption requests")
+        print(f"\nProcessed {total_processed} caption requests")
         print(f"Results saved as individual files in: {output_dir}")
 
 if __name__ == "__main__":
