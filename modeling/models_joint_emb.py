@@ -26,16 +26,22 @@ class RspCaptionJoint(RspCaption):
             torch.zeros(1, 1, self.decoder_embed_dim),
         )
         nn.init.normal_(self.language_type_embed, std=0.02)
-
-        self.joint_context_proj = nn.Linear(context_emb_dim, self.decoder_embed_dim)
         self.decoder_embed_deter = nn.Linear(self.embed_dim, self.decoder_embed_dim)
 
-        # self.image_cls_proj = nn.Linear(self.embed_dim * 2, self.decoder_embed_dim)
+        self.joint_context_proj = nn.Linear(context_emb_dim, self.decoder_embed_dim)
+        
+        self.src_tgt_joint_proj = nn.Linear(self.embed_dim, self.decoder_embed_dim)
         self.joint_emb_decoder = nn.ModuleList([
             CrossAttentionBlock(self.decoder_embed_dim, self.decoder_embed_dim, embed_decoder_num_heads)
         for _ in range(embed_decoder_depth)
         ])
+        
         self.joint_emb_norm = nn.LayerNorm(self.decoder_embed_dim)
+        self.to_posterior = nn.Sequential(
+            nn.Linear(self.decoder_embed_dim, self.decoder_embed_dim),
+            nn.ReLU(),
+            nn.Linear(self.decoder_embed_dim, self.stoch_size),
+        )
 
         self.to_posterior = nn.Sequential(
             nn.Linear(self.decoder_embed_dim, self.decoder_embed_dim),
@@ -91,6 +97,7 @@ class RspCaptionJoint(RspCaption):
         # Concatenate features and project
         # h = self.image_cls_proj(torch.cat([src_cls, tgt_cls], dim=-1))  # [B, 1, decoder_embed_dim]
         kv = torch.cat([src_cls, tgt_cls], dim=1) # [B, 2, C]
+        kv = self.src_tgt_joint_proj(kv)
 
         # Add sequence dimension to embedding if needed
         if len(embedding.shape) == 2:
@@ -129,7 +136,7 @@ class RspCaptionJoint(RspCaption):
 
         # Project context to prior space
         h_context_prime = self.to_language_prior(src_h[:, 0])
-
+        h_context = h_context.unsqueeze(1)
         tgt_pred = self.forward_decoder_fut(src_h, h_context, post_z)
         loss_post = self.forward_loss(tgt_imgs, tgt_pred)
         kl_loss, kl_value = self.compute_kl_loss(post_logits, prior_logits)
