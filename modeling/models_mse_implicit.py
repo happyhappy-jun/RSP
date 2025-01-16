@@ -7,7 +7,7 @@ from modeling.models_rsp import RSP
 from modeling.models_rsp_caption import RspCaption
 
 
-class RspCaptionMse(RspCaption):
+class RspCaptionMseImplicit(RspCaption):
     """RSP model variant that uses MSE loss instead of KL divergence"""
     def __init__(self,
                  *args,
@@ -134,8 +134,8 @@ class RspCaptionMse(RspCaption):
 
         return loss, tgt_pred, detailed_loss
 
-def rsp_mse_vit_small_patch8_dec512d8b(**kwargs):
-    model = RspCaptionMse(
+def rsp_mse_implicit_vit_small_patch8_dec512d8b(**kwargs):
+    model = RspCaptionMseImplicit(
         patch_size=8,
         embed_dim=384,
         depth=12,
@@ -149,8 +149,8 @@ def rsp_mse_vit_small_patch8_dec512d8b(**kwargs):
     )
     return model
 
-def rsp_mse_vit_small_patch16_dec512d8b(**kwargs):
-    model = RspCaptionMse(
+def rsp_mse_implicit_vit_small_patch16_dec512d8b(**kwargs):
+    model = RspCaptionMseImplicit(
         patch_size=16,
         embed_dim=384,
         depth=12,
@@ -164,8 +164,8 @@ def rsp_mse_vit_small_patch16_dec512d8b(**kwargs):
     )
     return model
 
-def rsp_mse_vit_base_patch16_dec512d8b(**kwargs):
-    model = RspCaptionMse(
+def rsp_mse_implicit_vit_base_patch16_dec512d8b(**kwargs):
+    model = RspCaptionMseImplicit(
         patch_size=16,
         embed_dim=768,
         depth=12,
@@ -179,8 +179,8 @@ def rsp_mse_vit_base_patch16_dec512d8b(**kwargs):
     )
     return model
 
-def rsp_mse_vit_large_patch16_dec512d8b(**kwargs):
-    model = RspCaptionMse(
+def rsp_mse_implicit_vit_large_patch16_dec512d8b(**kwargs):
+    model = RspCaptionMseImplicit(
         patch_size=16,
         embed_dim=1024,
         depth=24,
@@ -195,7 +195,7 @@ def rsp_mse_vit_large_patch16_dec512d8b(**kwargs):
     return model
 
 # Aliases
-rsp_mse_vit_small_patch8 = rsp_mse_vit_small_patch8_dec512d8b
-rsp_mse_vit_small_patch16 = rsp_mse_vit_small_patch16_dec512d8b
-rsp_mse_vit_base_patch16 = rsp_mse_vit_base_patch16_dec512d8b
-rsp_mse_vit_large_patch16 = rsp_mse_vit_large_patch16_dec512d8b
+rsp_mse_implicit_vit_small_patch8 = rsp_mse_implicit_vit_small_patch8_dec512d8b
+rsp_mse_implicit_vit_small_patch16 = rsp_mse_implicit_vit_small_patch16_dec512d8b
+rsp_mse_implicit_vit_base_patch16 = rsp_mse_implicit_vit_base_patch16_dec512d8b
+rsp_mse_implicit_vit_large_patch16 = rsp_mse_implicit_vit_large_patch16_dec512d8b
