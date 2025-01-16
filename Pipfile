@@ -26,6 +26,7 @@ bitsandbytes = {file = "https://github.com/bitsandbytes-foundation/bitsandbytes/
 av = "*"
 datasets = "*"
 questionary = "*"
+boto3 = "*"
 
 [dev-packages]
 
