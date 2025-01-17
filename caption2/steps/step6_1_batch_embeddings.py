@@ -85,7 +85,10 @@ def main():
         print(json.dumps(results, indent=2))
         return
 
-    print("\nProcessing embedding requests in shards...")
+    print("\nSubmitting all embedding request shards...")
+    all_batch_ids = []
+    
+    # First submit all shards
     for shard_idx in range(args.num_shards):
         start_idx = shard_idx * shard_size
         end_idx = min(start_idx + shard_size, len(embedding_requests))
@@ -101,25 +104,31 @@ def main():
                 description=f"Embeddings shard {shard_idx}",
                 shard_idx=shard_idx
             )
-
-            # Monitor and get results
-            results = processor.monitor_batches(batch_ids)
-            
-            # Transform results to match step6 schema
-            for result in results:
-                embedding_result = {
-                    "custom_id": result["custom_id"],
-                    "embedding": result["response"]["data"][0]["embedding"]
-                }
-                all_results.append(embedding_result)
-            
-            total_processed += len(results)
-            
-            # Clear memory
-            del results
+            all_batch_ids.extend(batch_ids)
             
         except Exception as e:
-            print(f"Error processing shard {shard_idx}: {str(e)}")
+            print(f"Error submitting shard {shard_idx}: {str(e)}")
+            
+    # Then monitor all batches together
+    print("\nMonitoring all batches...")
+    try:
+        results = processor.monitor_batches(all_batch_ids)
+        
+        # Transform results to match step6 schema
+        for result in results:
+            embedding_result = {
+                "custom_id": result["custom_id"],
+                "embedding": result["response"]["data"][0]["embedding"]
+            }
+            all_results.append(embedding_result)
+        
+        total_processed = len(results)
+        
+        # Clear memory
+        del results
+        
+    except Exception as e:
+        print(f"Error monitoring batches: {str(e)}")
 
     # Sort results by custom_id
     all_results.sort(key=lambda x: x["custom_id"])
