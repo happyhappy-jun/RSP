@@ -44,9 +44,11 @@ def main():
             
         caption = result["response"]["body"]["choices"][0]["message"]["content"]
         
-        # Create embedding request
+        # Create embedding request in expected batch format
         request = {
             "custom_id": result["custom_id"],
+            "method": "POST", 
+            "url": "v1/embeddings",
             "body": {
                 "model": args.model,
                 "input": caption
