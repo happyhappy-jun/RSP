@@ -73,9 +73,19 @@ class BatchProcessor:
                 )
                 
             # Create batch
+            # Determine endpoint and method based on request type
+            first_request = requests[0]
+            if 'messages' in first_request['body']:
+                endpoint = "/v1/chat/completions"
+                method = "post"
+            else:
+                endpoint = "/v1/embeddings"
+                method = "post"
+
             batch = self.client.batches.create(
                 input_file_id=batch_file.id,
-                endpoint="/v1/chat/completions",  # Use standard endpoint
+                endpoint=endpoint,
+                method=method,
                 completion_window="24h",
                 metadata={
                     "description": description or f"Batch shard {shard_idx}",
