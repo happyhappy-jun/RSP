@@ -1,12 +1,23 @@
 import argparse
 import json
 import time
+import logging
 from pathlib import Path
 
 from tqdm import tqdm
 from openai import OpenAI
 
 from caption2.core.batch_api import BatchProcessor
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler('batch_embeddings.log'),
+        logging.StreamHandler()
+    ]
+)
 
 def main():
     parser = argparse.ArgumentParser(description='Step 6-1: Create embeddings using batch API')
@@ -99,12 +110,14 @@ def main():
             for batch_ids in active_batches:
                 try:
                     results = processor.monitor_batches(batch_ids)
-                    all_results.extend(results)
-                    total_processed += len(results)
-                    completed_batches.append(batch_ids)
+                    if results:
+                        all_results.extend(results)
+                        total_processed += len(results)
+                        completed_batches.append(batch_ids)
+                        logging.info(f"Successfully processed batch with {len(results)} results")
                 except Exception as e:
                     if "still processing" not in str(e).lower():
-                        print(f"Error monitoring batch: {str(e)}")
+                        logging.error(f"Error monitoring batch {batch_ids}: {str(e)}", exc_info=True)
             
             # Remove completed batches
             for batch in completed_batches:
@@ -127,7 +140,10 @@ def main():
             print(f"Submitted batch {batch_num} with {len(current_batch)} requests")
             
         except Exception as e:
-            print(f"Error submitting batch {batch_num}: {str(e)}")
+            logging.error(f"Error submitting batch {batch_num} (requests {current_idx}-{end_idx}): {str(e)}", exc_info=True)
+            # Log failed request IDs
+            failed_ids = [req["custom_id"] for req in current_batch]
+            logging.warning(f"Failed request IDs: {', '.join(failed_ids)}")
             time.sleep(60)  # Wait before retrying
             continue
             
@@ -145,7 +161,7 @@ def main():
                 total_processed += len(results)
                 completed_batches.append(batch_ids)
             except Exception as e:
-                print(f"Error monitoring batch: {str(e)}")
+                logging.error(f"Error monitoring final batch {batch_ids}: {str(e)}", exc_info=True)
                 
         # Remove completed batches
         for batch in completed_batches:
