@@ -130,22 +130,33 @@ def main():
         end_idx = min(current_idx + BATCH_SIZE, len(embedding_requests))
         current_batch = embedding_requests[current_idx:end_idx]
         
-        try:
-            batch_ids = processor.submit_requests(
-                current_batch,
-                description=f"Embeddings batch {batch_num}",
-                shard_idx=batch_num
-            )
-            active_batches.append(batch_ids)
-            print(f"Submitted batch {batch_num} with {len(current_batch)} requests")
-            
-        except Exception as e:
-            logging.error(f"Error submitting batch {batch_num} (requests {current_idx}-{end_idx}): {str(e)}", exc_info=True)
-            # Log failed request IDs
-            failed_ids = [req["custom_id"] for req in current_batch]
-            logging.warning(f"Failed request IDs: {', '.join(failed_ids)}")
-            time.sleep(60)  # Wait before retrying
-            continue
+        max_retries = 3
+        retry_count = 0
+        while retry_count < max_retries:
+            try:
+                batch_ids = processor.submit_requests(
+                    current_batch,
+                    description=f"Embeddings batch {batch_num}",
+                    shard_idx=batch_num
+                )
+                active_batches.append(batch_ids)
+                logging.info(f"Successfully submitted batch {batch_num} with {len(current_batch)} requests")
+                break
+                    
+            except Exception as e:
+                retry_count += 1
+                logging.error(f"Error submitting batch {batch_num} (requests {current_idx}-{end_idx}): {str(e)}", exc_info=True)
+                # Log failed request IDs
+                failed_ids = [req["custom_id"] for req in current_batch]
+                logging.warning(f"Failed request IDs: {', '.join(failed_ids)}")
+                    
+                if retry_count < max_retries:
+                    wait_time = 60 * retry_count  # Exponential backoff
+                    logging.info(f"Retrying batch {batch_num} in {wait_time} seconds (attempt {retry_count + 1}/{max_retries})")
+                    time.sleep(wait_time)
+                else:
+                    logging.error(f"Failed to submit batch {batch_num} after {max_retries} attempts")
+                    continue
             
         current_idx = end_idx
         batch_num += 1
@@ -171,27 +182,39 @@ def main():
             time.sleep(60)
         
     # Transform results to match step6 schema
+    transformed_results = []
     try:
         for result in all_results:
-            embedding_result = {
-                "custom_id": result["custom_id"],
-                "embedding": result["response"]["data"][0]["embedding"]
-            }
-            
-        total_processed = len(all_results)
+            try:
+                embedding_result = {
+                    "custom_id": result["custom_id"],
+                    "embedding": result["response"]["data"][0]["embedding"]
+                }
+                transformed_results.append(embedding_result)
+            except Exception as e:
+                logging.error(f"Error transforming result for {result.get('custom_id', 'unknown')}: {str(e)}")
+                logging.debug(f"Problematic result: {json.dumps(result, indent=2)}")
+                continue
+                
+        total_processed = len(transformed_results)
+        logging.info(f"Successfully transformed {total_processed} results")
         
     except Exception as e:
-        print(f"Error transforming results: {str(e)}")
+        logging.error(f"Error in results transformation: {str(e)}", exc_info=True)
 
     # Sort results by custom_id
     all_results.sort(key=lambda x: x["custom_id"])
 
     # Save combined results
     output_file = output_dir / "embeddings.json"
-    with open(output_file, 'w') as f:
-        for result in all_results:
-            json.dump(result, f)
-            f.write('\n')
+    try:
+        with open(output_file, 'w') as f:
+            for result in transformed_results:
+                json.dump(result, f)
+                f.write('\n')
+        logging.info(f"Successfully saved results to {output_file}")
+    except Exception as e:
+        logging.error(f"Error saving results to {output_file}: {str(e)}", exc_info=True)
 
     print(f"\nProcessed {total_processed} embedding requests")
     print(f"Results saved to: {output_file}")
