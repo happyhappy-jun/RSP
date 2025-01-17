@@ -87,8 +87,8 @@ class BatchProcessor:
                 completion_window="24h",
                 metadata={
                     "description": description or f"Batch shard {shard_idx}",
-                    "shard_idx": shard_idx,
-                    "total_requests": len(requests)
+                    "shard_idx": str(shard_idx),
+                    "total_requests": str(len(requests))
                 }
             )
             
