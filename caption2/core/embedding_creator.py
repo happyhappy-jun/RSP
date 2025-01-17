@@ -71,10 +71,12 @@ class APIRequest:
                     raise ValueError(f"Failed to parse JSON response. Status: {response.status}. Error: {str(e)}")
                 
             if "error" in response:
-                logging.warning(f"Request {self.task_id} failed with error {response['error']}")
+                error_msg = response.get('error', {}).get('message', 'Unknown API error')
+                error_type = response.get('error', {}).get('type', 'Unknown')
+                logging.warning(f"Request {self.task_id} failed with API error - Type: {error_type}, Message: {error_msg}")
                 status_tracker.num_api_errors += 1
                 error = response
-                if "rate limit" in response["error"].get("message", "").lower():
+                if "rate limit" in error_msg.lower():
                     status_tracker.time_of_last_rate_limit_error = time.time()
                     status_tracker.num_rate_limit_errors += 1
                     status_tracker.num_api_errors -= 1  # rate limit errors counted separately
@@ -86,6 +88,7 @@ class APIRequest:
         if error:
             self.result.append(error)
             if self.attempts_left:
+                logging.warning(f"Request {self.task_id} failed - Retrying with {self.attempts_left} attempts left. Error: {str(error)}")
                 retry_queue.put_nowait(self)
             else:
                 logging.error(f"Request {self.task_id} failed after all attempts. Saving errors: {self.result}")
