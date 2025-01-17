@@ -1,5 +1,6 @@
 import argparse
 import json
+import time
 from pathlib import Path
 
 from tqdm import tqdm
@@ -15,8 +16,6 @@ def main():
                        help='Output directory for embeddings')
     parser.add_argument('--model', type=str, default="text-embedding-3-small",
                        help="OpenAI embedding model")
-    parser.add_argument('--num_shards', type=int, required=True,
-                       help='Number of shards to split requests into')
     parser.add_argument('--sanity_check', action='store_true',
                        help='Run sanity check with single request only')
     args = parser.parse_args()
@@ -67,14 +66,13 @@ def main():
         output_dir=output_dir
     )
 
-    # Calculate shard size
-    shard_size = len(embedding_requests) // args.num_shards
-    if len(embedding_requests) % args.num_shards:
-        shard_size += 1
-
-    # Process in shards
+    # Process in batches of 50,000 requests
+    BATCH_SIZE = 50000
+    MAX_ACTIVE_BATCHES = 20  # To stay under 1M request limit
+    
     total_processed = 0
     all_results = []
+    active_batches = []
 
     if args.sanity_check:
         # For sanity check, just process first request
@@ -87,37 +85,74 @@ def main():
         print(json.dumps(results, indent=2))
         return
 
-    print("\nSubmitting all embedding request shards...")
-    all_batch_ids = []
+    print(f"\nProcessing {len(embedding_requests)} requests in batches of {BATCH_SIZE}...")
     
-    # First submit all shards
-    for shard_idx in range(args.num_shards):
-        start_idx = shard_idx * shard_size
-        end_idx = min(start_idx + shard_size, len(embedding_requests))
-        shard = embedding_requests[start_idx:end_idx]
+    # Process all requests
+    current_idx = 0
+    batch_num = 0
+    
+    while current_idx < len(embedding_requests):
+        # Wait if we have too many active batches
+        while len(active_batches) >= MAX_ACTIVE_BATCHES:
+            print(f"\nWaiting for batches to complete ({len(active_batches)} active)...")
+            completed_batches = []
+            for batch_ids in active_batches:
+                try:
+                    results = processor.monitor_batches(batch_ids)
+                    all_results.extend(results)
+                    total_processed += len(results)
+                    completed_batches.append(batch_ids)
+                except Exception as e:
+                    if "still processing" not in str(e).lower():
+                        print(f"Error monitoring batch: {str(e)}")
+            
+            # Remove completed batches
+            for batch in completed_batches:
+                active_batches.remove(batch)
+                
+            if len(active_batches) >= MAX_ACTIVE_BATCHES:
+                time.sleep(60)  # Wait before checking again
         
-        if not shard:  # Skip empty shards
-            continue
-
+        # Submit next batch
+        end_idx = min(current_idx + BATCH_SIZE, len(embedding_requests))
+        current_batch = embedding_requests[current_idx:end_idx]
+        
         try:
-            # Submit shard with proper request format
             batch_ids = processor.submit_requests(
-                shard,
-                description=f"Embeddings shard {shard_idx}",
-                shard_idx=shard_idx
+                current_batch,
+                description=f"Embeddings batch {batch_num}",
+                shard_idx=batch_num
             )
-            all_batch_ids.extend(batch_ids)
+            active_batches.append(batch_ids)
+            print(f"Submitted batch {batch_num} with {len(current_batch)} requests")
             
         except Exception as e:
-            if "batch_expired" in str(e):
-                print(f"Shard {shard_idx} expired: {str(e)}")
-            else:
-                print(f"Error submitting shard {shard_idx}: {str(e)}")
+            print(f"Error submitting batch {batch_num}: {str(e)}")
+            time.sleep(60)  # Wait before retrying
+            continue
             
-    # Then monitor all batches together
-    print("\nMonitoring all batches...")
-    try:
-        results = processor.monitor_batches(all_batch_ids)
+        current_idx = end_idx
+        batch_num += 1
+        
+    # Process remaining active batches
+    print("\nProcessing remaining batches...")
+    while active_batches:
+        completed_batches = []
+        for batch_ids in active_batches:
+            try:
+                results = processor.monitor_batches(batch_ids)
+                all_results.extend(results)
+                total_processed += len(results)
+                completed_batches.append(batch_ids)
+            except Exception as e:
+                print(f"Error monitoring batch: {str(e)}")
+                
+        # Remove completed batches
+        for batch in completed_batches:
+            active_batches.remove(batch)
+            
+        if active_batches:
+            time.sleep(60)
         
         # Transform results to match step6 schema
         for result in results:
