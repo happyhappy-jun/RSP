@@ -185,19 +185,33 @@ class BatchProcessor:
             print("\nRunning sanity check with first request only...")
             try:
                 request = requests[0]
-                response = self.client.chat.completions.create(**request['body'])
-                result = {
-                    'custom_id': request['custom_id'],
-                    'response': {
-                        'body': {
-                            'choices': [{
-                                'message': {
-                                    'content': response.choices[0].message.content
-                                }
+                # Handle different request types
+                if 'messages' in request['body']:
+                    # Chat completion request
+                    response = self.client.chat.completions.create(**request['body'])
+                    result = {
+                        'custom_id': request['custom_id'],
+                        'response': {
+                            'body': {
+                                'choices': [{
+                                    'message': {
+                                        'content': response.choices[0].message.content
+                                    }
+                                }]
+                            }
+                        }
+                    }
+                else:
+                    # Embedding request
+                    response = self.client.embeddings.create(**request['body'])
+                    result = {
+                        'custom_id': request['custom_id'],
+                        'response': {
+                            'data': [{
+                                'embedding': response.data[0].embedding
                             }]
                         }
                     }
-                }
                 return metadata_store.merge_results([result])
             except Exception as e:
                 print(f"Sanity check failed: {str(e)}")
