@@ -15,8 +15,8 @@ def main():
                        help='Output directory for embeddings')
     parser.add_argument('--model', type=str, default="text-embedding-3-small",
                        help="OpenAI embedding model")
-    parser.add_argument('--batch_size', type=int, default=1000,
-                       help='Number of captions to process in each batch')
+    parser.add_argument('--num_shards', type=int, required=True,
+                       help='Number of shards to split requests into')
     parser.add_argument('--sanity_check', action='store_true',
                        help='Run sanity check with single request only')
     args = parser.parse_args()
@@ -65,10 +65,14 @@ def main():
         output_dir=output_dir
     )
 
-    # Process in batches
+    # Calculate shard size
+    shard_size = len(embedding_requests) // args.num_shards
+    if len(embedding_requests) % args.num_shards:
+        shard_size += 1
+
+    # Process in shards
     total_processed = 0
-    current_batch = []
-    current_shard = 0
+    all_results = []
 
     if args.sanity_check:
         # For sanity check, just process first request
@@ -81,42 +85,54 @@ def main():
         print(json.dumps(results, indent=2))
         return
 
-    print("\nProcessing embedding requests in batches...")
-    for i in range(0, len(embedding_requests), args.batch_size):
-        batch = embedding_requests[i:i + args.batch_size]
-        results_file = output_dir / f"embedding_results_{current_shard:04d}.json"
+    print("\nProcessing embedding requests in shards...")
+    for shard_idx in range(args.num_shards):
+        start_idx = shard_idx * shard_size
+        end_idx = min(start_idx + shard_size, len(embedding_requests))
+        shard = embedding_requests[start_idx:end_idx]
         
-        if results_file.exists():
-            print(f"Skipping existing results file: {results_file}")
-            current_shard += 1
+        if not shard:  # Skip empty shards
             continue
 
         try:
-            # Submit batch
+            # Submit shard
             batch_ids = processor.submit_requests(
-                batch,
-                description=f"Embeddings batch {current_shard}",
-                shard_idx=current_shard
+                shard,
+                description=f"Embeddings shard {shard_idx}",
+                shard_idx=shard_idx
             )
 
-            # Monitor and save results
+            # Monitor and get results
             results = processor.monitor_batches(batch_ids)
             
-            # Save results
-            with open(results_file, 'w') as f:
-                json.dump(results, f, indent=2)
+            # Transform results to match step6 schema
+            for result in results:
+                embedding_result = {
+                    "custom_id": result["custom_id"],
+                    "embedding": result["response"]["data"][0]["embedding"]
+                }
+                all_results.append(embedding_result)
             
             total_processed += len(results)
-            current_shard += 1
             
             # Clear memory
             del results
             
         except Exception as e:
-            print(f"Error processing batch {current_shard}: {str(e)}")
+            print(f"Error processing shard {shard_idx}: {str(e)}")
+
+    # Sort results by custom_id
+    all_results.sort(key=lambda x: x["custom_id"])
+
+    # Save combined results
+    output_file = output_dir / "embeddings.json"
+    with open(output_file, 'w') as f:
+        for result in all_results:
+            json.dump(result, f)
+            f.write('\n')
 
     print(f"\nProcessed {total_processed} embedding requests")
-    print(f"Results saved in: {output_dir}")
+    print(f"Results saved to: {output_file}")
 
 if __name__ == "__main__":
     main()
