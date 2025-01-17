@@ -217,19 +217,27 @@ class BatchProcessor:
                 print(f"Sanity check failed: {str(e)}")
                 return []
 
-        # Treat input requests as a single batch
-        print("\nSubmitting batch...")
+        # Split into sub-batches of max 50,000 requests
+        MAX_REQUESTS_PER_BATCH = 50000
+        sub_batches = []
+        for i in range(0, len(requests), MAX_REQUESTS_PER_BATCH):
+            sub_batches.append(requests[i:i + MAX_REQUESTS_PER_BATCH])
+            
+        print(f"\nSplitting into {len(sub_batches)} sub-batches of max {MAX_REQUESTS_PER_BATCH} requests...")
+        
         with ThreadPoolExecutor(max_workers=num_workers) as submit_executor:
-            # Submit single batch
+            # Submit all sub-batches
             batch_futures = []
-            future = submit_executor.submit(
-                self.submit_batch,
-                requests,
-                shard_idx=str(shard_idx) if shard_idx is not None else str(0),
-                description=description or "Batch processing",
-                original_shard_file=original_shard_file
-            )
-            batch_futures.append(future)
+            for sub_idx, sub_batch in enumerate(sub_batches):
+                sub_shard_idx = f"{shard_idx}_{sub_idx}" if shard_idx is not None else str(sub_idx)
+                future = submit_executor.submit(
+                    self.submit_batch,
+                    sub_batch,
+                    shard_idx=sub_shard_idx,
+                    description=f"{description or 'Batch processing'} (sub-batch {sub_idx + 1}/{len(sub_batches)})",
+                    original_shard_file=original_shard_file
+                )
+                batch_futures.append(future)
 
             # Wait for all batch submissions to complete
             batch_ids = []
