@@ -130,6 +130,8 @@ class EmbeddingCreator:
         
         output_dir.mkdir(parents=True, exist_ok=True)
         output_file = output_dir / "embedding_6_pair.jsonl"
+        if os.path.exists(output_file):
+            os.remove(output_file)
         request_url = "https://api.openai.com/v1/embeddings"
         request_header = {"Authorization": f"Bearer {self.api_key}"}
         
