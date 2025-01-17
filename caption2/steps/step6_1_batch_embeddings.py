@@ -98,7 +98,7 @@ def main():
             continue
 
         try:
-            # Submit shard
+            # Submit shard with proper request format
             batch_ids = processor.submit_requests(
                 shard,
                 description=f"Embeddings shard {shard_idx}",
@@ -107,7 +107,10 @@ def main():
             all_batch_ids.extend(batch_ids)
             
         except Exception as e:
-            print(f"Error submitting shard {shard_idx}: {str(e)}")
+            if "batch_expired" in str(e):
+                print(f"Shard {shard_idx} expired: {str(e)}")
+            else:
+                print(f"Error submitting shard {shard_idx}: {str(e)}")
             
     # Then monitor all batches together
     print("\nMonitoring all batches...")
