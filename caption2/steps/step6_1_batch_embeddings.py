@@ -154,21 +154,18 @@ def main():
         if active_batches:
             time.sleep(60)
         
-        # Transform results to match step6 schema
-        for result in results:
+    # Transform results to match step6 schema
+    try:
+        for result in all_results:
             embedding_result = {
                 "custom_id": result["custom_id"],
                 "embedding": result["response"]["data"][0]["embedding"]
             }
-            all_results.append(embedding_result)
-        
-        total_processed = len(results)
-        
-        # Clear memory
-        del results
+            
+        total_processed = len(all_results)
         
     except Exception as e:
-        print(f"Error monitoring batches: {str(e)}")
+        print(f"Error transforming results: {str(e)}")
 
     # Sort results by custom_id
     all_results.sort(key=lambda x: x["custom_id"])
