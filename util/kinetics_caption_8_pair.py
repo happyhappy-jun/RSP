@@ -23,7 +23,7 @@ def process_lines(lines):
             video_idx = int(parts[1])
             pair_idx = int(parts[-1])
             embedding = record[1]['data'][0]['embedding']
-            results[(video_idx, pair_idx)] = np.array(embedding, dtype=np.float32)
+            results[(video_idx, pair_idx)] = np.array(embedding, dtype=np.float32)[:512]
         except Exception as e:
             print(f"Error processing line: {e}")
     return results
@@ -38,8 +38,8 @@ class PairedKineticsWithCaption8Pair(Dataset):
             total_lines = sum(1 for _ in f)
         
         # Optimized for 500GB RAM, 192 cores, and 200GB dataset
-        chunk_size = 50000  # ~1GB per chunk (assuming avg 20KB per record)
-        n_jobs = 160  # Slightly less than total cores to leave room for system processes
+        chunk_size = 10000  # ~1GB per chunk (assuming avg 20KB per record)
+        n_jobs = 20  # Slightly less than total cores to leave room for system processes
         
         print(f"Total lines to process: {total_lines:,}")
         print(f"Using {n_jobs} workers with chunk size of {chunk_size:,}")

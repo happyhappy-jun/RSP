@@ -36,7 +36,6 @@ log_dir: logs/${run_name}
 model_name: "rsp_vit_small_patch16"
 amp: true
 input_size: 224
-context_emb_dim: 1536
 dtype: "float32"  # Options: float32, float16, bfloat16
 
 model_params:

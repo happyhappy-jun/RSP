@@ -30,6 +30,7 @@ boto3 = "*"
 ujson = "*"
 hydra-colorlog = "*"
 joblib = "*"
+nvitop = "*"
 
 [dev-packages]
 

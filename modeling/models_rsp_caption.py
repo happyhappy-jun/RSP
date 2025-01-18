@@ -167,7 +167,7 @@ class RspCaption(nn.Module):
         self.to_language_prior = nn.Sequential(
             nn.Linear(embed_dim, embed_dim * 2),
             nn.ReLU(),
-            nn.Linear(embed_dim * 2, self.decoder_embed_dim),
+            nn.Linear(embed_dim * 2, self.embed_dim),
         )
         
         self.decoder_embed_mae = nn.Linear(embed_dim, decoder_embed_dim, bias=True)

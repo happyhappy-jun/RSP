@@ -27,21 +27,13 @@ class RspCaptionJointCut(RspCaption):
         )
         nn.init.normal_(self.language_type_embed, std=0.02)
 
-        self.src_tgt_proj = nn.Linear(self.embed_dim, self.decoder_embed_dim)
         self.decoder_embed_deter = nn.Linear(self.embed_dim, self.decoder_embed_dim)
 
-        # self.image_cls_proj = nn.Linear(self.embed_dim * 2, self.decoder_embed_dim)
         self.joint_emb_decoder = nn.ModuleList([
-            CrossAttentionBlock(self.decoder_embed_dim, self.decoder_embed_dim, embed_decoder_num_heads)
+            CrossAttentionBlock(self.embed_dim, self.embed_dim, embed_decoder_num_heads)
         for _ in range(embed_decoder_depth)
         ])
-        self.joint_emb_norm = nn.LayerNorm(self.decoder_embed_dim)
-
-        self.to_posterior = nn.Sequential(
-            nn.Linear(self.decoder_embed_dim, self.decoder_embed_dim),
-            nn.ReLU(),
-            nn.Linear(self.decoder_embed_dim, self.stoch_size),
-        )
+        self.joint_emb_norm = nn.LayerNorm(self.embed_dim *2)
 
     def get_feat(self, h, h_context, z):
         # Process deterministic path
@@ -90,7 +82,7 @@ class RspCaptionJointCut(RspCaption):
 
         # Concatenate features and project
         # h = self.image_cls_proj(torch.cat([src_cls, tgt_cls], dim=-1))  # [B, 1, decoder_embed_dim]
-        kv = self.src_tgt_proj(torch.cat([src_cls, tgt_cls], dim=1))
+        q = torch.cat([src_cls, tgt_cls], dim=1) # [B, 2, decoder_embed_dim]
 
         # Add sequence dimension to embedding if needed
         if len(embedding.shape) == 2:
@@ -98,10 +90,12 @@ class RspCaptionJointCut(RspCaption):
 
         # Apply cross attention blocks
         for blk in self.joint_emb_decoder:
-            embedding = blk(embedding, kv)
+            q = blk(q, embedding)
+            
+        q = q.reshape(q.size(0), 1, -1)
 
-        embedding = self.joint_emb_norm(embedding)
-        return embedding
+        q = self.joint_emb_norm(q)
+        return q
 
 
     def forward(self, src_imgs, tgt_imgs, embedding, epoch):
@@ -110,13 +104,13 @@ class RspCaptionJointCut(RspCaption):
         tgt_imgs = tgt_imgs.reshape(-1, *tgt_imgs.shape[2:])
         embedding = embedding.reshape(-1, embedding.size(-1))
         embedding = embedding.unsqueeze(1)
-        h_context = self.resize_embed(embedding, self.decoder_embed_dim)
+        h_context_embed_dim = self.resize_embed(embedding, self.embed_dim)
         src_h, _, _ = self.forward_encoder(src_imgs, mask_ratio=0)
         tgt_h, _, _ = self.forward_encoder(self.perturb(tgt_imgs), mask_ratio=0)
 
         # Posterior distribution from both images
         # post_h = torch.cat([src_h[:, 0], tgt_h[:, 0]], -1)
-        post_h = self.forward_joint_emb(src_h[:, 0], tgt_h[:, 0], h_context)
+        post_h = self.forward_joint_emb(src_h[:, 0], tgt_h[:, 0], h_context_embed_dim)
         post_logits = self.to_posterior(post_h)
         post_dist = self.make_dist(post_logits)
         post_z = post_dist.rsample()
@@ -128,13 +122,14 @@ class RspCaptionJointCut(RspCaption):
         prior_z = prior_dist.rsample()
 
         # Project context to prior space
-        h_context_prime = self.to_language_prior(src_h[:, 0])
+        h_context_prime_embed_dim = self.to_language_prior(src_h[:, 0])
 
-        tgt_pred = self.forward_decoder_fut(src_h, h_context, post_z)
+        h_context_decoder = self.resize_embed(embedding, self.decoder_embed_dim)
+        tgt_pred = self.forward_decoder_fut(src_h, h_context_decoder, post_z)
         loss_post = self.forward_loss(tgt_imgs, tgt_pred)
         kl_loss, kl_value = self.compute_kl_loss(post_logits, prior_logits)
-        h_context_prime = h_context_prime.view(h_context.shape)  # Ensure same shape as h_context
-        context_loss = 1 - torch.nn.functional.cosine_similarity(h_context.squeeze(1), h_context_prime.squeeze(1), dim=1)
+        h_context_prime_embed_dim = h_context_prime_embed_dim.view(h_context_embed_dim.shape)  # Ensure same shape as h_context
+        context_loss = 1 - torch.nn.functional.cosine_similarity(h_context_prime_embed_dim.squeeze(1), h_context_prime_embed_dim.squeeze(1), dim=1)
         context_loss = context_loss.mean()
 
         # MAE
@@ -143,7 +138,7 @@ class RspCaptionJointCut(RspCaption):
         mae_loss = self.forward_loss(tgt_imgs, pred_masked, mask)
 
         with torch.no_grad():
-            tgt_pred_prior = self.forward_decoder_fut(src_h, h_context, prior_z)
+            tgt_pred_prior = self.forward_decoder_fut(src_h, h_context_decoder, prior_z)
             loss_prior = self.forward_loss(tgt_imgs, tgt_pred_prior)
 
         loss = loss_post + self.kl_scale * kl_loss + self.cos_scale * context_loss + mae_loss
