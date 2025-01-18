@@ -37,8 +37,9 @@ class PairedKineticsWithCaption8Pair(Dataset):
         with open(embeddings_path, 'r') as f:
             total_lines = sum(1 for _ in f)
         
-        chunk_size = 50000  # Adjust based on your memory constraints
-        n_jobs = min(160, os.cpu_count())  # Limit max number of jobs
+        # Optimized for 500GB RAM, 192 cores, and 200GB dataset
+        chunk_size = 50000  # ~1GB per chunk (assuming avg 20KB per record)
+        n_jobs = 160  # Slightly less than total cores to leave room for system processes
         
         print(f"Total lines to process: {total_lines:,}")
         print(f"Using {n_jobs} workers with chunk size of {chunk_size:,}")
@@ -226,9 +227,9 @@ if __name__ == "__main__":
 
     print("\nInitializing dataset...")
     dataset = PairedKineticsWithCaption8Pair(
-        frame_root="/data/kinetics400caption",
-        frame_info_path="/data/kinetics400caption/frame_info.json",
-        embeddings_path="/data/kinetics400caption/embedding_large.jsonl",
+        frame_root="/data/kinetics400caption8",
+        frame_info_path="/data/kinetics400caption8/frame_info.json",
+        embeddings_path="/data/kinetics400caption8/embedding_large.jsonl",
         frame_info_additional_path="/data/kinetics400caption8/frame_info_additional.json",
         embeddings_additional_path="/data/kinetics400caption8/embedding_6_pair.jsonl"
     )
@@ -237,13 +238,17 @@ if __name__ == "__main__":
     
     # Print some random samples from results
     print("\nRandom samples from dataset:")
-    sample_indices = random.sample(range(len(dataset.results)), min(5, len(dataset.results)))
-    for idx in sample_indices:
-        sample = dataset.results[idx]
-        print(f"\nSample {idx}:")
-        print(f"Frame current path: {sample['frame_cur_path']}")
-        print(f"Frame future path: {sample['frame_fut_path']}")
-        print(f"Pair idx: {sample['pair_idx']}")
+    if dataset.results:
+        video_indices = list(dataset.results.keys())
+        sample_videos = random.sample(video_indices, min(5, len(video_indices)))
+        for video_idx in sample_videos:
+            pairs = dataset.results[video_idx]
+            if pairs:  # Check if there are any pairs for this video
+                sample_pair = random.choice(pairs)
+                print(f"\nVideo {video_idx}:")
+                print(f"Frame current path: {sample_pair['frame_cur_path']}")
+                print(f"Frame future path: {sample_pair['frame_fut_path']}")
+                print(f"Pair idx: {sample_pair['pair_idx']}")
 
     # Create dataloader with small batch size for validation
     dataloader = DataLoader(
