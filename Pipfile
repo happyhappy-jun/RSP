@@ -27,6 +27,9 @@ av = "*"
 datasets = "*"
 questionary = "*"
 boto3 = "*"
+ujson = "*"
+hydra-colorlog = "*"
+joblib = "*"
 
 [dev-packages]
 
