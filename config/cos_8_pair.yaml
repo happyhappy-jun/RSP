@@ -1,0 +1,31 @@
+defaults:
+  - main
+  - _self_
+
+exp_name: rsp_cos
+
+model_name: rsp_cos_vit_small_patch16
+
+data_root: /data
+
+dataset:
+  _target_: util.kinetics_caption.PairedKineticsWithCaption8Pair
+  frame_root: ${..data_root}/kinetics400caption8
+  frame_info_path: ${..data_root}/kinetics400caption8/frame_info.json
+  embeddings_path: ${..data_root}/kinetics400caption8/embedding_large.jsonl
+  frame_info_additional_path: ${..data_root}/kinetics400caption8/frame_info_additional.json
+  embeddings_additional_path: ${..data_root}/kinetics400caption8/embedding_6_pair.jsonl
+
+train_loop:
+  _target_: engine_pretrain_repsamp.train_one_epoch_llm
+  _partial_: true
+
+num_workers: 2
+
+model_params:
+  kl_scale: 0.001
+  cos_scale: 0.1
+  enable_rms_norm: true
+  embed_scale_factor: 1.0
+
+

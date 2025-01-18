@@ -126,7 +126,7 @@ class EmbeddingCreator:
         self,
         caption_results: List[Dict[str, Any]],
         output_dir: Path,
-        max_attempts: int = 5,
+        max_attempts: int = 30,
         seconds_to_sleep: float = 0.001
     ) -> None:
         """Process caption results and create embeddings asynchronously"""

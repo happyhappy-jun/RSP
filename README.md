@@ -39,3 +39,9 @@ python -m caption2.steps.step6_create_embeddings --caption_results /data/RSP/cap
 ```
 
 We use seed 42 when sampling first 2 pair of frames for each video. We use seed 43 when sampling additional 6 pair of frame for each video. 
+
+
+### Sync artifacts 
+```bash
+aws s3 cp s3://junyoon-rsp . --recursive --exclude="*" --include="checkpoint-199.pth"
+```

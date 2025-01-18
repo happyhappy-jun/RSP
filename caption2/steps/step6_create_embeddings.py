@@ -16,7 +16,7 @@ async def main():
     parser.add_argument('--model', type=str, default="text-embedding-3-small", help="OpenAI embedding model")
     args = parser.parse_args()
 
-    creator = EmbeddingCreator()
+    creator = EmbeddingCreator(model=args.model)
     caption_results_path = Path(args.caption_results)
     output_dir = Path(args.output_dir)
     
