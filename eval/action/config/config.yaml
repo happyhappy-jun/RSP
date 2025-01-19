@@ -1,5 +1,5 @@
 defaults:
-  - dataset: imagenet1k
+  - /imagenet1k
   - _self_
 
 hydra:
