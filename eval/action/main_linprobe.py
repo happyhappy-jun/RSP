@@ -44,8 +44,11 @@ from engine_finetune import train_one_epoch, evaluate
 
 @hydra.main(version_base=None, config_path="config", config_name="config")
 def main(cfg: DictConfig):
-    # Convert to regular dict for compatibility
+    # Convert to regular dict and restructure for compatibility
     args = OmegaConf.to_object(cfg)
+    # Add distributed training parameters directly to args
+    for k, v in args.get('distributed', {}).items():
+        args[k] = v
     pprint(args)
     misc.init_distributed_mode(args)
 
