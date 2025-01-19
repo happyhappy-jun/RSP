@@ -80,25 +80,21 @@ def main(cfg: DictConfig):
         transforms.CenterCrop(224),
         transforms.ToTensor(),
         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])])
-    # Initialize datasets based on dataset name
-    if args.dataset.name == "ssv2":
-        from datasets.something_something_v2 import SomethingSomethingV2
-        dataset_train = SomethingSomethingV2(
-            data_root=args.data_path,
-            split="train",
-            transform=transform_train,
-            frames_per_video=1
-        )
-        dataset_val = SomethingSomethingV2(
-            data_root=args.data_path,
-            split="validation",
-            transform=transform_val,
-            frames_per_video=1
-        )
+    # Initialize datasets using Hydra instantiate
+    if cfg.dataset.name == "ssv2":
+        # Create train dataset
+        train_cfg = OmegaConf.create(OmegaConf.to_yaml(cfg.dataset))
+        train_cfg.split = "train"
+        dataset_train = hydra.utils.instantiate(train_cfg, transform=transform_train, data_root=cfg.dataset.data_path)
+        
+        # Create validation dataset
+        val_cfg = OmegaConf.create(OmegaConf.to_yaml(cfg.dataset))
+        val_cfg.split = "validation"
+        dataset_val = hydra.utils.instantiate(val_cfg, transform=transform_val, data_root=cfg.dataset.data_path)
     else:
-        # Default to ImageFolder for other datasets (imagenet1k, imagenet100, etc)
-        dataset_train = datasets.ImageFolder(os.path.join(args.data_path, 'train'), transform=transform_train)
-        dataset_val = datasets.ImageFolder(os.path.join(args.data_path, 'val'), transform=transform_val)
+        # Default to ImageFolder for other datasets
+        dataset_train = datasets.ImageFolder(os.path.join(cfg.dataset.data_path, 'train'), transform=transform_train)
+        dataset_val = datasets.ImageFolder(os.path.join(cfg.dataset.data_path, 'val'), transform=transform_val)
     
     print(f"Training dataset: {dataset_train}")
     print(f"Validation dataset: {dataset_val}")
