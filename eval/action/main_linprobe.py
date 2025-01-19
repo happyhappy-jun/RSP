@@ -10,6 +10,8 @@
 # --------------------------------------------------------
 
 import datetime
+from pprint import pprint
+
 import hydra
 from hydra.core.hydra_config import HydraConfig
 from omegaconf import DictConfig, OmegaConf
@@ -44,6 +46,7 @@ from engine_finetune import train_one_epoch, evaluate
 def main(cfg: DictConfig):
     # Convert to regular dict for compatibility
     args = OmegaConf.to_object(cfg)
+    pprint(args)
     misc.init_distributed_mode(args)
 
     # Initialize wandb

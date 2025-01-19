@@ -5,10 +5,10 @@ defaults:
 
 # Wandb Configuration
 wandb:
-  project: "mae-finetune"
-  entity: null  # your wandb username/entity
+  project: "rsp-linear"
+  entity: happyhappy-jun  # your wandb username/entity
   group: ${dataset.name}  # group by dataset
-  tags: ["linear_probe", "${model.name}"]
+  tags: ["linear_probe", "${model.name}", "${dataset.name}"]
   mode: "online"  # set to "disabled" to disable wandb
 
 hydra:
