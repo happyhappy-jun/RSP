@@ -24,7 +24,7 @@ num_workers: 4
 batch_size: 24
 accum_iter: 8
 pin_memory: false
-prefetch_factor: 2
+prefetch_factor: 3
 
 model_params:
   context_emb_dim: 3072

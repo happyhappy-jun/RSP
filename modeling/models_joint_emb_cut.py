@@ -34,6 +34,11 @@ class RspCaptionJointCut(RspCaption):
         for _ in range(embed_decoder_depth)
         ])
         self.joint_emb_norm = nn.LayerNorm(self.embed_dim *2)
+        self.to_language_prior = nn.Sequential(
+            nn.Linear(self.embed_dim, self.embed_dim * 2),
+            nn.ReLU(),
+            nn.Linear(self.embed_dim * 2, self.decoder_embed_dim),
+        )
 
     def get_feat(self, h, h_context, z):
         # Process deterministic path
@@ -128,8 +133,8 @@ class RspCaptionJointCut(RspCaption):
         tgt_pred = self.forward_decoder_fut(src_h, h_context_decoder, post_z)
         loss_post = self.forward_loss(tgt_imgs, tgt_pred)
         kl_loss, kl_value = self.compute_kl_loss(post_logits, prior_logits)
-        h_context_prime_embed_dim = h_context_prime_embed_dim.view(h_context_embed_dim.shape)  # Ensure same shape as h_context
-        context_loss = 1 - torch.nn.functional.cosine_similarity(h_context_prime_embed_dim.squeeze(1), h_context_prime_embed_dim.squeeze(1), dim=1)
+        h_context_prime_embed_dim = h_context_prime_embed_dim.view(h_context_decoder.shape)  # Ensure same shape as h_context
+        context_loss = 1 - torch.nn.functional.cosine_similarity(h_context_prime_embed_dim.squeeze(1), h_context_decoder.squeeze(1), dim=1)
         context_loss = context_loss.mean()
 
         # MAE
