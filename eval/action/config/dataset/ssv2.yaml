@@ -2,9 +2,9 @@ defaults:
   - _self_
 
 name: ssv2
-data_path: /data/something-something-v2/
 nb_classes: 174
 
 _target_: eval.action.datasets.something_something_v2.SomethingSomethingV2
+data_root: /data/something-something-v2/
 split: train
 frames_per_video: 1

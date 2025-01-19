@@ -87,7 +87,7 @@ def main(cfg: DictConfig):
         # Create train dataset
         train_cfg = OmegaConf.create(OmegaConf.to_yaml(cfg.dataset))
         train_cfg.split = "train"
-        dataset_train = hydra.utils.instantiate(train_cfg, transform=transform_train, data_root=cfg.dataset.data_path)
+        dataset_train = hydra.utils.instantiate(train_cfg, transform=transform_train)
         
         # Create validation dataset
         val_cfg = OmegaConf.create(OmegaConf.to_yaml(cfg.dataset))
