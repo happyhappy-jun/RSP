@@ -146,10 +146,7 @@ def main(cfg: DictConfig):
         drop_last=False
     )
 
-    model = modeling.__dict__[args.model](
-        num_classes=args.nb_classes,
-        global_pool=args.global_pool,
-    )
+    model = hydra.utils.instantiate(cfg.model)
 
     if args.finetune and not args.eval:
         checkpoint = torch.load(args.finetune, map_location='cpu')

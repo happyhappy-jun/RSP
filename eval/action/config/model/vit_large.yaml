@@ -1,6 +1,10 @@
-_target_: modeling.rsp_vit_small_patch16
-name: vit_small_patch16
+defaults:
+  - _self_
+
+_target_: modeling.rsp_vit_large_patch16
+name: vit_large_patch16
 finetune: ''
 global_pool: false
 cls_token: true
 weight_decay: 0
+num_classes: ${dataset.nb_classes}
