@@ -1,0 +1,3 @@
+name: ssv2
+data_path: /data/something-something-v2/
+nb_classes: 174
