@@ -80,10 +80,28 @@ def main(cfg: DictConfig):
         transforms.CenterCrop(224),
         transforms.ToTensor(),
         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])])
-    dataset_train = datasets.ImageFolder(os.path.join(args.data_path, 'train'), transform=transform_train)
-    dataset_val = datasets.ImageFolder(os.path.join(args.data_path, 'val'), transform=transform_val)
-    print(dataset_train)
-    print(dataset_val)
+    # Initialize datasets based on dataset name
+    if args.dataset.name == "ssv2":
+        from datasets.something_something_v2 import SomethingSomethingV2
+        dataset_train = SomethingSomethingV2(
+            data_root=args.data_path,
+            split="train",
+            transform=transform_train,
+            frames_per_video=1
+        )
+        dataset_val = SomethingSomethingV2(
+            data_root=args.data_path,
+            split="validation",
+            transform=transform_val,
+            frames_per_video=1
+        )
+    else:
+        # Default to ImageFolder for other datasets (imagenet1k, imagenet100, etc)
+        dataset_train = datasets.ImageFolder(os.path.join(args.data_path, 'train'), transform=transform_train)
+        dataset_val = datasets.ImageFolder(os.path.join(args.data_path, 'val'), transform=transform_val)
+    
+    print(f"Training dataset: {dataset_train}")
+    print(f"Validation dataset: {dataset_val}")
 
     if True:  # args.distributed:
         num_tasks = misc.get_world_size()
