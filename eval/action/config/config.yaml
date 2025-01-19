@@ -3,6 +3,14 @@ defaults:
   - model: vit_large
   - _self_
 
+# Wandb Configuration
+wandb:
+  project: "mae-finetune"
+  entity: null  # your wandb username/entity
+  group: ${dataset.name}  # group by dataset
+  tags: ["linear_probe", "${model.name}"]
+  mode: "online"  # set to "disabled" to disable wandb
+
 hydra:
   job:
     chdir: True

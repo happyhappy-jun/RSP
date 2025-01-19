@@ -14,6 +14,7 @@ import hydra
 from hydra.core.hydra_config import HydraConfig
 from omegaconf import DictConfig, OmegaConf
 import json
+import wandb
 import numpy as np
 import os
 import time
@@ -46,6 +47,17 @@ def main(cfg: DictConfig):
     # Convert to regular dict for compatibility
     args = OmegaConf.to_object(cfg)
     misc.init_distributed_mode(args)
+
+    # Initialize wandb
+    if misc.is_main_process():
+        wandb.init(
+            project=args.wandb.project,
+            entity=args.wandb.entity,
+            group=args.wandb.group,
+            tags=args.wandb.tags,
+            mode=args.wandb.mode,
+            config=args
+        )
 
     print('job dir: {}'.format(os.path.dirname(os.path.realpath(__file__))))
     print("{}".format(args).replace(', ', ',\n'))

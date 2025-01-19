@@ -14,6 +14,7 @@ import sys
 from typing import Iterable, Optional
 
 import torch
+import wandb
 
 from timm.data import Mixup
 from timm.utils import accuracy
@@ -88,11 +89,29 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
             epoch_1000x = int((data_iter_step / len(data_loader) + epoch) * 1000)
             log_writer.add_scalar('loss', loss_value_reduce, epoch_1000x)
             log_writer.add_scalar('lr', max_lr, epoch_1000x)
+            
+            # Log to wandb
+            if misc.is_main_process():
+                wandb.log({
+                    "train/loss": loss_value_reduce,
+                    "train/lr": max_lr,
+                    "epoch": epoch + (data_iter_step / len(data_loader))
+                }, step=epoch_1000x)
 
     # gather the stats from all processes
     metric_logger.synchronize_between_processes()
     print("Averaged stats:", metric_logger)
-    return {k: meter.global_avg for k, meter in metric_logger.meters.items()}
+    metrics = {k: meter.global_avg for k, meter in metric_logger.meters.items()}
+    
+    # Log validation metrics to wandb
+    if misc.is_main_process():
+        wandb.log({
+            "val/loss": metrics['loss'],
+            "val/acc1": metrics['acc1'],
+            "val/acc5": metrics['acc5']
+        })
+    
+    return metrics
 
 
 @torch.no_grad()
