@@ -14,7 +14,8 @@ from pprint import pprint
 
 import hydra
 from hydra.core.hydra_config import HydraConfig
-from omegaconf import DictConfig, OmegaConf
+from omegaconf import DictConfig
+from util.config import Config
 import json
 import wandb
 import numpy as np
@@ -44,11 +45,8 @@ from engine_finetune import train_one_epoch, evaluate
 
 @hydra.main(version_base=None, config_path="config", config_name="config")
 def main(cfg: DictConfig):
-    # Convert to regular dict and restructure for compatibility
-    args = OmegaConf.to_object(cfg)
-    # Add distributed training parameters directly to args
-    for k, v in args.get('distributed', {}).items():
-        args[k] = v
+    # Convert config to object-like access
+    args = Config(cfg)
     pprint(args)
     misc.init_distributed_mode(args)
 
