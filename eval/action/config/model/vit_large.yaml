@@ -1,0 +1,6 @@
+_target_: modeling.vit_large_patch16
+name: vit_large_patch16
+finetune: ''
+global_pool: false
+cls_token: true
+weight_decay: 0

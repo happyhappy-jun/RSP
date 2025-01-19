@@ -1,5 +1,6 @@
 defaults:
   - dataset: imagenet1k
+  - model: vit_large
   - _self_
 
 hydra:
@@ -14,18 +15,11 @@ batch_size: 512
 epochs: 90
 accum_iter: 1
 
-# Model parameters
-model: vit_large_patch16
-weight_decay: 0
+# Learning rate parameters
 lr: null
 blr: 0.1
 min_lr: 0.0
 warmup_epochs: 10
-
-# Finetuning params
-finetune: ''
-global_pool: false
-cls_token: true
 
 # Output parameters
 output_dir: './output_dir'
