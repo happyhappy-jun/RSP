@@ -85,14 +85,22 @@ def main(cfg: DictConfig):
     # Initialize datasets using Hydra instantiate
     if cfg.dataset.name == "ssv2":
         # Create train dataset
-        train_cfg = OmegaConf.create(OmegaConf.to_yaml(cfg.dataset))
-        train_cfg.split = "train"
+        train_cfg = OmegaConf.create({
+            "_target_": cfg.dataset._target_,
+            "data_root": cfg.dataset.data_root,
+            "split": "train",
+            "frames_per_video": cfg.dataset.frames_per_video
+        })
         dataset_train = hydra.utils.instantiate(train_cfg, transform=transform_train)
         
         # Create validation dataset
-        val_cfg = OmegaConf.create(OmegaConf.to_yaml(cfg.dataset))
-        val_cfg.split = "validation"
-        dataset_val = hydra.utils.instantiate(val_cfg, transform=transform_val, data_root=cfg.dataset.data_path)
+        val_cfg = OmegaConf.create({
+            "_target_": cfg.dataset._target_,
+            "data_root": cfg.dataset.data_root,
+            "split": "validation", 
+            "frames_per_video": cfg.dataset.frames_per_video
+        })
+        dataset_val = hydra.utils.instantiate(val_cfg, transform=transform_val)
     else:
         # Default to ImageFolder for other datasets
         dataset_train = datasets.ImageFolder(os.path.join(cfg.dataset.data_path, 'train'), transform=transform_train)

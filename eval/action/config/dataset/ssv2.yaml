@@ -1,10 +1,15 @@
 defaults:
   - _self_
 
+# Dataset metadata (not passed to class constructor)
 name: ssv2
 nb_classes: 174
 
+# Constructor arguments
 _target_: eval.action.datasets.something_something_v2.SomethingSomethingV2
 data_root: /data/something-something-v2/
 split: train
 frames_per_video: 1
+
+# Hydra config
+_recursive_: false
