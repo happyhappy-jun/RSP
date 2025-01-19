@@ -1,1 +1,5 @@
-# Package initialization
+from . import datasets
+
+__all__ = [
+    'datasets'
+]
