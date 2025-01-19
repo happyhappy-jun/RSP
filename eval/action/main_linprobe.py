@@ -41,8 +41,6 @@ from engine_finetune import train_one_epoch, evaluate
 
 
 @hydra.main(version_base=None, config_path="config", config_name="config")
-
-
 def main(cfg: DictConfig):
     # Convert to regular dict for compatibility
     args = OmegaConf.to_object(cfg)
@@ -247,7 +245,7 @@ def main(cfg: DictConfig):
             with open(os.path.join(args.output_dir, "log.txt"), mode="a", encoding="utf-8") as f:
                 f.write(json.dumps(log_stats) + "\n")
 
-    total_time = time.time() - start_time
+    total_time = time.time() - start_timeww
     total_time_str = str(datetime.timedelta(seconds=int(total_time)))
     print('Training time {}'.format(total_time_str))
 
