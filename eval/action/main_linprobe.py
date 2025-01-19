@@ -14,7 +14,7 @@ from pprint import pprint
 
 import hydra
 from hydra.core.hydra_config import HydraConfig
-from omegaconf import DictConfig
+from omegaconf import DictConfig, OmegaConf
 from util.config import Config
 import json
 import wandb
