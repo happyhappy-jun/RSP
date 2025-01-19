@@ -15,7 +15,6 @@ from pprint import pprint
 import hydra
 from hydra.core.hydra_config import HydraConfig
 from omegaconf import DictConfig, OmegaConf
-from eval.action.util.config import Config
 import json
 import wandb
 import numpy as np
@@ -45,9 +44,8 @@ from engine_finetune import train_one_epoch, evaluate
 
 @hydra.main(version_base=None, config_path="config", config_name="config")
 def main(cfg: DictConfig):
-    # Convert config to object-like access
-    args = Config(cfg)
-    pprint(args)
+    args = cfg
+    pprint(OmegaConf.to_container(args, resolve=True))
     misc.init_distributed_mode(args)
 
     # Initialize wandb
