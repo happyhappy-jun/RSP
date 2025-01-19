@@ -1,5 +1,5 @@
-_target_: modeling.vit_large_patch16
-name: vit_large_patch16
+_target_: modeling.rsp_vit_small_patch16
+name: vit_small_patch16
 finetune: ''
 global_pool: false
 cls_token: true
