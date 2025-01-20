@@ -210,7 +210,7 @@ def main(cfg: DictConfig):
     misc.load_model(args=args, model_without_ddp=model_without_ddp, optimizer=optimizer, loss_scaler=loss_scaler)
 
     if args.eval:
-        test_stats = evaluate(data_loader_val, model, device, args, epoch)
+        test_stats = evaluate(data_loader_val, model, device, args, 0)  # Use epoch 0 for eval mode
         print(f"Accuracy of the network on the {len(dataset_val)} test images: {test_stats['acc1']:.1f}%")
         exit(0)
 
