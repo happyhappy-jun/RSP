@@ -45,12 +45,14 @@ async def main():
                 metadata = {
                     'video_name': video['video_name'],
                     'class_label': video['class_label'],
-                    'frame_indices': json.dumps(video['frame_indices'][-2:]),  # Last two frames
-                    'prediction_type': 'future_frame'
+                    'frame_indices': json.dumps(video['frame_indices']),
+                    'pair_idx': str(video['pair_idx']),
+                    'prediction_type': 'future_frame',
+                    'sampling_seed': video.get('sampling_seed', 42)
                 }
                 
-                # Create custom ID that indicates this is a future prediction
-                custom_id = f"video_{video['video_idx']}_future_{video['pair_idx']}"
+                # Create custom ID matching existing caption structure
+                custom_id = f"video_{video['video_idx']}_pair_{video['pair_idx']}"
                 
                 request = builder.build_caption_request(
                     frame_paths=video['frame_paths'][-2:],  # Use last two frames
