@@ -172,7 +172,8 @@ class BatchProcessor:
     def submit_requests(
         self,
         requests: List[Dict[str, Any]],
-        max_batch_size: int = 100 * 1024 * 1024,  # 100MB in bytes
+        max_batch_size: int = 90 * 1024 * 1024,  # 90MB to stay under Cloudflare limit
+        batch_check_size: int = 100,  # Check size every N requests
         num_workers: int = 4,
         description: str = None,
         sanity_check: bool = False,
@@ -226,13 +227,34 @@ class BatchProcessor:
                 print(f"Sanity check failed: {str(e)}")
                 return []
 
-        # Split into sub-batches of max 50,000 requests
+        # Split into size-limited sub-batches
         MAX_REQUESTS_PER_BATCH = 50000
         sub_batches = []
-        for i in range(0, len(requests), MAX_REQUESTS_PER_BATCH):
-            sub_batches.append(requests[i:i + MAX_REQUESTS_PER_BATCH])
+        current_batch = []
+        current_size = 0
+        
+        print("\nSplitting requests into size-limited batches...")
+        for i, request in enumerate(tqdm(requests)):
+            request_size = self._estimate_request_size(request)
             
-        print(f"\nSplitting into {len(sub_batches)} sub-batches of max {MAX_REQUESTS_PER_BATCH} requests...")
+            # Check if adding this request would exceed size limit
+            if (i % batch_check_size == 0 and 
+                current_size + request_size > max_batch_size) or \
+                len(current_batch) >= MAX_REQUESTS_PER_BATCH:
+                
+                if current_batch:  # Only append if we have requests
+                    sub_batches.append(current_batch)
+                    current_batch = []
+                    current_size = 0
+            
+            current_batch.append(request)
+            current_size += request_size
+        
+        # Add final batch if not empty
+        if current_batch:
+            sub_batches.append(current_batch)
+            
+        print(f"\nSplit into {len(sub_batches)} sub-batches")
         
         with ThreadPoolExecutor(max_workers=num_workers) as submit_executor:
             # Submit all sub-batches
