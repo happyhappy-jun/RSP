@@ -1,6 +1,7 @@
 defaults:
   - dataset: imagenet1k
   - model: vit_large
+  - hydra/launcher: basic
   - _self_
 
 # Wandb Configuration
@@ -45,12 +46,12 @@ prefetch_factor: 4
 pin_mem: true
 
 # Distributed training parameters
-world_size: 1
+world_size: 2  # 2 GPUs per task
 local_rank: -1
 dist_on_itp: false
 dist_url: env://
 rank: 0
-gpu: 0
+gpu: null  # Let Hydra manage GPU assignment
 distributed: true
 dist_backend: 'nccl'
 
