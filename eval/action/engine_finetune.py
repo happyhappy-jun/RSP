@@ -112,6 +112,16 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
     print("Averaged stats:", metric_logger)
     metrics = {k: meter.global_avg for k, meter in metric_logger.meters.items()}
     
+    # Log epoch metrics to wandb
+    if misc.is_main_process():
+        wandb.log({
+            "train/loss": metrics['loss'],
+            "train/acc1": metrics['acc1'],
+            "train/acc5": metrics['acc5'],
+            "train/lr": metrics['lr'],
+            "epoch": epoch
+        })
+    
     return metrics
 
 
@@ -150,4 +160,15 @@ def evaluate(data_loader, model, device, args):
     print('* Acc@1 {top1.global_avg:.3f} Acc@5 {top5.global_avg:.3f} loss {losses.global_avg:.3f}'
           .format(top1=metric_logger.acc1, top5=metric_logger.acc5, losses=metric_logger.loss))
 
-    return {k: meter.global_avg for k, meter in metric_logger.meters.items()}
+    metrics = {k: meter.global_avg for k, meter in metric_logger.meters.items()}
+    
+    # Log validation metrics to wandb
+    if misc.is_main_process():
+        wandb.log({
+            "val/loss": metrics['loss'],
+            "val/acc1": metrics['acc1'],
+            "val/acc5": metrics['acc5'],
+            "epoch": epoch
+        })
+    
+    return metrics
