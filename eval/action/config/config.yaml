@@ -6,7 +6,7 @@ defaults:
 # Wandb Configuration
 wandb:
   project: "rsp-linear"
-  entity: happyhappy-jun  # your wandb username/entity
+  entity: happyhappy  # your wandb username/entity
   group: ${dataset.name}  # group by dataset
   tags: ["linear_probe", "${model.name}", "${dataset.name}"]
   mode: "online"  # set to "disabled" to disable wandb
@@ -40,12 +40,17 @@ resume: ''
 start_epoch: 0
 eval: false
 dist_eval: false
-num_workers: 10
+num_workers: 12
+prefetch_factor: 4
 pin_mem: true
 
 # Distributed training parameters
-distributed:
-  world_size: 1
-  local_rank: -1
-  dist_on_itp: false
-  dist_url: env://
+world_size: 1
+local_rank: -1
+dist_on_itp: false
+dist_url: env://
+rank: 0
+gpu: 0
+distributed: true
+dist_backend: 'nccl'
+
