@@ -75,7 +75,13 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
 
         torch.cuda.synchronize()
 
+        acc1, acc5 = accuracy(outputs, targets, topk=(1, 5))
+        batch_size = samples.shape[0]
+        
         metric_logger.update(loss=loss_value)
+        metric_logger.meters['acc1'].update(acc1.item(), n=batch_size)
+        metric_logger.meters['acc5'].update(acc5.item(), n=batch_size)
+        
         min_lr = 10.
         max_lr = 0.
         for group in optimizer.param_groups:
@@ -105,14 +111,6 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
     metric_logger.synchronize_between_processes()
     print("Averaged stats:", metric_logger)
     metrics = {k: meter.global_avg for k, meter in metric_logger.meters.items()}
-    
-    # Log validation metrics to wandb
-    if misc.is_main_process():
-        wandb.log({
-            "val/loss": metrics['loss'],
-            "val/acc1": metrics['acc1'],
-            "val/acc5": metrics['acc5']
-        })
     
     return metrics
 
