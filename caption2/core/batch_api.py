@@ -318,6 +318,11 @@ class BatchProcessor:
                     future._result = None
                     del future
         
-        # Sort results before returning
-        results.sort(key=lambda x: x['custom_id'])
-        return results
+        try:
+            # Sort results before returning
+            results.sort(key=lambda x: x['custom_id'])
+            return results
+        finally:
+            # Clear monitor futures list
+            monitor_futures.clear()
+            del monitor_futures
