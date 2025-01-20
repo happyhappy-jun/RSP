@@ -12,35 +12,29 @@ def split_frame_info(input_file: Path, output_dir: Path):
         frame_info = json.load(f)
     
     total_videos = len(frame_info['videos'])
-    split_point = math.ceil(total_videos / 2)
+    split_size = math.ceil(total_videos / 3)
     
     print(f"Total videos: {total_videos}")
-    print(f"Splitting at: {split_point}")
+    print(f"Split size: {split_size}")
     
-    # Create first half
-    first_half = {
-        'config': frame_info['config'],
-        'videos': frame_info['videos'][:split_point]
-    }
-    
-    # Create second half
-    second_half = {
-        'config': frame_info['config'],
-        'videos': frame_info['videos'][split_point:]
-    }
+    # Create three parts
+    splits = []
+    for i in range(3):
+        start_idx = i * split_size
+        end_idx = min((i + 1) * split_size, total_videos)
+        part = {
+            'config': frame_info['config'],
+            'videos': frame_info['videos'][start_idx:end_idx]
+        }
+        splits.append(part)
     
     # Save split files
-    first_output = output_dir / "frame_info_additional_part1.json"
-    second_output = output_dir / "frame_info_additional_part2.json"
-    
-    print(f"\nSaving splits:")
-    print(f"Part 1 ({len(first_half['videos'])} videos): {first_output}")
-    with open(first_output, 'w') as f:
-        json.dump(first_half, f, indent=2)
-        
-    print(f"Part 2 ({len(second_half['videos'])} videos): {second_output}")
-    with open(second_output, 'w') as f:
-        json.dump(second_half, f, indent=2)
+    print("\nSaving splits:")
+    for i, split in enumerate(splits, 1):
+        output_file = output_dir / f"frame_info_additional_part{i}.json"
+        print(f"Part {i} ({len(split['videos'])} videos): {output_file}")
+        with open(output_file, 'w') as f:
+            json.dump(split, f, indent=2)
 
 def main():
     parser = argparse.ArgumentParser(description='Split frame_info_additional.json into two parts')
