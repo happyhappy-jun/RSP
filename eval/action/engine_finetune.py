@@ -116,7 +116,7 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
 
 
 @torch.no_grad()
-def evaluate(data_loader, model, device):
+def evaluate(data_loader, model, device, args):
     criterion = torch.nn.CrossEntropyLoss()
 
     metric_logger = misc.MetricLogger(delimiter="  ")
@@ -133,7 +133,7 @@ def evaluate(data_loader, model, device):
 
         # compute output
         with torch.amp.autocast("cuda"):
-            if "rsp" in model.module.name:
+            if "rsp" in args.model.name:
                 output = model.module.forward_head(images)
             else:
                 output = model(images)
