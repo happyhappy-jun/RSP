@@ -128,6 +128,7 @@ def main(cfg: DictConfig):
         batch_size=args.batch_size,
         num_workers=args.num_workers,
         pin_memory=args.pin_mem,
+        prefetch_factor=args.prefetch_factor,
         drop_last=True,
     )
 
@@ -136,6 +137,7 @@ def main(cfg: DictConfig):
         batch_size=args.batch_size,
         num_workers=args.num_workers,
         pin_memory=args.pin_mem,
+        prefetch_factor=args.prefetch_factor,
         drop_last=False
     )
 
@@ -157,7 +159,6 @@ def main(cfg: DictConfig):
 
         # load pre-trained model
         msg = model.load_state_dict(checkpoint_model, strict=False)
-        print(msg)
 
         if args.model.global_pool:
             assert set(msg.missing_keys) == {'head.weight', 'head.bias', 'fc_norm.weight', 'fc_norm.bias'}
@@ -181,7 +182,6 @@ def main(cfg: DictConfig):
     model_without_ddp = model
     n_parameters = sum(p.numel() for p in model.parameters() if p.requires_grad)
 
-    print("Model = %s" % str(model_without_ddp))
     print('number of params (M): %.2f' % (n_parameters / 1.e6))
 
     eff_batch_size = args.batch_size * args.accum_iter * misc.get_world_size()
@@ -232,7 +232,7 @@ def main(cfg: DictConfig):
                 args=args, model=model, model_without_ddp=model_without_ddp, optimizer=optimizer,
                 loss_scaler=loss_scaler, epoch=epoch)
 
-        test_stats = evaluate(data_loader_val, model, device, args, 0)  # epoch 0 for eval-only mode
+        test_stats = evaluate(data_loader_val, model, device, args, epoch)
         print(f"Accuracy of the network on the {len(dataset_val)} test images: {test_stats['acc1']:.1f}%")
         max_accuracy = max(max_accuracy, test_stats["acc1"])
         print(f'Max accuracy: {max_accuracy:.2f}%')
