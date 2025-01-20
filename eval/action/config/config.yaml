@@ -9,7 +9,7 @@ wandb:
   project: "rsp-linear"
   entity: happyhappy  # your wandb username/entity
   group: ${dataset.name}  # group by dataset
-  name: ${model.name}_${dataset.name}  # descriptive run name
+  name: ${model.name}_${dataset.name}_lr${blr}_b${batch_size}_${now:%Y%m%d_%H%M%S}  # descriptive run name with timestamp
   tags: ["linear_probe", "${model.name}", "${dataset.name}"]
   mode: "online"  # set to "disabled" to disable wandb
 
