@@ -56,7 +56,8 @@ def main(cfg: DictConfig):
             group=args.wandb.group,
             tags=args.wandb.tags,
             mode=args.wandb.mode,
-            config=args
+            # dict config to dict
+            config=dict(args)
         )
 
     print('job dir: {}'.format(os.path.dirname(os.path.realpath(__file__))))
@@ -83,28 +84,14 @@ def main(cfg: DictConfig):
         transforms.ToTensor(),
         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])])
     # Initialize datasets using Hydra instantiate
+    print(cfg.dataset)
     if cfg.dataset.name == "ssv2":
-        # Create train dataset
-        train_cfg = OmegaConf.create({
-            "_target_": cfg.dataset._target_,
-            "data_root": cfg.dataset.data_root,
-            "split": "train",
-            "frames_per_video": cfg.dataset.frames_per_video
-        })
-        dataset_train = hydra.utils.instantiate(train_cfg, transform=transform_train)
-        
-        # Create validation dataset
-        val_cfg = OmegaConf.create({
-            "_target_": cfg.dataset._target_,
-            "data_root": cfg.dataset.data_root,
-            "split": "validation", 
-            "frames_per_video": cfg.dataset.frames_per_video
-        })
-        dataset_val = hydra.utils.instantiate(val_cfg, transform=transform_val)
+        dataset_train = hydra.utils.instantiate(cfg.dataset, split="train", transform=transform_train)
+        dataset_val = hydra.utils.instantiate(cfg.dataset, split="validation", transform=transform_val)
     else:
         # Default to ImageFolder for other datasets
-        dataset_train = datasets.ImageFolder(os.path.join(cfg.dataset.data_path, 'train'), transform=transform_train)
-        dataset_val = datasets.ImageFolder(os.path.join(cfg.dataset.data_path, 'val'), transform=transform_val)
+        dataset_train = datasets.ImageFolder(os.path.join(cfg.dataset.data_root, 'train'), transform=transform_train)
+        dataset_val = datasets.ImageFolder(os.path.join(cfg.dataset.data_root, 'val'), transform=transform_val)
     
     print(f"Training dataset: {dataset_train}")
     print(f"Validation dataset: {dataset_val}")
@@ -152,12 +139,12 @@ def main(cfg: DictConfig):
         drop_last=False
     )
 
-    model = hydra.utils.instantiate(cfg.model)
+    model = hydra.utils.instantiate(cfg.model.model_kwargs)
 
-    if args.finetune and not args.eval:
-        checkpoint = torch.load(args.finetune, map_location='cpu')
+    if args.model.finetune and not args.eval:
+        checkpoint = torch.load(args.model.finetune, map_location='cpu')
 
-        print("Load pre-trained checkpoint from: %s" % args.finetune)
+        print("Load pre-trained checkpoint from: %s" % args.model.finetune)
         checkpoint_model = checkpoint['model']
         state_dict = model.state_dict()
         for k in ['head.weight', 'head.bias']:
@@ -172,7 +159,7 @@ def main(cfg: DictConfig):
         msg = model.load_state_dict(checkpoint_model, strict=False)
         print(msg)
 
-        if args.global_pool:
+        if args.model.global_pool:
             assert set(msg.missing_keys) == {'head.weight', 'head.bias', 'fc_norm.weight', 'fc_norm.bias'}
         else:
             assert set(msg.missing_keys) == {'head.weight', 'head.bias'}
@@ -212,7 +199,7 @@ def main(cfg: DictConfig):
         model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[args.gpu])
         model_without_ddp = model.module
 
-    optimizer = LARS(model_without_ddp.head.parameters(), lr=args.lr, weight_decay=args.weight_decay)
+    optimizer = LARS(model_without_ddp.head.parameters(), lr=args.lr, weight_decay=args.model.weight_decay)
     print(optimizer)
     loss_scaler = NativeScaler()
 
@@ -223,7 +210,7 @@ def main(cfg: DictConfig):
     misc.load_model(args=args, model_without_ddp=model_without_ddp, optimizer=optimizer, loss_scaler=loss_scaler)
 
     if args.eval:
-        test_stats = evaluate(data_loader_val, model, device)
+        test_stats = evaluate(data_loader_val, model, device, args)
         print(f"Accuracy of the network on the {len(dataset_val)} test images: {test_stats['acc1']:.1f}%")
         exit(0)
 
@@ -245,7 +232,7 @@ def main(cfg: DictConfig):
                 args=args, model=model, model_without_ddp=model_without_ddp, optimizer=optimizer,
                 loss_scaler=loss_scaler, epoch=epoch)
 
-        test_stats = evaluate(data_loader_val, model, device)
+        test_stats = evaluate(data_loader_val, model, device, args)
         print(f"Accuracy of the network on the {len(dataset_val)} test images: {test_stats['acc1']:.1f}%")
         max_accuracy = max(max_accuracy, test_stats["acc1"])
         print(f'Max accuracy: {max_accuracy:.2f}%')
