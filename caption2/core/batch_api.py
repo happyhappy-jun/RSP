@@ -172,9 +172,9 @@ class BatchProcessor:
     def submit_requests(
         self,
         requests: List[Dict[str, Any]],
-        max_batch_size: int = 90 * 1024 * 1024,  # 90MB to stay under Cloudflare limit
-        batch_check_size: int = 100,  # Check size every N requests
-        num_workers: int = 4,
+        max_batch_size: int = 160 * 1024 * 1024,  # 90MB to stay under Cloudflare limit
+        batch_check_size: int = 200,  # Check size every N requests
+        num_workers: int = 10,
         description: str = None,
         sanity_check: bool = False,
         shard_idx: Optional[int] = None,
