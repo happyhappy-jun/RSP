@@ -163,12 +163,12 @@ def evaluate(data_loader, model, device, args, epoch=None):
     metrics = {k: meter.global_avg for k, meter in metric_logger.meters.items()}
     
     # Log validation metrics to wandb
-    if misc.is_main_process():
+    if misc.is_main_process() and epoch is not None:
         wandb.log({
             "val/loss": metrics['loss'],
             "val/acc1": metrics['acc1'],
             "val/acc5": metrics['acc5'],
-            "epoch": epoch
+            "epoch": float(epoch)  # Ensure epoch is a simple numeric type
         })
     
     return metrics
