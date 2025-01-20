@@ -310,8 +310,13 @@ class BatchProcessor:
                         results.extend(result['results'])
                         # Clear memory
                         del result['results']
+                        del result
                 except Exception as e:
                     print(f"Error processing batch: {str(e)}")
+                finally:
+                    # Release future object
+                    future._result = None
+                    del future
         
         # Sort results before returning
         results.sort(key=lambda x: x['custom_id'])
