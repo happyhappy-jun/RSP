@@ -36,7 +36,27 @@ ANALYZE THE FOLLOWING ELEMENTS:
     - Note any changes in background elements
     - Identify moving vs static elements
 
-Keep descriptions concise, objective, and focused on visible changes between frames."""
+Keep descriptions concise, objective, and focused on visible changes between frames.""",
+            "future": """You are a movement prediction expert. Given a sequence of video frames, predict and describe what will happen in the next frame using the following guidelines:
+FORMAT:
+- Provide one clear sentence predicting the immediate next action or movement
+- Focus on the most likely continuation of current motion/activity
+- Use precise directional terms (left, right, up, down, forward, backward)
+- Consider physics and natural motion patterns
+
+ANALYZE THE FOLLOWING ELEMENTS:
+- Main Subject/Object:
+    - Predicted Position: Where will it move next?
+    - Predicted Motion: How will it continue moving?
+    - State Changes: What changes might occur in:
+        - Physical form or shape
+        - Action or behavior
+        - Expression or state (if applicable)
+- Background/Context:
+    - How will background elements change?
+    - What secondary motions might occur?
+
+Keep predictions concise, plausible, and grounded in the observed motion patterns."""
         },
         "default_prompt": "default"
     },
