@@ -20,13 +20,14 @@ async def main():
                        help='Path to configuration YAML file')
     parser.add_argument('--sanity_check', action='store_true',
                        help='Run sanity check with single request only')
+    parser.add_argument("--frame_dir", type=str,)
     args = parser.parse_args()
 
     # Setup paths and config
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     
-    config = Config(args.config_path) if args.config_path else Config()
+    config = Config(args.config_path, frame_output_dir=args.frame_dir) if args.config_path else Config(frame_output_dir=args.frame_dir)
     
     # Load frame info
     print(f"\nLoading frame info from: {args.frame_info}")
@@ -55,7 +56,7 @@ async def main():
                 custom_id = f"video_{video['video_idx']}_pair_{video['pair_idx']}"
                 
                 request = builder.build_caption_request(
-                    frame_paths=video['frame_paths'][-2:],  # Use last two frames
+                    frame_paths=[video['frame_paths'][-1]],  # Use last two frames
                     custom_id=custom_id,
                     metadata=metadata,
                     system_prompt=config.prompt_config['caption']['prompts']['future']
@@ -91,6 +92,8 @@ async def main():
             future_requests,
             description="Future frame caption generation"
         )
+
+        del future_requests
         
         print("\nMonitoring batch processing...")
         results = processor.monitor_batches(batch_ids)

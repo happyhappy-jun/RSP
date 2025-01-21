@@ -54,10 +54,7 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
             samples, targets = mixup_fn(samples, targets)
 
         with torch.amp.autocast("cuda"):
-            if "rsp" in args.model.name:
-                outputs = model.module.forward_head(samples)
-            else:
-                outputs = model(samples)
+            outputs = model(samples)
             loss = criterion(outputs, targets)
 
         loss_value = loss.item()
@@ -143,10 +140,7 @@ def evaluate(data_loader, model, device, args, epoch=None):
 
         # compute output
         with torch.amp.autocast("cuda"):
-            if "rsp" in args.model.name:
-                output = model.module.forward_head(images)
-            else:
-                output = model(images)
+            output = model(images)
             loss = criterion(output, target)
 
         acc1, acc5 = accuracy(output, target, topk=(1, 5))

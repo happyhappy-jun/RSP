@@ -1,0 +1,3 @@
+data_root: /data/ImageNet100/
+nb_classes: 100
+name: imagenet100

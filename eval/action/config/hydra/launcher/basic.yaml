@@ -1,5 +1,0 @@
-defaults:
-  - submitit_local
-
-num_gpus: 2
-tasks_per_node: 4  # 8 GPUs total / 2 GPUs per task = 4 tasks can run simultaneously

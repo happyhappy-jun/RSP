@@ -1,7 +1,6 @@
 defaults:
   - dataset: imagenet1k
   - model: mae
-  - hydra/launcher: basic
   - _self_
 
 # Wandb Configuration

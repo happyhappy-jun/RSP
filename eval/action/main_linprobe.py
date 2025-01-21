@@ -56,6 +56,7 @@ def main(cfg: DictConfig):
             group=args.wandb.group,
             tags=args.wandb.tags,
             mode=args.wandb.mode,
+            name=args.wandb.name,
             # dict config to dict
             config=dict(args)
         )
@@ -86,8 +87,8 @@ def main(cfg: DictConfig):
     # Initialize datasets using Hydra instantiate
     print(cfg.dataset)
     if cfg.dataset.name == "ssv2":
-        dataset_train = hydra.utils.instantiate(cfg.dataset, split="train", transform=transform_train)
-        dataset_val = hydra.utils.instantiate(cfg.dataset, split="validation", transform=transform_val)
+        dataset_train = hydra.utils.instantiate(cfg.dataset.args, split="train", transform=transform_train)
+        dataset_val = hydra.utils.instantiate(cfg.dataset.args, split="validation", transform=transform_val)
     else:
         # Default to ImageFolder for other datasets
         dataset_train = datasets.ImageFolder(os.path.join(cfg.dataset.data_root, 'train'), transform=transform_train)
@@ -227,7 +228,7 @@ def main(cfg: DictConfig):
             log_writer=log_writer,
             args=args
         )
-        if args.output_dir:
+        if args.output_dir and (epoch % 25 == 0 or epoch == args.epochs - 1) and misc.is_main_process():
             misc.save_model(
                 args=args, model=model, model_without_ddp=model_without_ddp, optimizer=optimizer,
                 loss_scaler=loss_scaler, epoch=epoch)
