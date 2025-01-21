@@ -1,0 +1,13 @@
+defaults:
+  - _self_
+
+
+name: rsp_cos_proj
+finetune: /home/junyoon/RSP/outputs/cos-kl_scall0.005-emblarge_2025-01-02_16-53-01/checkpoint-199.pth
+global_pool: false
+cls_token: true
+weight_decay: 0
+num_classes: ${dataset.nb_classes}
+
+model_kwargs:
+  _target_: timm.models.vision_transformer.vit_small_patch16_224
