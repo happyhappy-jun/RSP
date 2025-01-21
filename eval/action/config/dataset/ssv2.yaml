@@ -11,6 +11,3 @@ args:
   data_root: /data/something-something-v2/
   split: train
   frames_per_video: 1
-
-# Hydra config
-_recursive_: false
