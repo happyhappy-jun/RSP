@@ -189,6 +189,7 @@ class PairedKineticsWithCaption8PairM3AE(Dataset):
         src_images = []
         tgt_images = []
         embeddings = []
+        future_embeddings = []
 
         # Randomly sample pairs for this video
         sampled_pairs = random.sample(video_pairs, min(self.repeated_sampling, len(video_pairs)))
