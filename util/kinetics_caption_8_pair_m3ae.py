@@ -29,9 +29,11 @@ def process_lines(lines):
     return results
 
 class PairedKineticsWithCaption8PairM3AE(Dataset):
-    def _load_embeddings(self, embeddings_path):
+    def _load_embeddings(self, embeddings_path, future_embeddings_path=None):
         """Load embeddings from jsonl file using joblib parallel processing"""
         print(f"\nLoading embeddings from {embeddings_path}")
+        if future_embeddings_path:
+            print(f"Loading future embeddings from {future_embeddings_path}")
         
         # Count total lines and calculate chunks
         with open(embeddings_path, 'r') as f:
@@ -69,10 +71,12 @@ class PairedKineticsWithCaption8PairM3AE(Dataset):
     def __init__(
         self,
         frame_root,
-        frame_info_path,      # Path to frame_info.json
-        embeddings_path,      # Path to combined_output.jsonl
+        frame_info_path,          # Path to frame_info.json
+        embeddings_path,          # Path to combined_output.jsonl
+        future_embeddings_path,   # Path to future embeddings jsonl
         frame_info_additional_path=None,  # Optional path to additional frame info
         embeddings_additional_path=None,  # Optional path to additional embeddings
+        future_embeddings_additional_path=None,  # Optional path to additional future embeddings
         repeated_sampling=2   # Number of augmented samples per pair
     ):
         super().__init__()
@@ -85,10 +89,11 @@ class PairedKineticsWithCaption8PairM3AE(Dataset):
             videos = frame_info['videos']
             self._process_frame_info(videos, prefix="frames")
 
-        # Load main embeddings data
+        # Load main embeddings and future embeddings data
         print("Loading main embeddings data...")
         self.embeddings = {}
-        self._load_embeddings(embeddings_path)
+        self.future_embeddings = {}
+        self._load_embeddings(embeddings_path, future_embeddings_path)
 
         # Load additional data if provided
         if frame_info_additional_path and embeddings_additional_path:
@@ -99,7 +104,7 @@ class PairedKineticsWithCaption8PairM3AE(Dataset):
                     prefix="frames_additional",
                     pair_idx_offset=2  # Add 2 to pair_idx for additional dataset
                 )
-            self._load_embeddings(embeddings_additional_path)
+            self._load_embeddings(embeddings_additional_path, future_embeddings_additional_path)
 
         # Filter and group valid pairs by video_idx
         self.video_pairs = defaultdict(list)
@@ -108,8 +113,9 @@ class PairedKineticsWithCaption8PairM3AE(Dataset):
         for video_idx, frame_data in self.results.items():
             for pair in frame_data:
                 key = (video_idx, pair["pair_idx"])
-                if key in self.embeddings:
+                if key in self.embeddings and key in self.future_embeddings:
                     pair["embedding"] = self.embeddings[key]
+                    pair["future_embedding"] = self.future_embeddings[key]
                     self.video_pairs[video_idx].append(pair)
                 else:
                     missing_embeddings[video_idx].append(pair["pair_idx"])
@@ -198,18 +204,21 @@ class PairedKineticsWithCaption8PairM3AE(Dataset):
             src_images.append(src_image)
             tgt_images.append(tgt_image)
             embeddings.append(torch.from_numpy(pair["embedding"]))
+            future_embeddings.append(torch.from_numpy(pair["future_embedding"]))
 
         # If we need more samples, repeat the last pair
         while len(src_images) < self.repeated_sampling:
             src_images.append(src_images[-1])
             tgt_images.append(tgt_images[-1])
             embeddings.append(embeddings[-1])
+            future_embeddings.append(future_embeddings[-1])
 
         return {
             "video_idx": video_idx,
             "src_images": torch.stack(src_images, dim=0),
             "tgt_images": torch.stack(tgt_images, dim=0),
-            "embeddings": torch.stack(embeddings, dim=0)
+            "embeddings": torch.stack(embeddings, dim=0),
+            "future_embeddings": torch.stack(future_embeddings, dim=0)
         }
 
 def collate_fn(batch):
@@ -217,6 +226,7 @@ def collate_fn(batch):
         "src_images": torch.stack([x['src_images'] for x in batch], dim=0),
         "tgt_images": torch.stack([x['tgt_images'] for x in batch], dim=0),
         "embeddings": torch.stack([x['embeddings'] for x in batch], dim=0),
+        "future_embeddings": torch.stack([x['future_embeddings'] for x in batch], dim=0),
     }
 
 if __name__ == "__main__":
