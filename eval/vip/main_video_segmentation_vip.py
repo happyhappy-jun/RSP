@@ -28,7 +28,7 @@ import torch
 from torch.nn import functional as F
 from PIL import Image
 from util.load_ckpt import load_pretrained_weights
-import vision_transformer as vits
+import eval.DAVIS.vision_transformer as vits
 
 
 @torch.no_grad()
@@ -323,7 +323,8 @@ if __name__ == "__main__":
     model.eval()
 
     color_palette = []
-    with open('./util/data_palette.txt', 'r') as file:
+    print(os.path.abspath("."))
+    with open(f'{os.environ["HOME"]}/RSP/util/data_palette.txt', 'r') as file:
         lines = file.readlines()
     for line in lines:
         color_palette.append([int(i) for i in line.split("\n")[0].split(" ")])

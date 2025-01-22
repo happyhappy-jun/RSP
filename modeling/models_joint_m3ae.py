@@ -4,6 +4,7 @@ import torch.nn as nn
 
 from modeling.layers import RMSNorm, CrossAttention, CrossAttentionBlock
 from modeling.models_rsp_caption import RspCaption
+from util.pos_embed import get_2d_sincos_pos_embed
 
 
 class RspCaptionJointM3AE(RspCaption):
@@ -42,6 +43,23 @@ class RspCaptionJointM3AE(RspCaption):
             nn.ReLU(),
             nn.Linear(self.decoder_embed_dim, self.stoch_size),
         )
+        
+        # MAE decoder
+        self.language_patch_num = self.context_emb_dim // self.decoder_embed_dim
+        self.mae_decoder_pos_embed = nn.Parameter(
+            torch.zeros(1, self.num_patches + self.language_patch_num, self.decoder_embed_dim),
+            requires_grad=False
+        )
+        mae_decoder_pos_embed = get_2d_sincos_pos_embed(
+            self.mae_decoder_pos_embed.shape[-1],
+            int((self.patch_embed.num_patches+self.language_patch_num)**0.5),
+            cls_token=True,
+        )
+                
+        self.mae_decoder_pos_embed.data.copy_(
+            torch.from_numpy(mae_decoder_pos_embed).float().unsqueeze(0)
+        )
+
 
     def get_feat(self, h, h_context, z):
         # Process deterministic path
@@ -62,7 +80,8 @@ class RspCaptionJointM3AE(RspCaption):
         feat = torch.cat([z, h_concat], dim=1)
         return feat
 
-    def forward_decoder_fut(self, h, h_context, z):
+    def forward_decoder_fut(self, h, context_patch, h_context, z):
+        h = torch.cat([h, context_patch], dim=1)
         kvx_h = self.get_feat(h, h_context, z)
 
         mask_tokens = self.mask_token.repeat(h.shape[0], h.shape[1], 1)
@@ -102,9 +121,48 @@ class RspCaptionJointM3AE(RspCaption):
 
         embedding = self.joint_emb_norm(embedding)
         return embedding
+    
+    def reshape_context(self, embedding):
+        num_patches = embedding.shape[-1] // self.decoder_embed_dim
+        truncated_embedding = self.resize_embed(embedding, num_patches * self.decoder_embed_dim)
+        patchfied_embedding = truncated_embedding.view(-1, num_patches, self.decoder_embed_dim)
+        return patchfied_embedding
 
+    def forward_decoder_mae(self, h, future_embedding, ids_restore):
+        h = self.decoder_embed_mae(h)
+        mask_tokens = self.mask_token.repeat(h.shape[0], ids_restore.shape[1] + 1 - h.shape[1], 1)
+        h_ = torch.cat([h[:, 1:, :], mask_tokens], dim=1)  # no cls token
+        h_ = torch.gather(h_, dim=1, index=ids_restore.unsqueeze(-1).repeat(1, 1, h.shape[2]))  # unshuffle
+        h = torch.cat([h[:, :1, :], h_], dim=1)  # append cls token
+        
+        future_patch = self.reshape_context(future_embedding)
+        _m_future_patch, _, _m_ids_restore = self.random_masking(future_patch, self.mask_ratio)
+        _future_mask_tokens = self.mask_token.repeat(_m_future_patch.shape[0], _m_ids_restore.shape[1] + 1 - _m_future_patch.shape[1], 1)
+        _future_mask_tokens = torch.gather(_future_mask_tokens, dim=1, index=_m_ids_restore.unsqueeze(-1).repeat(1, 1, _m_future_patch.shape[2]))
+        m_future_patch = torch.cat([_m_future_patch, _future_mask_tokens], dim=1)
+        
+        h = torch.cat([h, m_future_patch], dim=1)
+        
+        kvx_h = h + self.mae_decoder_pos_embed
 
-    def forward(self, src_imgs, tgt_imgs, embedding, epoch):
+        # embed tokens
+        mask_tokens = self.mask_token.repeat(h.shape[0], h.shape[1], 1)
+        x = mask_tokens + self.mae_decoder_pos_embed
+
+        # apply Transformer blocks
+        for blk in self.decoder_blocks:
+            x = blk(x, kvx=kvx_h)
+        x = self.decoder_norm(x)
+
+        # predictor projection
+        x = self.decoder_pred(x)
+
+        # remove cls token
+        x = x[:, 1:, :]
+
+        return x
+
+    def forward(self, src_imgs, tgt_imgs, embedding, future_embedding, epoch):
         # Extract embeddings
         src_imgs = src_imgs.reshape(-1, *src_imgs.shape[2:])
         tgt_imgs = tgt_imgs.reshape(-1, *tgt_imgs.shape[2:])
@@ -139,7 +197,7 @@ class RspCaptionJointM3AE(RspCaption):
 
         # MAE
         img_h, mask, ids_restore = self.forward_encoder(tgt_imgs, mask_ratio=self.mask_ratio)
-        pred_masked = self.forward_decoder_mae(img_h, ids_restore)
+        pred_masked = self.forward_decoder_mae(img_h, future_embedding, ids_restore)
         mae_loss = self.forward_loss(tgt_imgs, pred_masked, mask)
 
         with torch.no_grad():

@@ -1,0 +1,20 @@
+# config.yaml
+artifact: ???
+
+# General settings
+device: 0
+dataset: "vip"
+epochs: 199
+model: vit_small
+
+# Evaluation parameters
+eval:
+  topk: 7
+  neighbor: 30
+  queue: 30
+
+# Paths configuration
+paths:
+  data_path: "/data/RSP/VIP_560_560"
+
+# Artifact path (for checkpoints)

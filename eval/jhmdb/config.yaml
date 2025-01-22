@@ -1,0 +1,18 @@
+# configs/jhmdb.yaml
+
+# Training configuration
+epochs: 199  # Number of epochs
+
+artifact: ???
+device: 0
+
+# Evaluation parameters
+eval:
+  topk: 10 # Top-k parameter
+  neighbor: 5  # Neighborhood radius
+  queue: 30  # Video length/queue size
+
+# Path configurations
+paths:
+  data_root: "/data/RSP/"  # Root directory for data
+  val_list: "/data/RSP/JHMDB/val_list.txt"  # Validation list file

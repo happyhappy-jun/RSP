@@ -135,7 +135,6 @@ def train_one_epoch_llm(
         src_samples = batch["src_images"].to(device, non_blocking=True)
         tgt_samples = batch["tgt_images"].to(device, non_blocking=True)
         lm_logits = batch["embeddings"].to(device, non_blocking=True)
-        future_lm = batch["future_embeddings"].to(device, non_blocking=True)
 
         loss, _, detailed_loss = model(
             src_samples, tgt_samples, lm_logits,
