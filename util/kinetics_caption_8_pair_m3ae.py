@@ -236,12 +236,14 @@ if __name__ == "__main__":
     import random
 
     print("\nInitializing dataset...")
-    dataset = PairedKineticsWithCaption8Pair(
+    dataset = PairedKineticsWithCaption8PairM3AE(
         frame_root="/data/kinetics400caption8",
         frame_info_path="/data/kinetics400caption8/frame_info.json",
         embeddings_path="/data/kinetics400caption8/embedding_large.jsonl",
+        future_embeddings_path="/data/kinetics400caption8/future_embedding_large.jsonl",
         frame_info_additional_path="/data/kinetics400caption8/frame_info_additional.json",
-        embeddings_additional_path="/data/kinetics400caption8/embedding_6_pair.jsonl"
+        embeddings_additional_path="/data/kinetics400caption8/embedding_6_pair.jsonl",
+        future_embeddings_additional_path="/data/kinetics400caption8/future_embedding_6_pair.jsonl"
     )
     
     print(f"\nTotal number of valid pairs: {len(dataset)}")
@@ -288,6 +290,8 @@ if __name__ == "__main__":
                 failed_indices.append((idx, "NaN in target images"))
             if torch.isnan(batch['embeddings']).any():
                 failed_indices.append((idx, "NaN in embeddings"))
+            if torch.isnan(batch['future_embeddings']).any():
+                failed_indices.append((idx, "NaN in future embeddings"))
 
     except Exception as e:
         print(f"\nError during validation: {str(e)}")
@@ -309,9 +313,11 @@ if __name__ == "__main__":
     print(f"Source images: {sample_batch['src_images'].shape}")
     print(f"Target images: {sample_batch['tgt_images'].shape}")
     print(f"Embeddings: {sample_batch['embeddings'].shape}")
+    print(f"Future Embeddings: {sample_batch['future_embeddings'].shape}")
     
     # Print shapes of individual samples within the batch
     print("\nIndividual sample shapes in batch:")
     print(f"Source image shape (per sample): {sample_batch['src_images'][0].shape}")
     print(f"Target image shape (per sample): {sample_batch['tgt_images'][0].shape}")
     print(f"Embedding shape (per sample): {sample_batch['embeddings'][0].shape}")
+    print(f"Future embedding shape (per sample): {sample_batch['future_embeddings'][0].shape}")
