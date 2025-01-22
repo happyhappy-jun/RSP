@@ -170,16 +170,23 @@ class PairedKineticsWithCaption8PairM3AE(Dataset):
         # Filter and group valid pairs by video_idx
         self.video_pairs = defaultdict(list)
         missing_embeddings = defaultdict(list)
+        missing_future_embeddings = defaultdict(list)
 
         for video_idx, frame_data in self.results.items():
             for pair in frame_data:
                 key = (video_idx, pair["pair_idx"])
-                if key in self.embeddings and key in self.future_embeddings:
+                has_embedding = key in self.embeddings
+                has_future = key in self.future_embeddings
+                
+                if has_embedding and has_future:
                     pair["embedding"] = self.embeddings[key]
                     pair["future_embedding"] = self.future_embeddings[key]
                     self.video_pairs[video_idx].append(pair)
                 else:
-                    missing_embeddings[video_idx].append(pair["pair_idx"])
+                    if not has_embedding:
+                        missing_embeddings[video_idx].append(pair["pair_idx"])
+                    if not has_future:
+                        missing_future_embeddings[video_idx].append(pair["pair_idx"])
 
         # Convert to list of (video_idx, pairs) for indexing
         self.valid_videos = [
@@ -190,7 +197,9 @@ class PairedKineticsWithCaption8PairM3AE(Dataset):
         print(f"Total videos: {len(self.valid_videos)}")
         print(f"Total pairs found: {sum(len(pairs) for _, pairs in self.valid_videos)}")
         print(f"Total embeddings found: {len(self.embeddings)}")
+        print(f"Total future embeddings found: {len(self.future_embeddings)}")
         print(f"Videos with missing embeddings: {len(missing_embeddings)}")
+        print(f"Videos with missing future embeddings: {len(missing_future_embeddings)}")
 
         # Print some example pair counts
         print("\nExample video pair counts:")
@@ -366,7 +375,7 @@ if __name__ == "__main__":
                 batch["embeddings"].shape[0] == batch["src_images"].shape[0]
             ), f"Batch {idx}: Mismatched batch sizes between images and embeddings"
 
-            # Check for NaN values
+            # Check for NaN values and shapes
             if torch.isnan(batch["src_images"]).any():
                 failed_indices.append((idx, "NaN in source images"))
             if torch.isnan(batch["tgt_images"]).any():
@@ -375,6 +384,12 @@ if __name__ == "__main__":
                 failed_indices.append((idx, "NaN in embeddings"))
             if torch.isnan(batch["future_embeddings"]).any():
                 failed_indices.append((idx, "NaN in future embeddings"))
+                
+            # Verify embedding dimensions
+            if batch['embeddings'].shape[-1] != 512:
+                failed_indices.append((idx, f"Wrong embedding dimension: {batch['embeddings'].shape[-1]}, expected 512"))
+            if batch['future_embeddings'].shape[-1] != 512:
+                failed_indices.append((idx, f"Wrong future embedding dimension: {batch['future_embeddings'].shape[-1]}, expected 512"))
 
     except Exception as e:
         print(f"\nError during validation: {str(e)}")
