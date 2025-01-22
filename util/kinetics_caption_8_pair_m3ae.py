@@ -314,10 +314,10 @@ if __name__ == "__main__":
     dataset = PairedKineticsWithCaption8PairM3AE(
         frame_root="/data/kinetics400caption",
         frame_info_path="/data/kinetics400caption/frame_info.json",
-        embeddings_path="/data/kinetics400caption/embedding_large.jsonl",
-        future_embeddings_path="/data/kinetics400caption/future_embedding_fixed.jsonl",
+        embeddings_path="/data/kinetics400caption/embedding_large_512.jsonl",
+        future_embeddings_path="/data/kinetics400caption/future_embedding_8.jsonl",
         frame_info_additional_path="/data/kinetics400caption/frame_info_additional.json",
-        embeddings_additional_path="/data/kinetics400caption/embedding_6_pair.jsonl",
+        embeddings_additional_path="/data/kinetics400caption/embedding_6_pair_512.jsonl",
     )
 
     print(f"\nTotal number of valid pairs: {len(dataset)}")
