@@ -8,10 +8,10 @@ fi
 
 # Define tasks as arrays of dataset and model pairs
 declare -a tasks=(
-    "ssv2 mae"
-    "ssv2 rsp_cos_proj"
-    "imagenet100 mae"
-    "imagenet100 rsp_cos_proj"
+    "ssv2 cos_cut_8_001"
+    "ssv2 cos_cut_8_imgq_0.005"
+    # "imagenet100 cos_cut_8_001"
+    # "imagenet100 rsp_cos_proj"
 )
 
 # Create a temporary file to track assigned tasks

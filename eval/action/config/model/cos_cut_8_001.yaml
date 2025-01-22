@@ -1,0 +1,13 @@
+defaults:
+  - _self_
+
+
+name: cos_cut_8_001
+finetune: /home/junyoon/RSP/outputs/cut_8_pair_kl0.01_2025-01-20_14-07-12/checkpoint-199.pth
+global_pool: false
+cls_token: true
+weight_decay: 0
+num_classes: ${dataset.nb_classes}
+
+model_kwargs:
+  _target_: timm.models.vision_transformer.vit_small_patch16_224

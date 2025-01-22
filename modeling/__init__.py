@@ -56,4 +56,4 @@ rsp_mse_implicit_vit_small_patch16 = models_mse_implicit.rsp_mse_implicit_vit_sm
 
 rsp_joint_text_qvit_small_patch16 = models_joint_text_q.rsp_joint_text_qvit_small_patch16_dec512d8b
 
-rsp_joint_m3ae_vit_small_patch16 = models_joint_m3ae.rsp_joint_m3ae_vit_small_patch16_dec512d8b()
+# rsp_joint_m3ae_vit_small_patch16 = models_joint_m3ae.rsp_joint_m3ae_vit_small_patch16_dec512d8b()
