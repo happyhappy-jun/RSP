@@ -123,7 +123,10 @@ class PairedKineticsWithCaption8PairM3AE(Dataset):
         else:
             for chunk_result in tqdm.tqdm(results, desc="Merging embeddings"):
                 self.embeddings.update(chunk_result)
-            print(f"\nFinished loading {len(self.embeddings):,} embeddings")
+            if len(self.embeddings) == 0:
+            raise ValueError(f"No embeddings were loaded from {embeddings_path}")
+            
+        print(f"\nFinished loading {len(self.embeddings):,} embeddings")
 
     def __init__(
         self,
@@ -344,6 +347,14 @@ if __name__ == "__main__":
     print("\nValidating dataset by attempting to load all samples...")
     total_samples = len(dataloader)
     failed_indices = []
+
+    if total_samples == 0:
+        print("ERROR: Dataset is empty! No valid samples were loaded.")
+        print("Please check:")
+        print("1. The frame_root path exists and contains images")
+        print("2. The frame_info files contain valid entries")
+        print("3. The embedding files exist and contain matching entries")
+        sys.exit(1)
 
     try:
         for idx, batch in tqdm.tqdm(enumerate(dataloader), total=total_samples):
