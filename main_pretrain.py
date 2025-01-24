@@ -16,7 +16,6 @@ import torch.backends.cudnn as cudnn
 from torch.utils.tensorboard import SummaryWriter
 
 import timm
-assert timm.__version__ == "0.3.2"  # version check
 import timm.optim.optim_factory as optim_factory
 import torch.multiprocessing as mp
 import util.misc as misc

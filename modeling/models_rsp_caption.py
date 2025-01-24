@@ -353,7 +353,7 @@ class RspCaption(nn.Module):
 
         return x
 
-    def forward_decoder_mae(self, h, ids_restore):
+    def forward_decoder_m3ae(self, h, ids_restore):
         h = self.decoder_embed_mae(h)
         mask_tokens = self.mask_token.repeat(h.shape[0], ids_restore.shape[1] + 1 - h.shape[1], 1)
         h_ = torch.cat([h[:, 1:, :], mask_tokens], dim=1)  # no cls token
@@ -508,7 +508,7 @@ class RspCaption(nn.Module):
 
         # MAE
         img_h, mask, ids_restore = self.forward_encoder(tgt_imgs, mask_ratio=self.mask_ratio)
-        pred_masked = self.forward_decoder_mae(img_h, ids_restore)
+        pred_masked = self.forward_decoder_m3ae(img_h, ids_restore)
         mae_loss = self.forward_loss(tgt_imgs, pred_masked, mask)
 
         with torch.no_grad():

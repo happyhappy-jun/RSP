@@ -9,7 +9,12 @@ from util.pos_embed import get_1d_sincos_pos_embed, get_2d_sincos_pos_embed
 
 
 class RspCaptionJointM3AE(RspCaption):
-    """RSP model variant that uses MSE loss instead of KL divergence"""
+    """
+    RSP model variant that uses MSE loss instead of KL divergence with joint M3AE architecture.
+
+    This model combines RSP caption generation with M3AE pretraining for improved
+    multimodal understanding.
+    """
 
     def __init__(
         self,
@@ -23,25 +28,40 @@ class RspCaptionJointM3AE(RspCaption):
         **kwargs
     ):
         super().__init__(*args, **kwargs)
+
+        # Model hyperparameters
         self.cos_scale = cos_scale
         self.image_loss_weight = image_loss_weight
         self.text_loss_weight = text_loss_weight
+        self.language_patch_num = context_emb_dim // self.embed_dim
+        del self.language_type_embed
+        del self.image_type_embed
+
+        # Type embeddings
         self.encoder_image_type_embed = nn.Parameter(
-            torch.zeros(1, self.num_patches + 1, self.embed_dim),
+            torch.zeros(1, self.num_patches + 1, self.embed_dim)
         )
-        nn.init.normal_(self.encoder_image_type_embed, std=0.02)
-        self.joint_emb_language_type_embed = nn.Parameter(
-            torch.zeros(1, 1, self.embed_dim),
+        self.rsp_decoder_language_type_embed = nn.Parameter(
+            torch.zeros(1, 1, self.decoder_embed_dim)
         )
-        nn.init.normal_(self.joint_emb_language_type_embed, std=0.02)
+        self.shard_decoder_image_type_embed = nn.Parameter(
+            torch.zeros(1, self.num_patches + 1, self.decoder_embed_dim)
+        )
+        self.m3ae_enc_language_type_embed = nn.Parameter(
+            torch.zeros(1, self.language_patch_num, self.embed_dim)
+        )
+        self.m3ae_decoder_language_type_embed = nn.Parameter(
+            torch.zeros(1, self.language_patch_num, self.decoder_embed_dim)
+        )
 
-        self.rsp_dec_language_type_embed = nn.Parameter(
-            torch.zeros(1, 1, self.decoder_embed_dim),
-        )
-        nn.init.normal_(self.rsp_dec_language_type_embed, std=0.02)
+        # Initialize type embeddings
+        self._init_type_embeddings()
 
+        # Linear projections
         self.decoder_embed_deter = nn.Linear(self.embed_dim, self.decoder_embed_dim)
+        self.m3ae_decoder_lang_proj = nn.Linear(self.decoder_embed_dim, self.embed_dim)
 
+        # Joint embedding decoder components
         self.joint_emb_decoder = nn.ModuleList(
             [
                 CrossAttentionBlock(
@@ -57,48 +77,39 @@ class RspCaptionJointM3AE(RspCaption):
             nn.Linear(self.embed_dim * 2, self.decoder_embed_dim),
         )
 
-        # MAE decoder
-        self.language_patch_num = context_emb_dim // self.embed_dim
-        self.m3ae_decoder_lang_proj = nn.Linear(self.decoder_embed_dim, self.embed_dim)
+        # MAE decoder components
+        total_patches = 1 + self.num_patches + self.language_patch_num
         self.mae_decoder_pos_embed = nn.Parameter(
-            torch.zeros(
-                1,
-                1 + self.num_patches + self.language_patch_num,
-                self.decoder_embed_dim,
-            ),
-            requires_grad=False,
+            torch.zeros(1, total_patches, self.decoder_embed_dim), requires_grad=False
         )
-        mae_img_decoder_pos_embed = get_2d_sincos_pos_embed(
+        self._init_mae_pos_embeddings()
+
+    def _init_type_embeddings(self):
+        """Initialize all type embeddings with normal distribution."""
+        for param in [
+            self.encoder_image_type_embed,
+            self.rsp_decoder_language_type_embed,
+            self.shard_decoder_image_type_embed,
+            self.m3ae_enc_language_type_embed,
+            self.m3ae_decoder_language_type_embed,
+        ]:
+            nn.init.normal_(param, std=0.02)
+
+    def _init_mae_pos_embeddings(self):
+        """Initialize MAE positional embeddings."""
+        mae_img_pos_embed = get_2d_sincos_pos_embed(
             self.mae_decoder_pos_embed.shape[-1],
-            int((self.patch_embed.num_patches) ** 0.5),
+            int(np.sqrt(self.patch_embed.num_patches)),
             cls_token=True,
         )
-        mae_lang_decoder_pos_embed = get_1d_sincos_pos_embed(
-            self.mae_decoder_pos_embed.shape[-1], int(self.language_patch_num)
+        mae_lang_pos_embed = get_1d_sincos_pos_embed(
+            self.mae_decoder_pos_embed.shape[-1], self.language_patch_num
         )
         mae_decoder_pos_embed = np.concatenate(
-            [mae_img_decoder_pos_embed, mae_lang_decoder_pos_embed], axis=0
+            [mae_img_pos_embed, mae_lang_pos_embed], axis=0
         )
-
         self.mae_decoder_pos_embed.data.copy_(
             torch.from_numpy(mae_decoder_pos_embed).float().unsqueeze(0)
-        )
-
-        self.shard_decoder_image_type_embed = nn.Parameter(
-            torch.zeros(1, self.num_patches + 1, self.decoder_embed_dim),
-        )
-        nn.init.normal_(self.shard_decoder_image_type_embed, std=0.02)
-        self.m3ae_enc_language_type_embed = nn.Parameter(
-            torch.zeros(1, self.language_patch_num, self.embed_dim),
-        )
-        nn.init.normal_(self.m3ae_enc_language_type_embed, std=0.02)
-        self.m3ae_decoder_language_type_embed = nn.Parameter(
-            torch.zeros(1, self.language_patch_num, self.decoder_embed_dim),
-        )
-        nn.init.normal_(self.m3ae_decoder_language_type_embed, std=0.02)
-
-        self.decoder_language_embed_mae = nn.Linear(
-            self.embed_dim, self.decoder_embed_dim, bias=True
         )
 
     def get_feat(self, h, h_context, z):
@@ -106,7 +117,7 @@ class RspCaptionJointM3AE(RspCaption):
         h = self.decoder_embed_deter(h)  # [B, L, decoder_embed_dim]
         h = h + self.decoder_pos_embed  # Add positional embedding
         h = h + self.shard_decoder_image_type_embed
-        h_context = h_context + self.rsp_dec_language_type_embed
+        h_context = h_context + self.rsp_decoder_language_type_embed
 
         # Concatenate along sequence dimension
         h_concat = torch.cat([h, h_context], dim=1)  # [B, L+1, decoder_embed_dim]
@@ -154,8 +165,6 @@ class RspCaptionJointM3AE(RspCaption):
         if len(embedding.shape) == 2:
             embedding = embedding.unsqueeze(1)  # [B, 1, C]
 
-        # Apply cross attention blocks
-        embedding = embedding + self.joint_emb_language_type_embed
         for blk in self.joint_emb_decoder:
             q = blk(q, embedding)
 
@@ -251,7 +260,6 @@ class RspCaptionJointM3AE(RspCaption):
 
     def forward_m3ae_encoder(self, imgs, future_embedding, mask_ratio=0.0):
         x_img = self.patch_embed(imgs)
-
         x_img = x_img + self.pos_embed[:, 1:, :]
         x_img = x_img + self.encoder_image_type_embed[:, 1:, :]
 
@@ -259,15 +267,10 @@ class RspCaptionJointM3AE(RspCaption):
         x_emb = x_emb + self.m3ae_enc_language_type_embed
 
         if mask_ratio != 0.0:
-            # masking: length -> length * mask_ratio
             x_img, mask_img, ids_restore_img = self.random_masking(x_img, mask_ratio)
-        else:
-            mask_img, ids_restore_img = None, None
-
-        if mask_ratio != 0.0:
-            # masking: length -> length * mask_ratio
             x_emb, mask_emb, ids_restore_emb = self.random_masking(x_emb, mask_ratio)
         else:
+            mask_img, ids_restore_img = None, None
             mask_emb, ids_restore_emb = None, None
 
         cls_token = (
@@ -286,44 +289,69 @@ class RspCaptionJointM3AE(RspCaption):
         return x, (mask_img, mask_emb), (ids_restore_img, ids_restore_emb)
 
     def forward_m3ae_loss(self, imgs, future_embed, pred_img, pred_emb, mask=None):
-        image_mask, emb_mask = mask
+        """
+        Calculate M3AE reconstruction loss for both images and embeddings.
+        Args:
+            imgs: Input images
+            future_embed: Future embedding target
+            pred_img: Predicted image reconstructions
+            pred_emb: Predicted embedding reconstructions
+            mask: Optional mask for masked modeling
+        Returns:
+            Tuple of (total_loss, loss_dict)
+        """
+        image_loss = self._compute_image_reconstruction_loss(
+            imgs, pred_img, mask[0] if mask else None
+        )
+        embed_loss = self._compute_embedding_reconstruction_loss(
+            future_embed, pred_emb, mask[1] if mask else None
+        )
+
+        # Combine losses with weights
+        total_loss = (
+            self.image_loss_weight * image_loss + self.text_loss_weight * embed_loss
+        )
+
+        return total_loss, {
+            "loss_img_recon": image_loss,
+            "loss_emb_recon": embed_loss,
+        }
+
+    def _compute_image_reconstruction_loss(self, imgs, pred_img, mask=None):
+        """Compute reconstruction loss for images."""
         target = self.patchify(imgs)
+
+        # Normalize pixels if required
         if self.norm_pix_loss:
             mean = target.mean(dim=-1, keepdim=True)
             var = target.var(dim=-1, keepdim=True)
             target = (target - mean) / (var + 1.0e-4) ** 0.5
 
-        img_recon_loss = (pred_img - target) ** 2
+        # Calculate squared error
+        loss = (pred_img - target) ** 2
 
-        emb_target = self.reshape_context(future_embed)
-        emb_recon_loss = (pred_emb - emb_target) ** 2
-
+        # Apply mask if provided
         if mask is not None:
-            img_recon_loss = img_recon_loss.mean(dim=-1)  # [N, L], mean loss per patch
-            img_recon_loss = (
-                img_recon_loss * image_mask
-            ).sum() / image_mask.sum()  # mean loss on removed patches
-
-            emb_recon_loss = emb_recon_loss.mean(dim=-1)  # [N, L], mean loss per patch
-            emb_recon_loss = (
-                emb_recon_loss * emb_mask
-            ).sum() / emb_mask.sum()  # mean loss on removed patches
-            recon_loss = (
-                self.image_loss_weight * img_recon_loss
-                + self.text_loss_weight * emb_recon_loss
-            )
+            loss = loss.mean(dim=-1)  # Mean over feature dimension
+            loss = (loss * mask).sum() / mask.sum()  # Mean over masked tokens
         else:
-            img_recon_loss = img_recon_loss.mean()
-            emb_recon_loss = emb_recon_loss.mean()
-            recon_loss = (
-                self.image_loss_weight * img_recon_loss
-                + self.text_loss_weight * emb_recon_loss
-            )
+            loss = loss.mean()  # Mean over all dimensions
 
-        return recon_loss, {
-            "loss_img_recon": img_recon_loss,
-            "loss_emb_recon": emb_recon_loss,
-        }
+        return loss
+
+    def _compute_embedding_reconstruction_loss(self, future_embed, pred_emb, mask=None):
+        """Compute reconstruction loss for embeddings."""
+        emb_target = self.reshape_context(future_embed)
+        loss = (pred_emb - emb_target) ** 2
+
+        # Apply mask if provided
+        if mask is not None:
+            loss = loss.mean(dim=-1)  # Mean over feature dimension
+            loss = (loss * mask).sum() / mask.sum()  # Mean over masked tokens
+        else:
+            loss = loss.mean()  # Mean over all dimensions
+
+        return loss
 
     def forward(self, src_imgs, tgt_imgs, embedding, future_embedding, epoch):
         # Extract embeddings

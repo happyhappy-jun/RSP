@@ -25,9 +25,19 @@ async def main():
     
     # Load caption results
     print(f"\nLoading caption results from: {caption_results_path}")
+    results = []
     with open(caption_results_path) as f:
-        results = [json.loads(line) for line in f.readlines()]
-    
+        # Skip empty lines and parse valid JSON lines
+        results = []
+        for line in f:
+            line = line.strip()
+            if line:  # This will skip empty lines
+                try:
+                    results.append(json.loads(line))
+                except json.JSONDecodeError as e:
+                    print(f"Error parsing line: {line[:100]}...")  # Print first 100 chars of problematic line
+                    continue
+
     # Process results
     caption_results = []
     skipped = 0
@@ -37,9 +47,13 @@ async def main():
         if result.get('error'):
             skipped += 1
             continue
-            
-        caption = result["response"]["body"]["choices"][0]["message"]["content"]
-            
+
+        try:
+            caption = result["response"]["body"]["choices"][0]["message"]["content"]
+        except:
+            caption = ""
+            print(f"Error parsing caption for custom_id: {result['custom_id']}")
+
         caption_results.append({
             "custom_id": result["custom_id"],
             "caption": caption

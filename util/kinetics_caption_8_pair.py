@@ -39,7 +39,7 @@ class PairedKineticsWithCaption8Pair(Dataset):
         
         # Optimized for 500GB RAM, 192 cores, and 200GB dataset
         chunk_size = 10000  # ~1GB per chunk (assuming avg 20KB per record)
-        n_jobs = 20  # Slightly less than total cores to leave room for system processes
+        n_jobs = 60  # Slightly less than total cores to leave room for system processes
         
         print(f"Total lines to process: {total_lines:,}")
         print(f"Using {n_jobs} workers with chunk size of {chunk_size:,}")
@@ -227,11 +227,11 @@ if __name__ == "__main__":
 
     print("\nInitializing dataset...")
     dataset = PairedKineticsWithCaption8Pair(
-        frame_root="/data/kinetics400caption8",
-        frame_info_path="/data/kinetics400caption8/frame_info.json",
-        embeddings_path="/data/kinetics400caption8/embedding_large.jsonl",
-        frame_info_additional_path="/data/kinetics400caption8/frame_info_additional.json",
-        embeddings_additional_path="/data/kinetics400caption8/embedding_6_pair.jsonl"
+        frame_root="/data/kinetics400caption",
+        frame_info_path="/data/kinetics400caption/frame_info.json",
+        embeddings_path="/data/kinetics400caption/embedding_large_512.jsonl",
+        frame_info_additional_path="/data/kinetics400caption/frame_info_additional.json",
+        embeddings_additional_path="/data/kinetics400caption/embedding_6_pair_512.jsonl"
     )
     
     print(f"\nTotal number of valid pairs: {len(dataset)}")
