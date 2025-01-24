@@ -1,72 +1,112 @@
 from functools import partial
+import numpy as np
 import torch
 import torch.nn as nn
 
 from modeling.layers import RMSNorm, CrossAttention, CrossAttentionBlock
 from modeling.models_rsp_caption import RspCaption
-from util.pos_embed import get_2d_sincos_pos_embed
+from util.pos_embed import get_1d_sincos_pos_embed, get_2d_sincos_pos_embed
 
 
 class RspCaptionJointM3AE(RspCaption):
     """RSP model variant that uses MSE loss instead of KL divergence"""
 
-    def __init__(self,
-                 *args,
-                 context_emb_dim=3072,
-                 cos_scale=1.0,
-                 embed_decoder_num_heads=8,
-                 embed_decoder_depth=4,
-                 **kwargs):
+    def __init__(
+        self,
+        *args,
+        context_emb_dim=3072,
+        cos_scale=1.0,
+        embed_decoder_num_heads=8,
+        embed_decoder_depth=4,
+        image_loss_weight=1.0,
+        text_loss_weight=1.0,
+        **kwargs
+    ):
         super().__init__(*args, **kwargs)
         self.cos_scale = cos_scale
-        self.image_type_embed = nn.Parameter(
-            torch.zeros(1, self.num_patches + 1, self.decoder_embed_dim),
+        self.image_loss_weight = image_loss_weight
+        self.text_loss_weight = text_loss_weight
+        self.encoder_image_type_embed = nn.Parameter(
+            torch.zeros(1, self.num_patches + 1, self.embed_dim),
         )
-        nn.init.normal_(self.image_type_embed, std=0.02)
-        self.language_type_embed = nn.Parameter(
+        nn.init.normal_(self.encoder_image_type_embed, std=0.02)
+        self.joint_emb_language_type_embed = nn.Parameter(
+            torch.zeros(1, 1, self.embed_dim),
+        )
+        nn.init.normal_(self.joint_emb_language_type_embed, std=0.02)
+
+        self.rsp_dec_language_type_embed = nn.Parameter(
             torch.zeros(1, 1, self.decoder_embed_dim),
         )
-        nn.init.normal_(self.language_type_embed, std=0.02)
+        nn.init.normal_(self.rsp_dec_language_type_embed, std=0.02)
 
-        self.src_tgt_proj = nn.Linear(self.embed_dim, self.decoder_embed_dim)
         self.decoder_embed_deter = nn.Linear(self.embed_dim, self.decoder_embed_dim)
 
-        # self.image_cls_proj = nn.Linear(self.embed_dim * 2, self.decoder_embed_dim)
-        self.joint_emb_decoder = nn.ModuleList([
-            CrossAttentionBlock(self.decoder_embed_dim, self.decoder_embed_dim, embed_decoder_num_heads)
-        for _ in range(embed_decoder_depth)
-        ])
-        self.joint_emb_norm = nn.LayerNorm(self.decoder_embed_dim)
-
-        self.to_posterior = nn.Sequential(
-            nn.Linear(self.decoder_embed_dim, self.decoder_embed_dim),
+        self.joint_emb_decoder = nn.ModuleList(
+            [
+                CrossAttentionBlock(
+                    self.embed_dim, self.embed_dim, embed_decoder_num_heads
+                )
+                for _ in range(embed_decoder_depth)
+            ]
+        )
+        self.joint_emb_norm = nn.LayerNorm(self.embed_dim * 2)
+        self.to_language_prior = nn.Sequential(
+            nn.Linear(self.embed_dim, self.embed_dim * 2),
             nn.ReLU(),
-            nn.Linear(self.decoder_embed_dim, self.stoch_size),
+            nn.Linear(self.embed_dim * 2, self.decoder_embed_dim),
         )
-        
+
         # MAE decoder
-        self.language_patch_num = self.context_emb_dim // self.decoder_embed_dim
+        self.language_patch_num = context_emb_dim // self.embed_dim
+        self.m3ae_decoder_lang_proj = nn.Linear(self.decoder_embed_dim, self.embed_dim)
         self.mae_decoder_pos_embed = nn.Parameter(
-            torch.zeros(1, self.num_patches + self.language_patch_num, self.decoder_embed_dim),
-            requires_grad=False
+            torch.zeros(
+                1,
+                1 + self.num_patches + self.language_patch_num,
+                self.decoder_embed_dim,
+            ),
+            requires_grad=False,
         )
-        mae_decoder_pos_embed = get_2d_sincos_pos_embed(
+        mae_img_decoder_pos_embed = get_2d_sincos_pos_embed(
             self.mae_decoder_pos_embed.shape[-1],
-            int((self.patch_embed.num_patches+self.language_patch_num)**0.5),
+            int((self.patch_embed.num_patches) ** 0.5),
             cls_token=True,
         )
-                
+        mae_lang_decoder_pos_embed = get_1d_sincos_pos_embed(
+            self.mae_decoder_pos_embed.shape[-1], int(self.language_patch_num)
+        )
+        mae_decoder_pos_embed = np.concatenate(
+            [mae_img_decoder_pos_embed, mae_lang_decoder_pos_embed], axis=0
+        )
+
         self.mae_decoder_pos_embed.data.copy_(
             torch.from_numpy(mae_decoder_pos_embed).float().unsqueeze(0)
         )
 
+        self.shard_decoder_image_type_embed = nn.Parameter(
+            torch.zeros(1, self.num_patches + 1, self.decoder_embed_dim),
+        )
+        nn.init.normal_(self.shard_decoder_image_type_embed, std=0.02)
+        self.m3ae_enc_language_type_embed = nn.Parameter(
+            torch.zeros(1, self.language_patch_num, self.embed_dim),
+        )
+        nn.init.normal_(self.m3ae_enc_language_type_embed, std=0.02)
+        self.m3ae_decoder_language_type_embed = nn.Parameter(
+            torch.zeros(1, self.language_patch_num, self.decoder_embed_dim),
+        )
+        nn.init.normal_(self.m3ae_decoder_language_type_embed, std=0.02)
+
+        self.decoder_language_embed_mae = nn.Linear(
+            self.embed_dim, self.decoder_embed_dim, bias=True
+        )
 
     def get_feat(self, h, h_context, z):
         # Process deterministic path
         h = self.decoder_embed_deter(h)  # [B, L, decoder_embed_dim]
         h = h + self.decoder_pos_embed  # Add positional embedding
-        h = h + self.image_type_embed
-        h_context = h_context + self.language_type_embed
+        h = h + self.shard_decoder_image_type_embed
+        h_context = h_context + self.rsp_dec_language_type_embed
 
         # Concatenate along sequence dimension
         h_concat = torch.cat([h, h_context], dim=1)  # [B, L+1, decoder_embed_dim]
@@ -80,8 +120,7 @@ class RspCaptionJointM3AE(RspCaption):
         feat = torch.cat([z, h_concat], dim=1)
         return feat
 
-    def forward_decoder_fut(self, h, context_patch, h_context, z):
-        h = torch.cat([h, context_patch], dim=1)
+    def forward_decoder_fut(self, h, h_context, z):
         kvx_h = self.get_feat(h, h_context, z)
 
         mask_tokens = self.mask_token.repeat(h.shape[0], h.shape[1], 1)
@@ -109,58 +148,182 @@ class RspCaptionJointM3AE(RspCaption):
 
         # Concatenate features and project
         # h = self.image_cls_proj(torch.cat([src_cls, tgt_cls], dim=-1))  # [B, 1, decoder_embed_dim]
-        kv = self.src_tgt_proj(torch.cat([src_cls, tgt_cls], dim=1))
+        q = torch.cat([src_cls, tgt_cls], dim=1)
 
         # Add sequence dimension to embedding if needed
         if len(embedding.shape) == 2:
             embedding = embedding.unsqueeze(1)  # [B, 1, C]
 
         # Apply cross attention blocks
+        embedding = embedding + self.joint_emb_language_type_embed
         for blk in self.joint_emb_decoder:
-            embedding = blk(embedding, kv)
+            q = blk(q, embedding)
 
-        embedding = self.joint_emb_norm(embedding)
-        return embedding
-    
+        q = q.reshape(q.size(0), 1, -1)
+
+        q = self.joint_emb_norm(q)
+        return q
+
     def reshape_context(self, embedding):
-        num_patches = embedding.shape[-1] // self.decoder_embed_dim
-        truncated_embedding = self.resize_embed(embedding, num_patches * self.decoder_embed_dim)
-        patchfied_embedding = truncated_embedding.view(-1, num_patches, self.decoder_embed_dim)
+        truncated_embedding = self.resize_embed(
+            embedding, self.language_patch_num * self.embed_dim
+        )
+        patchfied_embedding = truncated_embedding.view(
+            -1, self.language_patch_num, self.embed_dim
+        )
         return patchfied_embedding
 
-    def forward_decoder_mae(self, h, future_embedding, ids_restore):
+    def forward_decoder_m3ae(self, h, ids_restore):
+        ids_restore_img, ids_restore_emb = ids_restore
+
+        img_len = 1 + int(self.num_patches * (1 - self.mask_ratio))
         h = self.decoder_embed_mae(h)
-        mask_tokens = self.mask_token.repeat(h.shape[0], ids_restore.shape[1] + 1 - h.shape[1], 1)
-        h_ = torch.cat([h[:, 1:, :], mask_tokens], dim=1)  # no cls token
-        h_ = torch.gather(h_, dim=1, index=ids_restore.unsqueeze(-1).repeat(1, 1, h.shape[2]))  # unshuffle
-        h = torch.cat([h[:, :1, :], h_], dim=1)  # append cls token
-        
-        future_patch = self.reshape_context(future_embedding)
-        _m_future_patch, _, _m_ids_restore = self.random_masking(future_patch, self.mask_ratio)
-        _future_mask_tokens = self.mask_token.repeat(_m_future_patch.shape[0], _m_ids_restore.shape[1] + 1 - _m_future_patch.shape[1], 1)
-        _future_mask_tokens = torch.gather(_future_mask_tokens, dim=1, index=_m_ids_restore.unsqueeze(-1).repeat(1, 1, _m_future_patch.shape[2]))
-        m_future_patch = torch.cat([_m_future_patch, _future_mask_tokens], dim=1)
-        
-        h = torch.cat([h, m_future_patch], dim=1)
-        
+        img_h = h[:, :img_len, :]
+        emb_h = h[:, img_len:, :]
+
+        # Handle image part
+        mask_tokens = self.mask_token.repeat(
+            img_h.shape[0], ids_restore_img.shape[1] + 1 - img_h.shape[1], 1
+        )
+        img_h_ = torch.cat([img_h[:, 1:, :], mask_tokens], dim=1)  # no cls token
+        img_h_ = torch.gather(
+            img_h_,
+            dim=1,
+            index=ids_restore_img.unsqueeze(-1).repeat(1, 1, img_h.shape[2]),
+        )  # unshuffle
+        img_h = torch.cat([img_h[:, :1, :], img_h_], dim=1)  # append cls token
+
+        emb_mask_tokens = self.mask_token.repeat(
+            emb_h.shape[0], ids_restore_emb.shape[1] + 1 - emb_h.shape[1], 1
+        )
+        emb_h_ = torch.cat([emb_h, emb_mask_tokens], dim=1)  # no cls token
+        emb_h = torch.gather(
+            emb_h_,
+            dim=1,
+            index=ids_restore_emb.unsqueeze(-1).repeat(1, 1, emb_h.shape[2]),
+        )  # unshuffle
+
+        # Add positional embeddings
+        img_h = img_h + self.shard_decoder_image_type_embed
+        emb_h = emb_h + self.m3ae_decoder_language_type_embed
+
+        # Concatenate all parts
+        h = torch.cat([img_h, emb_h], dim=1)
         kvx_h = h + self.mae_decoder_pos_embed
 
-        # embed tokens
+        # Create input tokens
         mask_tokens = self.mask_token.repeat(h.shape[0], h.shape[1], 1)
         x = mask_tokens + self.mae_decoder_pos_embed
 
-        # apply Transformer blocks
+        # Apply transformer blocks
         for blk in self.decoder_blocks:
             x = blk(x, kvx=kvx_h)
         x = self.decoder_norm(x)
 
-        # predictor projection
-        x = self.decoder_pred(x)
+        # Predictor projection
+        x_img = self.decoder_pred(x[:, : 1 + self.num_patches, :])
+        x_emb = self.m3ae_decoder_lang_proj(x[:, 1 + self.num_patches :, :])
 
-        # remove cls token
-        x = x[:, 1:, :]
+        # Remove cls token
+        x_img = x_img[:, 1:, :]
 
-        return x
+        return x_img, x_emb
+
+    def forward_encoder(self, imgs, mask_ratio=0.0):
+        x = self.patch_embed(imgs)
+        x = x + self.pos_embed[:, 1:, :]
+
+        if mask_ratio != 0.0:
+            # masking: length -> length * mask_ratio
+            x, mask, ids_restore = self.random_masking(x, mask_ratio)
+        else:
+            mask, ids_restore = None, None
+
+        cls_token = self.cls_token + self.pos_embed[:, :1, :]
+        cls_tokens = cls_token.expand(x.shape[0], -1, -1)
+        x = torch.cat((cls_tokens, x), dim=1)
+        x = x + self.encoder_image_type_embed
+
+        for blk in self.blocks:
+            x = blk(x)
+        x = self.norm(x)
+        return x, mask, ids_restore
+
+    def forward_m3ae_encoder(self, imgs, future_embedding, mask_ratio=0.0):
+        x_img = self.patch_embed(imgs)
+
+        x_img = x_img + self.pos_embed[:, 1:, :]
+        x_img = x_img + self.encoder_image_type_embed[:, 1:, :]
+
+        x_emb = self.reshape_context(future_embedding)
+        x_emb = x_emb + self.m3ae_enc_language_type_embed
+
+        if mask_ratio != 0.0:
+            # masking: length -> length * mask_ratio
+            x_img, mask_img, ids_restore_img = self.random_masking(x_img, mask_ratio)
+        else:
+            mask_img, ids_restore_img = None, None
+
+        if mask_ratio != 0.0:
+            # masking: length -> length * mask_ratio
+            x_emb, mask_emb, ids_restore_emb = self.random_masking(x_emb, mask_ratio)
+        else:
+            mask_emb, ids_restore_emb = None, None
+
+        cls_token = (
+            self.cls_token
+            + self.pos_embed[:, :1, :]
+            + self.encoder_image_type_embed[:, :1, :]
+        )
+        cls_tokens = cls_token.expand(x_img.shape[0], -1, -1)
+        x_img = torch.cat((cls_tokens, x_img), dim=1)
+
+        x = torch.cat([x_img, x_emb], dim=1)
+
+        for blk in self.blocks:
+            x = blk(x)
+        x = self.norm(x)
+        return x, (mask_img, mask_emb), (ids_restore_img, ids_restore_emb)
+
+    def forward_m3ae_loss(self, imgs, future_embed, pred_img, pred_emb, mask=None):
+        image_mask, emb_mask = mask
+        target = self.patchify(imgs)
+        if self.norm_pix_loss:
+            mean = target.mean(dim=-1, keepdim=True)
+            var = target.var(dim=-1, keepdim=True)
+            target = (target - mean) / (var + 1.0e-4) ** 0.5
+
+        img_recon_loss = (pred_img - target) ** 2
+
+        emb_target = self.reshape_context(future_embed)
+        emb_recon_loss = (pred_emb - emb_target) ** 2
+
+        if mask is not None:
+            img_recon_loss = img_recon_loss.mean(dim=-1)  # [N, L], mean loss per patch
+            img_recon_loss = (
+                img_recon_loss * image_mask
+            ).sum() / image_mask.sum()  # mean loss on removed patches
+
+            emb_recon_loss = emb_recon_loss.mean(dim=-1)  # [N, L], mean loss per patch
+            emb_recon_loss = (
+                emb_recon_loss * emb_mask
+            ).sum() / emb_mask.sum()  # mean loss on removed patches
+            recon_loss = (
+                self.image_loss_weight * img_recon_loss
+                + self.text_loss_weight * emb_recon_loss
+            )
+        else:
+            img_recon_loss = img_recon_loss.mean()
+            emb_recon_loss = emb_recon_loss.mean()
+            recon_loss = (
+                self.image_loss_weight * img_recon_loss
+                + self.text_loss_weight * emb_recon_loss
+            )
+
+        return recon_loss, {
+            "loss_img_recon": img_recon_loss,
+            "loss_emb_recon": emb_recon_loss,
+        }
 
     def forward(self, src_imgs, tgt_imgs, embedding, future_embedding, epoch):
         # Extract embeddings
@@ -168,13 +331,13 @@ class RspCaptionJointM3AE(RspCaption):
         tgt_imgs = tgt_imgs.reshape(-1, *tgt_imgs.shape[2:])
         embedding = embedding.reshape(-1, embedding.size(-1))
         embedding = embedding.unsqueeze(1)
-        h_context = self.resize_embed(embedding, self.decoder_embed_dim)
+        h_context_embed_dim = self.resize_embed(embedding, self.embed_dim)
         src_h, _, _ = self.forward_encoder(src_imgs, mask_ratio=0)
         tgt_h, _, _ = self.forward_encoder(self.perturb(tgt_imgs), mask_ratio=0)
 
         # Posterior distribution from both images
         # post_h = torch.cat([src_h[:, 0], tgt_h[:, 0]], -1)
-        post_h = self.forward_joint_emb(src_h[:, 0], tgt_h[:, 0], h_context)
+        post_h = self.forward_joint_emb(src_h[:, 0], tgt_h[:, 0], h_context_embed_dim)
         post_logits = self.to_posterior(post_h)
         post_dist = self.make_dist(post_logits)
         post_z = post_dist.rsample()
@@ -186,25 +349,41 @@ class RspCaptionJointM3AE(RspCaption):
         prior_z = prior_dist.rsample()
 
         # Project context to prior space
-        h_context_prime = self.to_language_prior(src_h[:, 0])
+        h_context_prime_decoder_embed_dim = self.to_language_prior(src_h[:, 0])
 
-        tgt_pred = self.forward_decoder_fut(src_h, h_context, post_z)
+        h_context_decoder = self.resize_embed(embedding, self.decoder_embed_dim)
+        tgt_pred = self.forward_decoder_fut(src_h, h_context_decoder, post_z)
         loss_post = self.forward_loss(tgt_imgs, tgt_pred)
         kl_loss, kl_value = self.compute_kl_loss(post_logits, prior_logits)
-        h_context_prime = h_context_prime.view(h_context.shape)  # Ensure same shape as h_context
-        context_loss = 1 - torch.nn.functional.cosine_similarity(h_context.squeeze(1), h_context_prime.squeeze(1), dim=1)
+        h_context_prime_decoder_embed_dim = h_context_prime_decoder_embed_dim.view(
+            h_context_decoder.shape
+        )
+        context_loss = 1 - torch.nn.functional.cosine_similarity(
+            h_context_prime_decoder_embed_dim.squeeze(1),
+            h_context_decoder.squeeze(1),
+            dim=1,
+        )
         context_loss = context_loss.mean()
 
         # MAE
-        img_h, mask, ids_restore = self.forward_encoder(tgt_imgs, mask_ratio=self.mask_ratio)
-        pred_masked = self.forward_decoder_mae(img_h, future_embedding, ids_restore)
-        mae_loss = self.forward_loss(tgt_imgs, pred_masked, mask)
+        x, mask, ids_restore = self.forward_m3ae_encoder(
+            tgt_imgs, future_embedding, mask_ratio=self.mask_ratio
+        )
+        img_pred_masked, emb_pred_masked = self.forward_decoder_m3ae(x, ids_restore)
+        m3ae_loss, m3ae_losses = self.forward_m3ae_loss(
+            tgt_imgs, future_embedding, img_pred_masked, emb_pred_masked, mask
+        )
 
         with torch.no_grad():
-            tgt_pred_prior = self.forward_decoder_fut(src_h, h_context, prior_z)
+            tgt_pred_prior = self.forward_decoder_fut(src_h, h_context_decoder, prior_z)
             loss_prior = self.forward_loss(tgt_imgs, tgt_pred_prior)
 
-        loss = loss_post + self.kl_scale * kl_loss + self.cos_scale * context_loss + mae_loss
+        loss = (
+            loss_post
+            + self.kl_scale * kl_loss
+            + self.cos_scale * context_loss
+            + m3ae_loss
+        )
 
         detailed_loss = {
             "loss_post": loss_post,
@@ -212,7 +391,9 @@ class RspCaptionJointM3AE(RspCaption):
             "loss_kl": kl_loss,
             "kl": kl_value,
             "context_loss": context_loss,
-            "loss_mae": mae_loss,
+            "loss_mae": m3ae_loss,
+            "loss_img_recon": m3ae_losses["loss_img_recon"],
+            "loss_emb_recon": m3ae_losses["loss_emb_recon"],
         }
 
         return loss, tgt_pred, detailed_loss
