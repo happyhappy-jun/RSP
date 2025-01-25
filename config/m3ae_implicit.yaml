@@ -34,7 +34,3 @@ model_params:
   embed_decoder_depth: 4
   kl_scale: 0.005
   cos_scale: 0.1
-
-
-wandb:
-  mode: "offline"  # Set to "disabled" to turn off wandb logging
