@@ -36,6 +36,23 @@ class MemmapPairedKineticsDataset(Dataset):
 
         self.repeated_sampling = repeated_sampling
 
+        # Print dataset statistics
+        print("\nDataset Statistics:")
+        print(f"Total number of videos: {len(self.frame_paths)}")
+        print(f"Total number of samples: {self.dataset_size}")
+        print(f"Repeated sampling per video: {self.repeated_sampling}")
+        
+        # Calculate average pairs per video
+        total_pairs = sum(len(self.frame_paths[str(idx)]) for idx in self.video_indices)
+        avg_pairs = total_pairs / len(self.frame_paths)
+        print(f"Average pairs per video: {avg_pairs:.2f}")
+        
+        # Find min and max pairs
+        min_pairs = min(len(self.frame_paths[str(idx)]) for idx in self.video_indices)
+        max_pairs = max(len(self.frame_paths[str(idx)]) for idx in self.video_indices)
+        print(f"Min pairs per video: {min_pairs}")
+        print(f"Max pairs per video: {max_pairs}")
+
         # Setup transforms
         self.transforms = PairedRandomResizedCrop(seed=42)
         self.basic_transform = transforms.Compose(
