@@ -4,7 +4,7 @@ defaults:
 
 name: baseline_dino
 data_root: /data/RSP
-finetune: ${data_root}/dino_kinetics/checkpoint-199.pth
+finetune: ${.data_root}/dino_kinetics/checkpoint-199.pth
 global_pool: false
 cls_token: true
 weight_decay: 0

@@ -3,7 +3,7 @@
 #SBATCH --job-name=rsp-linprobe
 #SBATCH --output=logs/%j.out
 #SBATCH --error=logs/%j.err
-#SBATCH --gres=gpu:2
+#SBATCH --gres=gpu:4
 #SBATCH --cpus-per-gpu=4
 #SBATCH --mem-per-gpu=32G
 #SBATCH --time=24:00:00
@@ -28,9 +28,11 @@ pipenv shell
 
 # Run training
 torchrun \
-    --nproc_per_node=2 \
+    --nproc_per_node=4 \
     --master_port=$PORT \
     eval/action/main_linprobe.py \
     dataset=${DATASET} \
     model=${MODEL} \
-    data_root=/mnt/nas/slurm_account/junyoon/data/baseline
+    dataset.data_root=/mnt/nas/slurm_account/junyoon/data/ImageNet100 \
+    model.data_root=/mnt/nas/slurm_account/junyoon/data/baseline \
+    batch_size=256
