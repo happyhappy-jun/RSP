@@ -22,6 +22,7 @@ PORT=$(comm -23 <(seq 49152 65535 | sort) <(ss -Htan | awk '{print $4}' | cut -d
 
 cd /mnt/nas/slurm_account/junyoon/RSP
 
+source /mnt/nas/slurm_account/junyoon/.bashrc
 # Use source instead of shell command for pipenv
 source $(pipenv --venv)/bin/activate
 
