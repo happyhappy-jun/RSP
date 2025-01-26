@@ -2,8 +2,9 @@ defaults:
   - _self_
 
 
-name: mae
-finetune: /data/RSP/mae_kinetics/checkpoint-199.pth
+name: baseline_dino
+data_root: /data/RSP
+finetune: ${data_root}/dino_kinetics/checkpoint-199.pth
 global_pool: false
 cls_token: true
 weight_decay: 0
@@ -11,3 +12,4 @@ num_classes: ${dataset.nb_classes}
 
 model_kwargs:
   _target_: timm.models.vision_transformer.vit_small_patch16_224
+

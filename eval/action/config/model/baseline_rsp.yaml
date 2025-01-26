@@ -1,0 +1,15 @@
+defaults:
+  - _self_
+
+
+name: baseline_rsp
+data_root: /data/RSP
+finetune: ${data_root}/rsp_kinetics/rsp_vits16.pth
+global_pool: false
+cls_token: true
+weight_decay: 0
+num_classes: ${dataset.nb_classes}
+
+model_kwargs:
+  _target_: timm.models.vision_transformer.vit_small_patch16_224
+
