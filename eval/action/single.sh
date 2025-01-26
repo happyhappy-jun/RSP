@@ -17,10 +17,13 @@ while getopts "d:m:" opt; do
     esac
 done
 
-PORT=${comm -23 <(seq 49152 65535 | sort) <(ss -Htan | awk '{print $4}' | cut -d':' -f2 | sort -u) | shuf 2>/dev/null | head -n 1}
+# Correct way to assign command output to PORT
+PORT=$(comm -23 <(seq 49152 65535 | sort) <(ss -Htan | awk '{print $4}' | cut -d':' -f2 | sort -u) | shuf 2>/dev/null | head -n 1)
 
 cd /mnt/nas/slurm_account/junyoon/RSP
-pipenv shell
+
+# Use source instead of shell command for pipenv
+source $(pipenv --venv)/bin/activate
 
 # Run training
 torchrun \
