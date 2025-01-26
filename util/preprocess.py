@@ -186,7 +186,6 @@ def create_memmap_dataset(
 
             # Create caption dataset with variable length string support
             caption_dt = h5py.special_dtype(vlen=str)
-            captions_curr = grp.create_dataset('captions', (len(pairs),), dtype=caption_dt)
             captions_future = grp.create_dataset('future_captions', (len(pairs),), dtype=caption_dt)
 
             for i, pair in enumerate(pairs):
@@ -195,7 +194,6 @@ def create_memmap_dataset(
                 grp.create_dataset(f'future_embedding_{i}', data=pair['future_embedding'])
 
                 # Store captions
-                captions_curr[i] = pair['caption']
                 captions_future[i] = pair['future_caption']
 
     # Step 6: Save frame paths
