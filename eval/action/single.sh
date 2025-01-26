@@ -17,9 +17,13 @@ while getopts "d:m:" opt; do
     esac
 done
 
+cd /mnt/nas/slurm_account/junyoon/RSP
+pipenv shell
+
 # Run training
 torchrun \
     --nproc_per_node=2 \
     eval/action/main_linprobe.py \
     dataset=${DATASET} \
-    model=${MODEL}
+    model=${MODEL} \
+    data_root=/mnt/nas/slurm_account/junyoon/data/baseline

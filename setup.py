@@ -17,7 +17,7 @@ setup(
         "openai",
         "pydantic",
         "tensorboard==2.17.0",
-        "timm==0.3.2",
+        "timm==0.6.13",
         "wandb",
     ],
     extras_require={

@@ -28,7 +28,6 @@ from torch.utils.tensorboard import SummaryWriter
 import torchvision.transforms as transforms
 import torchvision.datasets as datasets
 from torchvision.transforms import RandomResizedCrop
-import modeling
 import timm
 
 print(timm.__version__)
