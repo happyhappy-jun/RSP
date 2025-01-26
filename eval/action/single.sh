@@ -17,13 +17,15 @@ while getopts "d:m:" opt; do
     esac
 done
 
+PORT=${comm -23 <(seq 49152 65535 | sort) <(ss -Htan | awk '{print $4}' | cut -d':' -f2 | sort -u) | shuf 2>/dev/null | head -n 1}
+
 cd /mnt/nas/slurm_account/junyoon/RSP
 pipenv shell
 
 # Run training
 torchrun \
     --nproc_per_node=2 \
-    --master_port=${comm -23 <(seq 49152 65535 | sort) <(ss -Htan | awk '{print $4}' | cut -d':' -f2 | sort -u) | shuf 2>/dev/null | head -n 1} \
+    --master_port=$PORT \
     eval/action/main_linprobe.py \
     dataset=${DATASET} \
     model=${MODEL} \
