@@ -39,16 +39,16 @@ class RspCaptionJointM3AEImplicit(RspCaption):
 
         # Type embeddings
         self.encoder_image_type_embed = nn.Parameter(
-            torch.zeros(1, self.num_patches + 1, self.embed_dim)
+            torch.zeros(1, 1, self.embed_dim)
         )
         self.shard_decoder_image_type_embed = nn.Parameter(
-            torch.zeros(1, self.num_patches + 1, self.decoder_embed_dim)
+            torch.zeros(1, 1, self.decoder_embed_dim)
         )
         self.m3ae_enc_language_type_embed = nn.Parameter(
-            torch.zeros(1, self.language_patch_num, self.embed_dim)
+            torch.zeros(1, 1, self.embed_dim)
         )
         self.m3ae_decoder_language_type_embed = nn.Parameter(
-            torch.zeros(1, self.language_patch_num, self.decoder_embed_dim)
+            torch.zeros(1, 1, self.decoder_embed_dim)
         )
 
         # Initialize type embeddings
