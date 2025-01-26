@@ -53,7 +53,6 @@ def create_memmap_dataset(
         frame_info_path: str,
         embeddings_path: str,
         future_embeddings_path: str,
-        captions_path: str,
         future_captions_path: str,
         output_dir: str,
         frame_info_additional_path: str = None,
@@ -149,7 +148,6 @@ def create_memmap_dataset(
 
     embeddings = load_embeddings(embeddings_path, False)
     future_embeddings = load_embeddings(future_embeddings_path, True)
-    captions = load_captions(captions_path)
     future_captions = load_captions(future_captions_path)
 
     if embeddings_additional_path:
@@ -162,11 +160,9 @@ def create_memmap_dataset(
     for video_idx, frame_data in results.items():
         for pair in frame_data:
             key = (video_idx, pair["pair_idx"])
-            if (key in embeddings and key in future_embeddings and
-                    key in captions and key in future_captions):
+            if (key in embeddings and key in future_embeddings and key in future_captions):
                 pair["embedding"] = embeddings[key]
                 pair["future_embedding"] = future_embeddings[key]
-                pair["caption"] = captions[key]
                 pair["future_caption"] = future_captions[key]
                 video_pairs[video_idx].append(pair)
 
@@ -228,7 +224,6 @@ if __name__ == "__main__":
         frame_info_path="/data/kinetics400caption/frame_info.json",
         embeddings_path="/data/kinetics400caption/embedding_large_512.jsonl",
         future_embeddings_path="/data/kinetics400caption/future_embedding_fixed.jsonl",
-        captions_path="/data/kinetics400caption/captions.jsonl",
         future_captions_path="/data/kinetics400caption/future_caption_fixed.jsonl",
         frame_info_additional_path="/data/kinetics400caption/frame_info_additional.json",
         embeddings_additional_path="/data/kinetics400caption/embedding_6_pair_512.jsonl",
