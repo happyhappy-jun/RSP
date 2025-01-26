@@ -28,11 +28,7 @@ from torch.utils.tensorboard import SummaryWriter
 import torchvision.transforms as transforms
 import torchvision.datasets as datasets
 from torchvision.transforms import RandomResizedCrop
-import timm
-
-print(timm.__version__)
-# assert timm.__version__ == "0.3.2"  # version check
-from timm.models.layers import trunc_normal_
+from torch.nn.init import trunc_normal_
 
 import util.misc as misc
 from util.pos_embed import interpolate_pos_embed
