@@ -34,5 +34,5 @@ torchrun \
     dataset=${DATASET} \
     model=${MODEL} \
     dataset.data_root=/mnt/nas/slurm_account/junyoon/data/ImageNet100 \
-    finetune=/mnt/nas/slurm_account/junyoon/RSP/outputs/rsp_m3ae_2025-01-24_14-52-52/checkpoint-199.pth \
+    model.finetune=/mnt/nas/slurm_account/junyoon/RSP/outputs/rsp_m3ae_2025-01-24_14-52-52/checkpoint-199.pth \
     batch_size=256
