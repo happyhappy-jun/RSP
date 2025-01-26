@@ -24,7 +24,7 @@ cd /mnt/nas/slurm_account/junyoon/RSP
 
 source /mnt/nas/slurm_account/junyoon/.bashrc
 # Use source instead of shell command for pipenv
-pipenv shell
+source $(pipenv --venv)/bin/activate
 
 # Run training
 torchrun \
