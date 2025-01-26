@@ -248,7 +248,7 @@ class RspCaptionJointM3AEImplicit(RspCaption):
     def forward_m3ae_encoder(self, imgs, future_embedding, mask_ratio=0.0):
         x_img = self.patch_embed(imgs)
         x_img = x_img + self.pos_embed[:, 1:, :]
-        x_img = x_img + self.encoder_image_type_embed[:, 1:, :]
+        x_img = x_img + self.encoder_image_type_embed
 
         x_emb = self.reshape_context(future_embedding)
         x_emb = x_emb + self.m3ae_enc_language_type_embed
@@ -263,7 +263,7 @@ class RspCaptionJointM3AEImplicit(RspCaption):
         cls_token = (
             self.cls_token
             + self.pos_embed[:, :1, :]
-            + self.encoder_image_type_embed[:, :1, :]
+            + self.encoder_image_type_embed
         )
         cls_tokens = cls_token.expand(x_img.shape[0], -1, -1)
         x_img = torch.cat((cls_tokens, x_img), dim=1)
