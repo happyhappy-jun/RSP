@@ -3,6 +3,7 @@
 #SBATCH --job-name=rsp-linprobe
 #SBATCH --output=logs/%j.out
 #SBATCH --error=logs/%j.err
+#SBATCH --exclude=node10
 #SBATCH --gres=gpu:4
 #SBATCH --cpus-per-gpu=4
 #SBATCH --mem-per-gpu=32G
