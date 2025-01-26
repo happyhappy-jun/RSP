@@ -4,6 +4,7 @@ import torch
 import torch.nn as nn
 import torch.distributed as dist
 import torch.backends.cudnn as cudnn
+from torch.nn.init import trunc_normal_
 from torch.utils.data import DataLoader, DistributedSampler
 from torch.optim.lr_scheduler import CosineAnnealingLR
 from tqdm import tqdm
@@ -16,7 +17,6 @@ import datetime
 import json
 import numpy as np
 
-from timm.models.layers import trunc_normal_
 from util.pos_embed import interpolate_pos_embed
 from util.misc import NativeScalerWithGradNormCount as NativeScaler
 from eval.action.optimizers.lars import LARS

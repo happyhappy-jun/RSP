@@ -1,6 +1,6 @@
 defaults:
   - dataset: imagenet1k
-  - model: mae
+  - model: baseline_mae
 
 # Wandb Configuration
 wandb:
