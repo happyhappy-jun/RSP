@@ -113,9 +113,8 @@ class MemmapPairedKineticsDataset(Dataset):
         src_images = []
         tgt_images = []
         embeddings = []
-        future_embeddings = []
-        caption_tokens = []
-        future_caption_tokens = []
+        future_tokenized_caption = []
+        future_padding_mask = []
 
         video_group = self.data_file[str(video_idx)]
         future_captions = video_group['future_captions']
@@ -134,9 +133,6 @@ class MemmapPairedKineticsDataset(Dataset):
 
             # Load embeddings
             embedding = torch.from_numpy(video_group[f"embedding_{pair_idx}"][:])
-            future_embedding = torch.from_numpy(
-                video_group[f"future_embedding_{pair_idx}"][:]
-            )
 
             # Load and tokenize captions
             future_caption = future_captions[pair_idx]
@@ -145,29 +141,24 @@ class MemmapPairedKineticsDataset(Dataset):
             src_images.append(src_image)
             tgt_images.append(tgt_image)
             embeddings.append(embedding)
-            future_embeddings.append(future_embedding)
-            future_caption_tokens.append(future_caption_token)
+            future_tokenized_caption.append(future_caption_token[0])
+            future_padding_mask.append(future_caption_token[1])
 
         # If we need more samples, repeat the last pair
         while len(src_images) < self.repeated_sampling:
             src_images.append(src_images[-1])
             tgt_images.append(tgt_images[-1])
             embeddings.append(embeddings[-1])
-            future_embeddings.append(future_embeddings[-1])
-            future_caption_tokens.append(future_caption_tokens[-1])
-
-        stacked_future_caption_tokens = {
-            'tokenized_caption': torch.stack([x[0] for x in future_caption_tokens], dim=0),
-            'padding_mask': torch.stack([x[1] for x in future_caption_tokens], dim=0)
-        }
+            future_tokenized_caption.append(future_tokenized_caption[0])
+            future_padding_mask.append(future_padding_mask[1])
 
         return {
             "video_idx": video_idx,
             "src_images": torch.stack(src_images, dim=0),
             "tgt_images": torch.stack(tgt_images, dim=0),
             "embeddings": torch.stack(embeddings, dim=0),
-            "future_embeddings": torch.stack(future_embeddings, dim=0),
-            "future_caption_tokens": stacked_future_caption_tokens
+            "future_tokenized_caption": future_tokenized_caption,
+            "future_padding_mask": future_padding_mask,
         }
 
     def __del__(self):
@@ -183,15 +174,8 @@ def collate_fn(batch):
         "src_images": torch.stack([x["src_images"] for x in batch], dim=0),
         "tgt_images": torch.stack([x["tgt_images"] for x in batch], dim=0),
         "embeddings": torch.stack([x["embeddings"] for x in batch], dim=0),
-        "future_embeddings": torch.stack([x["future_embeddings"] for x in batch], dim=0),
-        "caption_tokens": {
-            'input_ids': torch.stack([x["caption_tokens"]["input_ids"] for x in batch], dim=0),
-            'attention_mask': torch.stack([x["caption_tokens"]["attention_mask"] for x in batch], dim=0)
-        },
-        "future_caption_tokens": {
-            'input_ids': torch.stack([x["future_caption_tokens"]["input_ids"] for x in batch], dim=0),
-            'attention_mask': torch.stack([x["future_caption_tokens"]["attention_mask"] for x in batch], dim=0)
-        }
+        "future_tokenized_caption": torch.stack([x["future_tokenized_caption"] for x in batch], dim=0),
+        "future_padding_mask": torch.stack([x["future_padding_mask"] for x in batch], dim=0),
     }
 
 

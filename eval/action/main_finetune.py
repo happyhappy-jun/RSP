@@ -29,6 +29,7 @@ import torchvision.transforms as transforms
 import torchvision.datasets as datasets
 from torchvision.transforms import RandomResizedCrop
 from torch.nn.init import trunc_normal_
+
 import util.misc as misc
 from util.pos_embed import interpolate_pos_embed
 from util.misc import NativeScalerWithGradNormCount as NativeScaler
@@ -87,7 +88,7 @@ def main(cfg: DictConfig):
         # Default to ImageFolder for other datasets
         dataset_train = datasets.ImageFolder(os.path.join(cfg.dataset.data_root, 'train'), transform=transform_train)
         dataset_val = datasets.ImageFolder(os.path.join(cfg.dataset.data_root, 'val'), transform=transform_val)
-
+    
     print(f"Training dataset: {dataset_train}")
     print(f"Validation dataset: {dataset_val}")
 

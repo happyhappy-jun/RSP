@@ -35,3 +35,14 @@ torchrun \
     model=${MODEL} \
     dataset.data_root=/mnt/nas/slurm_account/junyoon/data/ImageNet100 \
     batch_size=256
+
+export WANDB_API_KEY=9a2952e45b031429827499bf4bd6c86c4be13b65
+export CUDA_VISIBLE_DEVICES=4,5,6,7
+torchrun \
+    --nproc_per_node=4 \
+    --master_port=30413 \
+    eval/action/main_linprobe.py \
+    dataset=ssv2 \
+    model=udr_m3ae \
+    model.finetune=/root/RSP/outputs/rsp_m3ae_2025-01-24_14-52-52/checkpoint-199.pth \
+    batch_size=256

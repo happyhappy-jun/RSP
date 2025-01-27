@@ -17,15 +17,15 @@ class RspCaptionJointM3AEImplicit(RspCaption):
     """
 
     def __init__(
-        self,
-        *args,
-        context_emb_dim=3072,
-        cos_scale=1.0,
-        embed_decoder_num_heads=8,
-        embed_decoder_depth=4,
-        image_loss_weight=1.0,
-        text_loss_weight=1.0,
-        **kwargs
+            self,
+            *args,
+            context_emb_dim=3072,
+            cos_scale=1.0,
+            embed_decoder_num_heads=8,
+            embed_decoder_depth=4,
+            image_loss_weight=1.0,
+            text_loss_weight=1.0,
+            **kwargs
     ):
         super().__init__(*args, **kwargs)
 
@@ -72,6 +72,8 @@ class RspCaptionJointM3AEImplicit(RspCaption):
 
         # MAE decoder components
         total_patches = 1 + self.num_patches + self.language_patch_num
+        self.text_embedding = nn.Embedding(self.vocab_size, self.embed_dim)
+        self.m3ae_encoder_pos_embed = nn.Parameter(torch.zeros(1, total_patches, self.embed_dim), requires_grad=False)
         self.mae_decoder_pos_embed = nn.Parameter(
             torch.zeros(1, total_patches, self.decoder_embed_dim), requires_grad=False
         )
@@ -103,6 +105,47 @@ class RspCaptionJointM3AEImplicit(RspCaption):
         self.mae_decoder_pos_embed.data.copy_(
             torch.from_numpy(mae_decoder_pos_embed).float().unsqueeze(0)
         )
+
+        m3ae_encoder_pos_embed = np.concatenate(
+            get_2d_sincos_pos_embed(self.m3ae_encoder_pos_embed.shape[-1], int(np.sqrt(self.patch_embed.num_patches)),
+                                    cls_token=True),
+            get_1d_sincos_pos_embed(self.m3ae_encoder_pos_embed.shape[-1], self.language_patch_num),
+        )
+        self.m3ae_encoder_pos_embed.data.copy_(torch.from_numpy(m3ae_encoder_pos_embed).float().unsqueeze(0))
+
+    def random_masking(self, x, mask_ratio, padding_mask=None):
+        """
+        Perform per-sample random masking by per-sample shuffling.
+        Per-sample shuffling is done by argsort random noise.
+        x: [N, L, D], sequence
+        """
+        N, L, D = x.shape  # batch, length, dim
+        len_keep = int(L * (1 - mask_ratio))
+
+        noise = torch.rand(N, L, device=x.device)  # noise in [0, 1]
+
+        # sort noise for each sample
+        ids_shuffle = torch.argsort(noise, dim=1)  # ascend: small is keep, large is remove
+        ids_restore = torch.argsort(ids_shuffle, dim=1)
+
+        # keep the first subset
+        ids_keep = ids_shuffle[:, :len_keep]
+        x_masked = torch.gather(x, dim=1, index=ids_keep.unsqueeze(-1).repeat(1, 1, D))
+
+        # generate the binary mask: 0 is keep, 1 is remove
+        mask = torch.ones([N, L], device=x.device)
+        mask[:, :len_keep] = 0
+        # unshuffle to get the binary mask
+        mask = torch.gather(mask, dim=1, index=ids_restore)
+
+        if padding_mask is None:
+            return x_masked, mask, ids_restore
+
+        # Handle padding mask if provided
+        padding_mask_kept = torch.gather(padding_mask, dim=1, index=ids_keep)
+
+        return x_masked, mask, ids_restore, padding_mask_kept
+
 
     def get_feat(self, h, z):
         # Process deterministic path
@@ -218,7 +261,7 @@ class RspCaptionJointM3AEImplicit(RspCaption):
 
         # Predictor projection
         x_img = self.decoder_pred(x[:, : 1 + self.num_patches, :])
-        x_emb = self.m3ae_decoder_lang_proj(x[:, 1 + self.num_patches :, :])
+        x_emb = self.m3ae_decoder_lang_proj(x[:, 1 + self.num_patches:, :])
 
         # Remove cls token
         x_img = x_img[:, 1:, :]
@@ -245,25 +288,26 @@ class RspCaptionJointM3AEImplicit(RspCaption):
         x = self.norm(x)
         return x, mask, ids_restore
 
-    def forward_m3ae_encoder(self, imgs, future_embedding, mask_ratio=0.0):
+    def forward_m3ae_encoder(self, imgs, future_tokenized_caption, future_padding_mask, mask_ratio=0.0):
         x_img = self.patch_embed(imgs)
-        x_img = x_img + self.pos_embed[:, 1:, :]
+        x_img = x_img + self.m3ae_encoder_pos_embed[:, 1:self.num_patches + 1, :]
         x_img = x_img + self.encoder_image_type_embed
 
-        x_emb = self.reshape_context(future_embedding)
+        x_emb = self.text_embedding(future_tokenized_caption)
+        x_emb = x_emb + self.m3ae_encoder_pos_embed[:, self.num_patches + 1:, :]
         x_emb = x_emb + self.m3ae_enc_language_type_embed
 
         if mask_ratio != 0.0:
             x_img, mask_img, ids_restore_img = self.random_masking(x_img, mask_ratio)
-            x_emb, mask_emb, ids_restore_emb = self.random_masking(x_emb, mask_ratio)
+            x_emb, mask_emb, ids_restore_emb, emb_padding_mask = self.random_masking(x_emb, mask_ratio)
         else:
             mask_img, ids_restore_img = None, None
-            mask_emb, ids_restore_emb = None, None
+            mask_emb, ids_restore_emb, emb_padding_mask = None, None, None
 
         cls_token = (
-            self.cls_token
-            + self.pos_embed[:, :1, :]
-            + self.encoder_image_type_embed
+                self.cls_token
+                + self.pos_embed[:, :1, :]
+                + self.encoder_image_type_embed
         )
         cls_tokens = cls_token.expand(x_img.shape[0], -1, -1)
         x_img = torch.cat((cls_tokens, x_img), dim=1)
@@ -296,7 +340,7 @@ class RspCaptionJointM3AEImplicit(RspCaption):
 
         # Combine losses with weights
         total_loss = (
-            self.image_loss_weight * image_loss + self.text_loss_weight * embed_loss
+                self.image_loss_weight * image_loss + self.text_loss_weight * embed_loss
         )
 
         return total_loss, {
@@ -340,7 +384,7 @@ class RspCaptionJointM3AEImplicit(RspCaption):
 
         return loss
 
-    def forward(self, src_imgs, tgt_imgs, embedding, future_embedding, epoch):
+    def forward(self, src_imgs, tgt_imgs, embedding, future_caption_tokens, future_padding_mask, epoch):
         # Extract embeddings
         src_imgs = src_imgs.reshape(-1, *src_imgs.shape[2:])
         tgt_imgs = tgt_imgs.reshape(-1, *tgt_imgs.shape[2:])
@@ -370,7 +414,7 @@ class RspCaptionJointM3AEImplicit(RspCaption):
 
         # MAE
         x, mask, ids_restore = self.forward_m3ae_encoder(
-            tgt_imgs, future_embedding, mask_ratio=self.mask_ratio
+            tgt_imgs, future_caption_tokens, future_padding_mask, mask_ratio=self.mask_ratio
         )
         img_pred_masked, emb_pred_masked = self.forward_decoder_m3ae(x, ids_restore)
         m3ae_loss, m3ae_losses = self.forward_m3ae_loss(
@@ -382,9 +426,9 @@ class RspCaptionJointM3AEImplicit(RspCaption):
             loss_prior = self.forward_loss(tgt_imgs, tgt_pred_prior)
 
         loss = (
-            loss_post
-            + self.kl_scale * kl_loss
-            + m3ae_loss
+                loss_post
+                + self.kl_scale * kl_loss
+                + m3ae_loss
         )
 
         detailed_loss = {
