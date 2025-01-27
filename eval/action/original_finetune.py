@@ -23,7 +23,6 @@ import torch
 import torch.backends.cudnn as cudnn
 from torchvision.transforms import transforms
 
-from eval.vip.ATEN.keras_convGRU.tests.test_loss_weighting import num_classes
 from timm.data import IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD, create_transform
 from torch.utils.tensorboard import SummaryWriter
 
@@ -83,7 +82,6 @@ def build_transform(is_train, args):
 
 def get_args_parser():
     parser = argparse.ArgumentParser('MAE fine-tuning for image classification', add_help=False)
-    parser.add_argument('--data_root', default='/datasets01_101/imagenet_full_size/061417/', type=str)
     parser.add_argument('--batch_size', default=64, type=int,
                         help='Batch size per GPU (effective batch size is batch_size * accum_iter * # gpus')
     parser.add_argument('--epochs', default=50, type=int)
@@ -213,8 +211,8 @@ def main(args):
 
     cudnn.benchmark = True
 
-    dataset_train = datasets.ImageFolder(os.path.join(args.data_root, 'train'), transform=build_transform(True, args))
-    dataset_val = datasets.ImageFolder(os.path.join(args.data_root, 'val'), transform=build_transform(False, args))
+    dataset_train = datasets.ImageFolder(os.path.join(args.data_path, 'train'), transform=build_transform(True, args))
+    dataset_val = datasets.ImageFolder(os.path.join(args.data_path, 'val'), transform=build_transform(False, args))
 
     if True:  # args.distributed:
         num_tasks = misc.get_world_size()
