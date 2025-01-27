@@ -3,7 +3,6 @@
 #SBATCH --job-name=rsp-linprobe
 #SBATCH --output=logs/%j.out
 #SBATCH --error=logs/%j.err
-#SBATCH --exclude=node10
 #SBATCH --gres=gpu:4
 #SBATCH --cpus-per-gpu=4
 #SBATCH --mem-per-gpu=32G
@@ -35,5 +34,4 @@ torchrun \
     dataset=${DATASET} \
     model=${MODEL} \
     dataset.data_root=/mnt/nas/slurm_account/junyoon/data/ImageNet100 \
-    model.finetune=/mnt/nas/slurm_account/junyoon/RSP/outputs/rsp_m3ae_2025-01-24_14-52-52/checkpoint-199.pth \
     batch_size=256

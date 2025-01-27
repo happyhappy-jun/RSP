@@ -1,0 +1,13 @@
+defaults:
+  - _self_
+
+
+name: udr_implicit
+finetune: /mnt/nas/slurm_account/junyoon/RSP/outputs/rsp_joint_implicit_vit_small_patch16_2025-01-25_21-23-15/checkpoint-199.pth
+global_pool: false
+cls_token: true
+weight_decay: 0
+num_classes: ${dataset.nb_classes}
+
+model_kwargs:
+  _target_: timm.models.vision_transformer.vit_small_patch16_224
