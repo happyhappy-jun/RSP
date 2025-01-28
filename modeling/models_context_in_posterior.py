@@ -27,8 +27,11 @@ class RspContextInPosterior(RspCaption):
         else:
             self.rms_norm = nn.Identity()
             
-        self.context_proj = nn.Linear(context_embed_dim, self.decoder_embed_dim)
         nn.init.normal_(self.context_proj.weight, std=0.02)
+        self.to_language_prior = None
+        self.language_type_embed = None
+        self.image_type_embed = None
+
 
     def forward(self, src_imgs, tgt_imgs, embedding, epoch):
         # Extract embeddings
@@ -41,7 +44,7 @@ class RspContextInPosterior(RspCaption):
 
         # Posterior distribution from both images
         # h_context = self.resize_embed(embedding, self.embed_dim)
-        h_context = self.context_proj(embedding)
+        h_context = self.resize_embed(embedding, self.embed_dim)
         h_context = self.rms_norm(h_context)
         
         post_h = torch.cat([src_h[:, 0], tgt_h[:, 0], h_context], -1)

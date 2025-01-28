@@ -9,10 +9,19 @@ model_name: rsp_context_in_posterior_vit_small_patch16
 data_root: /root
 
 dataset:
-  _target_: util.kinetics_caption.PairedKineticsWithCaption
-  frame_root: ${..data_root}/kinetics400caption/frames
+#  _target_: util.kinetics_caption_8_pair.PairedKineticsWithCaption8Pair
+#  frame_root: ${..data_root}/kinetics400caption
+#  frame_info_path: ${..data_root}/kinetics400caption/frame_info.json
+#  embeddings_path: ${..data_root}/kinetics400caption/embedding_large_512.jsonl
+#  frame_info_additional_path: ${..data_root}/kinetics400caption/frame_info_additional.json
+#  embeddings_additional_path: ${..data_root}/kinetics400caption/embedding_6_pair_512.jsonl
+  _target_: util.kinetics_caption_8_pair.PairedKineticsWithCaption8Pair
+  frame_root: ${..data_root}/kinetics400caption
   frame_info_path: ${..data_root}/kinetics400caption/frame_info.json
-  embeddings_path: ${..data_root}/kinetics400caption/embeddings.jsonl
+  embeddings_path: ${..data_root}/kinetics400caption/embedding_large_512.jsonl
+  frame_info_additional_path: ${..data_root}/kinetics400caption/frame_info_additional.json
+  embeddings_additional_path: ${..data_root}/kinetics400caption/embedding_6_pair_512.jsonl
+
 
 train_loop:
   _target_: engine_pretrain_repsamp.train_one_epoch_llm
@@ -20,5 +29,5 @@ train_loop:
 
 model_params:
   kl_scale: 0.001
-  enable_rms_norm: true
+  enable_rms_norm: false
   embed_scale_factor: 1.0
