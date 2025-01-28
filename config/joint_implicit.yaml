@@ -9,7 +9,13 @@ model_name: rsp_joint_implicit_vit_small_patch16
 data_root: /data
 
 dataset:
-  _target_: util.kinetics_caption_8_pair.PairedKineticsWithCaption8Pair
+#  _target_: util.kinetics_caption_8_pair.PairedKineticsWithCaption8Pair
+#  frame_root: ${..data_root}/kinetics400caption
+#  frame_info_path: ${..data_root}/kinetics400caption/frame_info.json
+#  embeddings_path: ${..data_root}/kinetics400caption/embedding_large_512.jsonl
+#  frame_info_additional_path: ${..data_root}/kinetics400caption/frame_info_additional.json
+#  embeddings_additional_path: ${..data_root}/kinetics400caption/embedding_6_pair_512.jsonl
+  _target_: util.kinetics_caption8_pair_test.EfficientDataset
   frame_root: ${..data_root}/kinetics400caption
   frame_info_path: ${..data_root}/kinetics400caption/frame_info.json
   embeddings_path: ${..data_root}/kinetics400caption/embedding_large_512.jsonl
