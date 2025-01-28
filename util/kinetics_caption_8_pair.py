@@ -23,7 +23,7 @@ def process_lines(lines):
             video_idx = int(parts[1])
             pair_idx = int(parts[-1])
             embedding = record[1]['data'][0]['embedding']
-            results[(video_idx, pair_idx)] = np.array(embedding, dtype=np.float32)[:512]
+            results[(video_idx, pair_idx)] = np.array(embedding, dtype=np.float32)[:384]
         except Exception as e:
             print(f"Error processing line: {e}")
     return results
