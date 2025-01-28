@@ -6,7 +6,7 @@ import os
 client = openai.OpenAI(api_key=os.environ.get('OPENAI_API_KEY'))
 
 # Get the timestamp for cutoff
-cutoff = datetime(2025, 1, 17, 13, 0, 0).timestamp()
+cutoff = datetime(2025, 1, 23, 13, 0, 0).timestamp()
 
 # Initialize counters and storage
 total_files = 0

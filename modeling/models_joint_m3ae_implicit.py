@@ -169,7 +169,7 @@ class RspCaptionJointM3AEImplicit(RspCaption):
         )
         return patchfied_embedding
 
-    def forward_decoder_m3ae(self, h, ids_restore):
+    def forward_decoder_mae(self, h, ids_restore):
         ids_restore_img, ids_restore_emb = ids_restore
 
         img_len = 1 + int(self.num_patches * (1 - self.mask_ratio))
@@ -372,7 +372,7 @@ class RspCaptionJointM3AEImplicit(RspCaption):
         x, mask, ids_restore = self.forward_m3ae_encoder(
             tgt_imgs, future_embedding, mask_ratio=self.mask_ratio
         )
-        img_pred_masked, emb_pred_masked = self.forward_decoder_m3ae(x, ids_restore)
+        img_pred_masked, emb_pred_masked = self.forward_decoder_mae(x, ids_restore)
         m3ae_loss, m3ae_losses = self.forward_m3ae_loss(
             tgt_imgs, future_embedding, img_pred_masked, emb_pred_masked, mask
         )
