@@ -27,7 +27,6 @@ class RspContextInPosterior(RspCaption):
         else:
             self.rms_norm = nn.Identity()
             
-        nn.init.normal_(self.context_proj.weight, std=0.02)
         self.to_language_prior = None
         self.language_type_embed = None
         self.image_type_embed = None
