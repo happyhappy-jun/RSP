@@ -18,15 +18,6 @@ class RspCaptionJointImplicit(RspCaption):
                  **kwargs):
         super().__init__(*args, **kwargs)
         self.cos_scale = cos_scale
-        self.image_type_embed = nn.Parameter(
-            torch.zeros(1, self.num_patches + 1, self.decoder_embed_dim),
-        )
-        nn.init.normal_(self.image_type_embed, std=0.02)
-        self.language_type_embed = nn.Parameter(
-            torch.zeros(1, 1, self.decoder_embed_dim),
-        )
-        nn.init.normal_(self.language_type_embed, std=0.02)
-
         self.decoder_embed_deter = nn.Linear(self.embed_dim, self.decoder_embed_dim)
 
         self.joint_emb_decoder = nn.ModuleList([
