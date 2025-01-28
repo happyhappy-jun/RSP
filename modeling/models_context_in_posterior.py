@@ -43,6 +43,7 @@ class RspContextInPosterior(RspCaption):
 
         # Posterior distribution from both images
         # h_context = self.resize_embed(embedding, self.embed_dim)
+        embedding = embedding.unsqueeze(1)
         h_context = self.resize_embed(embedding, self.embed_dim)
         h_context = self.rms_norm(h_context)
         
