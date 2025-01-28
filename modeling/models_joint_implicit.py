@@ -25,6 +25,9 @@ class RspCaptionJointImplicit(RspCaption):
         for _ in range(embed_decoder_depth)
         ])
         self.joint_emb_norm = nn.LayerNorm(self.embed_dim *2)
+        self.to_language_prior = None
+        self.language_type_embed = None
+        self.image_type_embed = None
 
     def get_feat(self, h, z):
         # Process deterministic path
