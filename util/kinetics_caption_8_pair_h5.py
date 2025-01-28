@@ -1,7 +1,10 @@
 import h5py
 import torch
 import random
+import cv2
+import ast
 import numpy as np
+import os
 from torch.utils.data import Dataset
 from torchvision import transforms
 from util.transform import PairedRandomResizedCrop
@@ -11,26 +14,36 @@ class PairedKineticsWithCaption8PairH5(Dataset):
     def __init__(
             self,
             h5_path,
+            data_root,
             repeated_sampling=2
     ):
         super().__init__()
         self.h5_path = h5_path
+        self.data_root = data_root
         self.repeated_sampling = repeated_sampling
 
         # Open H5 file in read mode
         self.h5_file = h5py.File(h5_path, 'r')
 
-        # Get all valid video-pair combinations
+        # Get all video-pair combinations
         self.valid_pairs = []
-        for video_idx in self.h5_file['images'].keys():
-            video_group = self.h5_file['images'][video_idx]
-            pairs = [(video_idx, pair_idx) for pair_idx in video_group.keys()]
-            if pairs:
-                self.valid_pairs.append((video_idx, pairs))
+        for key in self.h5_file['frame_paths'].keys():
+            video_idx, pair_idx = key.split('_')
+            self.valid_pairs.append((video_idx, pair_idx))
+
+        # Group pairs by video_idx
+        self.video_pairs = {}
+        for video_idx, pair_idx in self.valid_pairs:
+            if video_idx not in self.video_pairs:
+                self.video_pairs[video_idx] = []
+            self.video_pairs[video_idx].append(pair_idx)
+
+        # Convert to list for indexing
+        self.videos = list(self.video_pairs.items())
 
         print(f"\nDataset Statistics:")
-        print(f"Total videos: {len(self.valid_pairs)}")
-        print(f"Total pairs: {sum(len(pairs) for _, pairs in self.valid_pairs)}")
+        print(f"Total videos: {len(self.videos)}")
+        print(f"Total pairs: {len(self.valid_pairs)}")
 
         # Setup transforms
         self.transforms = PairedRandomResizedCrop(seed=42)
@@ -43,14 +56,28 @@ class PairedKineticsWithCaption8PairH5(Dataset):
         ])
 
     def __len__(self):
-        return len(self.valid_pairs)
+        return len(self.videos)
+
+    def load_frame(self, frame_path):
+        """Load and convert frame to RGB"""
+        frame = cv2.imread(frame_path)
+        if frame is None:
+            raise ValueError(f"Failed to load frame from path: {frame_path}")
+        return cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
     def _load_pair(self, video_idx, pair_idx):
         """Load a single pair of frames and its embedding"""
-        # Get frame data
-        pair_group = self.h5_file['images'][video_idx][pair_idx]
-        frame_cur = pair_group['frame_cur'][:]
-        frame_fut = pair_group['frame_fut'][:]
+        # Get frame paths
+        paths_data = self.h5_file['frame_paths'][f"{video_idx}_{pair_idx}"][()]
+        paths_dict = ast.literal_eval(paths_data)
+
+        # Construct full paths based on whether it's from additional dataset
+        frame_cur_path = os.path.join(self.data_root, paths_dict['frame_cur'])
+        frame_fut_path = os.path.join(self.data_root, paths_dict['frame_fut'])
+
+        # Load frames
+        frame_cur = self.load_frame(frame_cur_path)
+        frame_fut = self.load_frame(frame_fut_path)
 
         # Apply transforms
         src_image, tgt_image = self.transforms(frame_cur, frame_fut)
@@ -65,21 +92,19 @@ class PairedKineticsWithCaption8PairH5(Dataset):
 
     def __getitem__(self, index):
         # Get video and its pairs
-        video_idx, video_pairs = self.valid_pairs[index]
+        video_idx, pair_indices = self.videos[index]
 
         src_images = []
         tgt_images = []
         embeddings = []
 
         # Randomly sample pairs for this video
-        sampled_pairs = random.sample(video_pairs,
-                                      min(self.repeated_sampling, len(video_pairs)))
+        sampled_pairs = random.sample(pair_indices,
+                                      min(self.repeated_sampling, len(pair_indices)))
 
         # Process each sampled pair
-        for _, pair_idx in sampled_pairs:
-            src_image, tgt_image, embedding = self._load_pair(
-                str(video_idx), str(pair_idx)
-            )
+        for pair_idx in sampled_pairs:
+            src_image, tgt_image, embedding = self._load_pair(video_idx, pair_idx)
             src_images.append(src_image)
             tgt_images.append(tgt_image)
             embeddings.append(embedding)
@@ -119,53 +144,11 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     parser.add_argument('--h5_path', type=str, required=True)
+    parser.add_argument('--data_root', type=str, required=True)
     args = parser.parse_args()
 
     print("\nInitializing dataset...")
     dataset = PairedKineticsWithCaption8PairH5(
-        h5_path=args.h5_path
+        h5_path=args.h5_path,
+        data_root=args.data_root
     )
-
-    # Create dataloader with small batch size for validation
-    dataloader = DataLoader(
-        dataset,
-        batch_size=4,
-        shuffle=False,
-        num_workers=2,
-        collate_fn=collate_fn
-    )
-
-    print("\nValidating dataset by attempting to load all samples...")
-    total_samples = len(dataloader)
-    failed_indices = []
-
-    try:
-        for idx, batch in tqdm.tqdm(enumerate(dataloader), total=total_samples):
-            # Verify batch contents
-            assert batch['src_images'].shape[0] == batch['tgt_images'].shape[0], \
-                f"Batch {idx}: Mismatched batch sizes between source and target images"
-            assert batch['embeddings'].shape[0] == batch['src_images'].shape[0], \
-                f"Batch {idx}: Mismatched batch sizes between images and embeddings"
-
-            # Check for NaN values
-            if torch.isnan(batch['src_images']).any():
-                failed_indices.append((idx, "NaN in source images"))
-            if torch.isnan(batch['tgt_images']).any():
-                failed_indices.append((idx, "NaN in target images"))
-            if torch.isnan(batch['embeddings']).any():
-                failed_indices.append((idx, "NaN in embeddings"))
-
-    except Exception as e:
-        print(f"\nError during validation: {str(e)}")
-        sys.exit(1)
-
-    print("\nDataset validation complete!")
-    print(f"Successfully processed {total_samples} batches")
-
-    if failed_indices:
-        print("\nWarning: Found issues in the following batches:")
-        for idx, issue in failed_indices:
-            print(f"Batch {idx}: {issue}")
-    else:
-        print("No issues found. All samples are valid and accessible.")
-
