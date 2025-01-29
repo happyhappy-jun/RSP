@@ -19,73 +19,79 @@ class PairedKineticsWithGlobalCaption(Dataset):
 
     def __init__(
             self,
-            root,  # Root directory containing videos
-            caption_path,
-            embeddings_path,  # Path to embeddings.jsonl
-            max_distance=48,
+            frame_root,  # Root directory containing frames
+            frame_info_path,  # Path to global_frame.json
+            embeddings_path,  # Path to global_embedding.jsonl
             repeated_sampling=2,
             seed=42
     ):
         super().__init__()
         seed_everything(seed)
 
-        self.root = root
-        self.video_root = os.path.join(self.root, "train2")
-        self.max_distance = max_distance
+        self.frame_root = frame_root
         self.repeated_sampling = repeated_sampling
 
-        # Load video samples from pickle
-        with open(os.path.join(self.root, "labels", f"label_full_1.0.pickle"), "rb") as f:
-            self.samples = pickle.load(f)
-
-        self.captions = json.load(open(caption_path))["results"]
-        self.data = dict()
-        for item in self.captions:
-            self.data[item["custom_id"]] = {
-                "label": item["label"],
-                "video_name": item["video_name"],
+        # Load frame info
+        print("Loading frame info...")
+        with open(frame_info_path, 'r') as f:
+            frame_info = json.load(f)
+            self.frame_data = {
+                f"video_{video['video_idx']}": {
+                    'video_idx': video['video_idx'],
+                    'frame_paths': [os.path.join(self.frame_root, path) for path in video['frame_paths']],
+                    'frame_indices': video['frame_indices'],
+                    'class_label': video['class_label']
+                }
+                for video in frame_info['videos']
             }
 
+        # Load embeddings
+        print("Loading embeddings...")
+        self.embeddings = {}
         with open(embeddings_path, 'r') as f:
             for line in f:
                 record = json.loads(line)
                 custom_id = record[-1]["custom_id"]
                 embedding = record[1]["data"][0]["embedding"]
-                self.data[custom_id]["embedding"] = embedding
+                self.embeddings[custom_id] = embedding
 
-        # Filter samples to only those with embeddings
-        self.valid_samples = [video_path.split(".")[0] for _, video_path in self.samples]
-        self.data = [v for _, v in self.data.items() if v["video_name"] not in self.valid_samples]
+        # Match frame data with embeddings
+        self.valid_videos = []
+        for custom_id, frame_info in self.frame_data.items():
+            if custom_id in self.embeddings:
+                frame_info['embedding'] = self.embeddings[custom_id]
+                self.valid_videos.append(frame_info)
 
         # Setup transforms
         self.transforms = PairedRandomResizedCrop(seed=seed)
         self.basic_transform = transforms.Compose([
             transforms.ToTensor(),
             transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                                 std=[0.229, 0.224, 0.225])
+                              std=[0.229, 0.224, 0.225])
         ])
 
         print(f"\nDataset Statistics:")
-        print(f"Total videos found: {len(self.data)}")
+        print(f"Total videos found: {len(self.valid_videos)}")
+        print(f"Total frames per video: {len(self.valid_videos[0]['frame_paths']) if self.valid_videos else 0}")
 
-    def load_frames(self, vr):
-        """Sample two frames with temporal constraint"""
-        seg_len = len(vr)
-        least_frames_num = self.max_distance + 1
+    def load_frame(self, frame_path):
+        """Load and convert frame to RGB"""
+        frame = cv2.imread(frame_path)
+        if frame is None:
+            raise ValueError(f"Failed to load frame from path: {frame_path}")
+        return cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
-        if seg_len >= least_frames_num:
-            idx_cur = random.randint(0, seg_len - least_frames_num)
-            interval = random.randint(4, self.max_distance)
-            idx_fut = idx_cur + interval
-        else:
-            indices = random.sample(range(seg_len), 2)
-            indices.sort()
-            idx_cur, idx_fut = indices
-
-        frame_cur = vr[idx_cur].asnumpy()
-        frame_fut = vr[idx_fut].asnumpy()
-
-        return frame_cur, frame_fut, (idx_cur, idx_fut)
+    def sample_frame_pairs(self, frame_paths):
+        """Sample pairs of frames from available frames"""
+        num_frames = len(frame_paths)
+        pairs = []
+        for _ in range(self.repeated_sampling):
+            # Randomly select two different indices
+            idx1, idx2 = random.sample(range(num_frames), 2)
+            if idx1 > idx2:
+                idx1, idx2 = idx2, idx1
+            pairs.append((idx1, idx2))
+        return pairs
 
     def transform(self, src_image, tgt_image):
         """Apply transforms to image pair"""
@@ -95,35 +101,36 @@ class PairedKineticsWithGlobalCaption(Dataset):
         return src_image, tgt_image
 
     def __len__(self):
-        return len(self.valid_samples)
+        return len(self.valid_videos)
 
     def __getitem__(self, index):
-        try:
-            video_path = os.path.join(self.video_root, self.data[index]["label"], self.data[index]["video_name"] + ".mp4")
-            vr = VideoReader(video_path, num_threads=1, ctx=cpu(0))
-
-            src_images = []
-            tgt_images = []
-            frame_indices = []
-
-            # Sample frames multiple times
-            for _ in range(self.repeated_sampling):
-                src_image, tgt_image, indices = self.load_frames(vr)
-                src_image, tgt_image = self.transform(src_image, tgt_image)
-
-                src_images.append(src_image)
-                tgt_images.append(tgt_image)
-                frame_indices.append(indices)
-
-        except Exception as e:
-            print(f"Error loading index {index}: {str(e)}")
-            raise
+        video_data = self.valid_videos[index]
+        frame_paths = video_data['frame_paths']
+        
+        src_images = []
+        tgt_images = []
+        
+        # Sample frame pairs
+        frame_pairs = self.sample_frame_pairs(frame_paths)
+        
+        # Load and process each pair
+        for idx1, idx2 in frame_pairs:
+            frame_cur = self.load_frame(frame_paths[idx1])
+            frame_fut = self.load_frame(frame_paths[idx2])
+            
+            src_image, tgt_image = self.transforms(frame_cur, frame_fut)
+            src_image = self.basic_transform(src_image)
+            tgt_image = self.basic_transform(tgt_image)
+            
+            src_images.append(src_image)
+            tgt_images.append(tgt_image)
 
         # Get embedding and repeat for each sample
-        embedding = torch.Tensor(self.data[index]["embedding"])
+        embedding = torch.tensor(video_data['embedding'])
         embedding = embedding.repeat(self.repeated_sampling, 1)
 
         return {
+            "video_idx": video_data['video_idx'],
             "src_images": torch.stack(src_images, dim=0),
             "tgt_images": torch.stack(tgt_images, dim=0),
             "embeddings": embedding,
