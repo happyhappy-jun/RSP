@@ -8,6 +8,7 @@ from torch.utils.data import Dataset
 from torchvision import transforms
 from util.transform import PairedRandomResizedCrop
 
+
 class PairedKineticsFixed(Dataset):
     def __init__(
             self,
@@ -19,7 +20,7 @@ class PairedKineticsFixed(Dataset):
     ):
         super().__init__()
         self.frame_root = frame_root
-        
+
         # Load main frame info data
         print("Loading main frame info data...")
         self.results = defaultdict(list)
@@ -33,14 +34,14 @@ class PairedKineticsFixed(Dataset):
             with open(frame_info_additional_path, 'r') as f:
                 frame_info_additional = json.load(f)
                 self._process_frame_info(
-                    frame_info_additional['videos'], 
+                    frame_info_additional['videos'],
                     prefix="frames_additional",
                     pair_idx_offset=2  # Add 2 to pair_idx for additional dataset
                 )
 
         # Convert to list of (video_idx, pairs) for indexing
         self.valid_videos = [(video_idx, pairs) for video_idx, pairs in self.results.items()]
-        
+
         print(f"\nDataset Statistics:")
         print(f"Total videos: {len(self.valid_videos)}")
         print(f"Total pairs: {sum(len(pairs) for _, pairs in self.valid_videos)}")
@@ -50,14 +51,11 @@ class PairedKineticsFixed(Dataset):
         self.transforms = PairedRandomResizedCrop(seed=seed)
         self.basic_transform = transforms.Compose([
             transforms.ToTensor(),
-            transforms.Normalize(mean=[0.485, 0.456, 0.406], 
-                              std=[0.229, 0.224, 0.225])
+            transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                 std=[0.229, 0.224, 0.225])
         ])
-        
-        self.repeated_sampling = repeated_sampling
 
-    def __len__(self):
-        return len(self.frames)
+        self.repeated_sampling = repeated_sampling
 
     def _process_frame_info(self, videos, prefix="frames", pair_idx_offset=0):
         """Process frame info with prefix and optional pair_idx offset"""
@@ -65,12 +63,12 @@ class PairedKineticsFixed(Dataset):
             video_idx = frame['video_idx']
             # Add offset to pair_idx for additional dataset
             pair_idx = frame.get('pair_idx', 0) + pair_idx_offset
-            
+
             processed_paths = [
-                f"{self.frame_root}/{prefix}/{path}" 
+                f"{self.frame_root}/{prefix}/{path}"
                 for path in frame['frame_paths']
             ]
-            
+
             self.results[video_idx].append({
                 'video_idx': video_idx,
                 'pair_idx': pair_idx,
@@ -91,7 +89,7 @@ class PairedKineticsFixed(Dataset):
     def __getitem__(self, index):
         # Get all pairs for the video at index
         video_idx, video_pairs = self.valid_videos[index]
-        
+
         src_images = []
         tgt_images = []
 
@@ -102,11 +100,11 @@ class PairedKineticsFixed(Dataset):
         for pair in sampled_pairs:
             frame_cur = self.load_frame(pair["frame_cur_path"])
             frame_fut = self.load_frame(pair["frame_fut_path"])
-            
+
             src_image, tgt_image = self.transforms(frame_cur, frame_fut)
             src_image = self.basic_transform(src_image)
             tgt_image = self.basic_transform(tgt_image)
-            
+
             src_images.append(src_image)
             tgt_images.append(tgt_image)
 
