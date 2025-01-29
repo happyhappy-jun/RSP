@@ -23,7 +23,7 @@ class PairedKineticsFixed(Dataset):
         self.frames = []
         with open(frame_info_path, 'r') as f:
             frame_info = json.load(f)
-            self._process_frame_info(frame_info['videos'], prefix="frames")
+            self._process_frame_info(frame_info['videos'], prefix="frames", pair_idx_offset=0)
 
         # Load additional frame info if provided
         if frame_info_additional_path:
@@ -32,7 +32,8 @@ class PairedKineticsFixed(Dataset):
                 frame_info_additional = json.load(f)
                 self._process_frame_info(
                     frame_info_additional['videos'], 
-                    prefix="frames_additional"
+                    prefix="frames_additional",
+                    pair_idx_offset=2  # Add 2 to pair_idx for additional dataset
                 )
 
         self.transforms = PairedRandomResizedCrop(seed=seed)
@@ -47,15 +48,20 @@ class PairedKineticsFixed(Dataset):
     def __len__(self):
         return len(self.frames)
 
-    def _process_frame_info(self, videos, prefix="frames"):
-        """Process frame info with prefix"""
+    def _process_frame_info(self, videos, prefix="frames", pair_idx_offset=0):
+        """Process frame info with prefix and optional pair_idx offset"""
         for frame in videos:
+            video_idx = frame['video_idx']
+            # Add offset to pair_idx for additional dataset
+            pair_idx = frame.get('pair_idx', 0) + pair_idx_offset
+            
             processed_paths = [
                 f"{self.frame_root}/{prefix}/{path}" 
                 for path in frame['frame_paths']
             ]
             self.frames.append({
-                'video_idx': frame['video_idx'],
+                'video_idx': video_idx,
+                'pair_idx': pair_idx,
                 'frame_paths': processed_paths
             })
 
