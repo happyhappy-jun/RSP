@@ -8,9 +8,9 @@ model_name: rsp_mse_vit_small_patch16
 
 dataset:
   _target_: util.kinetics_global_caption.PairedKineticsWithGlobalCaption
-  video_root: ${oc.env:HOME}/kinetics400
-  frame_info_path: ${oc.env:HOME}/RSP/artifacts/global/results/global_frame.json
-  embeddings_path: ${oc.env:HOME}/RSP/artifacts/global/embedding_results.jsonl
+  video_root: /data/kinetics400
+  frame_info_path: /data/kinetics400caption/global_frame.json
+  embeddings_path: /data/kinetics400caption/global_embedding.jsonl
   repeated_sampling: 2
   max_distance: 48
   seed: 42
