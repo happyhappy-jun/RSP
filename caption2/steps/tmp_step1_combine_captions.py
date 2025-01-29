@@ -42,11 +42,12 @@ def combine_caption_files(input_dir, output_file):
     # Create output directory if it doesn't exist
     os.makedirs(os.path.dirname(output_file), exist_ok=True)
     
-    # Save the combined and sorted data
+    # Save the combined and sorted data in JSONL format
     with open(output_file, 'w') as f:
-        json.dump(combined_data, f, indent=4)
+        for item in combined_data:
+            f.write(json.dumps(item) + '\n')
     
-    print(f"Combined {len(json_files)} files into {output_file}")
+    print(f"Combined {len(json_files)} files into {output_file} (JSONL format)")
     print(f"Total entries: {len(combined_data)}")
 
 if __name__ == "__main__":
