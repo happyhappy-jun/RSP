@@ -4,6 +4,9 @@ import os
 import re
 import argparse
 
+from tqdm import tqdm
+
+
 def extract_video_number(custom_id):
     """Extract the video number from custom_id string"""
     match = re.search(r'video_(\d+)', custom_id)
@@ -21,7 +24,7 @@ def combine_caption_files(input_dir, output_file):
     combined_data = []
     
     # Read and combine all JSON files
-    for json_file in json_files:
+    for json_file in tqdm(json_files):
         with open(json_file, 'r') as f:
             try:
                 data = json.load(f)
