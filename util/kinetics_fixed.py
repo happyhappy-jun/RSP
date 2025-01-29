@@ -85,16 +85,23 @@ class PairedKineticsFixed(Dataset):
             raise ValueError(f"Failed to load frame from path: {frame_path}")
         return cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
+    def __len__(self):
+        return len(self.valid_videos)
+
     def __getitem__(self, index):
-        frame_data = self.frames[index]
-        frame_paths = frame_data['frame_paths']
+        # Get all pairs for the video at index
+        video_idx, video_pairs = self.valid_videos[index]
         
         src_images = []
         tgt_images = []
-        
-        for _ in range(self.repeated_sampling):
-            frame_cur = self.load_frame(frame_paths[0])
-            frame_fut = self.load_frame(frame_paths[1])
+
+        # Randomly sample pairs for this video
+        sampled_pairs = random.sample(video_pairs, min(self.repeated_sampling, len(video_pairs)))
+
+        # Process each sampled pair
+        for pair in sampled_pairs:
+            frame_cur = self.load_frame(pair["frame_cur_path"])
+            frame_fut = self.load_frame(pair["frame_fut_path"])
             
             src_image, tgt_image = self.transforms(frame_cur, frame_fut)
             src_image = self.basic_transform(src_image)
@@ -102,6 +109,11 @@ class PairedKineticsFixed(Dataset):
             
             src_images.append(src_image)
             tgt_images.append(tgt_image)
+
+        # If we need more samples, repeat the last pair
+        while len(src_images) < self.repeated_sampling:
+            src_images.append(src_images[-1])
+            tgt_images.append(tgt_images[-1])
 
         return torch.stack(src_images, dim=0), torch.stack(tgt_images, dim=0), 0
 
