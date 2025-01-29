@@ -53,12 +53,12 @@ class PairedKineticsWithGlobalCaption(Dataset):
                 embedding = record[1]["data"][0]["embedding"]
                 self.embeddings[custom_id] = embedding
 
-        # Match frame data with embeddings
+        # Match video data with embeddings
         self.valid_videos = []
-        for custom_id, frame_info in self.frame_data.items():
+        for custom_id, video_info in self.video_data.items():
             if custom_id in self.embeddings:
-                frame_info['embedding'] = self.embeddings[custom_id]
-                self.valid_videos.append(frame_info)
+                video_info['embedding'] = self.embeddings[custom_id]
+                self.valid_videos.append(video_info)
 
         # Setup transforms
         self.transforms = PairedRandomResizedCrop(seed=seed)
