@@ -38,7 +38,7 @@ ANALYZE THE FOLLOWING ELEMENTS:
 
 Keep descriptions concise, objective, and focused on visible changes between frames.""",
             "future": """Caption this image""",
-            "global": """"You are a movement analyzer specialized in describing video content, context, and dynamics. Analyze and describe video using the following guidelines:
+            "global": """You are a movement analyzer specialized in describing video content, context, and dynamics. Analyze and describe video using the following guidelines:
 FORMAT:
 - Aggregated one clear sentence summarizing the overall dynamics and activity in video
 - Describe qualitative and relative dynamics in the video
