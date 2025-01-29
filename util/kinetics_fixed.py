@@ -91,3 +91,17 @@ class PairedKineticsFixed(Dataset):
             tgt_images.append(tgt_image)
 
         return torch.stack(src_images, dim=0), torch.stack(tgt_images, dim=0), 0
+
+
+if __name__ == "__main__":
+    dataset = PairedKineticsFixed(
+        frame_root="data/kinetics/frames",
+        frame_info_path="data/kinetics/frames_info.json",
+        repeated_sampling=2
+    )
+
+    print(f"Dataset length: {len(dataset)}")
+
+    src_images, tgt_images, _ = dataset[0]
+    print(f"Source images shape: {src_images.shape}")
+    print(f"Target images shape: {tgt_images.shape}")
