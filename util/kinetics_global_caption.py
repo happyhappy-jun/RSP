@@ -53,7 +53,7 @@ class PairedKineticsWithGlobalCaption(Dataset):
                 custom_id = record[-1]["custom_id"]
                 if custom_id in video_data:
                     video_info = video_data[custom_id]
-                    video_info['embedding'] = record[1]["data"][0]["embedding"]
+                    video_info['embedding'] = record[1]["data"][0]["embedding"][:384]
                     self.valid_videos.append(video_info)
                     
         # Clear temporary data
