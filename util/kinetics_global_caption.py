@@ -29,11 +29,14 @@ class PairedKineticsWithGlobalCaption(Dataset):
         self.repeated_sampling = repeated_sampling
         self.max_distance = max_distance
 
-        # Load frame info
-        print("Loading frame info...")
+        # Load frame info and embeddings
+        print("Loading frame info and embeddings...")
+        self.valid_videos = []
+        
+        # First load video data
         with open(frame_info_path, 'r') as f:
             frame_info = json.load(f)
-            self.video_data = {
+            video_data = {
                 f"video_{video['video_idx']}": {
                     'video_idx': video['video_idx'],
                     'video_path': os.path.join(self.video_root, video['video_path']),
@@ -42,23 +45,19 @@ class PairedKineticsWithGlobalCaption(Dataset):
                 }
                 for video in frame_info['videos']
             }
-
-        # Load embeddings
-        print("Loading embeddings...")
-        self.embeddings = {}
+        
+        # Then process embeddings and match with videos
         with open(embeddings_path, 'r') as f:
             for line in f:
                 record = json.loads(line)
                 custom_id = record[-1]["custom_id"]
-                embedding = record[1]["data"][0]["embedding"]
-                self.embeddings[custom_id] = embedding
-
-        # Match video data with embeddings
-        self.valid_videos = []
-        for custom_id, video_info in self.video_data.items():
-            if custom_id in self.embeddings:
-                video_info['embedding'] = self.embeddings[custom_id]
-                self.valid_videos.append(video_info)
+                if custom_id in video_data:
+                    video_info = video_data[custom_id]
+                    video_info['embedding'] = record[1]["data"][0]["embedding"]
+                    self.valid_videos.append(video_info)
+                    
+        # Clear temporary data
+        del video_data
 
         # Setup transforms
         self.transforms = PairedRandomResizedCrop(seed=seed)
