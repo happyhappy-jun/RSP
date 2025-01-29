@@ -70,7 +70,6 @@ class PairedKineticsWithGlobalCaption(Dataset):
 
         print(f"\nDataset Statistics:")
         print(f"Total videos found: {len(self.valid_videos)}")
-        print(f"Total frames per video: {len(self.valid_videos[0]['frame_paths']) if self.valid_videos else 0}")
 
     def load_frames(self, video_path):
         """Load and sample frame pairs from video"""
