@@ -21,7 +21,8 @@ class PairedKineticsWithGlobalCaption(Dataset):
             frame_info_path,  # Path to global_frame.json
             embeddings_path,  # Path to global_embedding.jsonl
             repeated_sampling=2,
-            max_distance=48
+            max_distance=48,
+            seed=42
     ):
         super().__init__()
         self.video_root = video_root
