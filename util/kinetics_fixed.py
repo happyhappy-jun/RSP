@@ -2,6 +2,8 @@ import os
 import json
 import cv2
 import torch
+import random
+from collections import defaultdict
 from torch.utils.data import Dataset
 from torchvision import transforms
 from util.transform import PairedRandomResizedCrop
@@ -20,7 +22,7 @@ class PairedKineticsFixed(Dataset):
         
         # Load main frame info data
         print("Loading main frame info data...")
-        self.frames = []
+        self.results = defaultdict(list)
         with open(frame_info_path, 'r') as f:
             frame_info = json.load(f)
             self._process_frame_info(frame_info['videos'], prefix="frames", pair_idx_offset=0)
@@ -35,6 +37,15 @@ class PairedKineticsFixed(Dataset):
                     prefix="frames_additional",
                     pair_idx_offset=2  # Add 2 to pair_idx for additional dataset
                 )
+
+        # Convert to list of (video_idx, pairs) for indexing
+        self.valid_videos = [(video_idx, pairs) for video_idx, pairs in self.results.items()]
+        
+        print(f"\nDataset Statistics:")
+        print(f"Total videos: {len(self.valid_videos)}")
+        print(f"Total pairs: {sum(len(pairs) for _, pairs in self.valid_videos)}")
+
+        del self.results  # Keep only the flattened valid_videos list
 
         self.transforms = PairedRandomResizedCrop(seed=seed)
         self.basic_transform = transforms.Compose([
@@ -59,10 +70,12 @@ class PairedKineticsFixed(Dataset):
                 f"{self.frame_root}/{prefix}/{path}" 
                 for path in frame['frame_paths']
             ]
-            self.frames.append({
+            
+            self.results[video_idx].append({
                 'video_idx': video_idx,
                 'pair_idx': pair_idx,
-                'frame_paths': processed_paths
+                'frame_cur_path': processed_paths[0],
+                'frame_fut_path': processed_paths[1]
             })
 
     def load_frame(self, frame_path):
