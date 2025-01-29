@@ -18,11 +18,11 @@ class RequestBuilder:
     ) -> Dict[str, Any]:
         """Build a request for frame captioning"""
         if system_prompt is None and self.config:
-            prompt_type = self.config.prompt_config["caption"].get("default_prompt", "default")
-            system_prompt = self.config.prompt_config["caption"]["prompts"].get(prompt_type)
+            # prompt_type = self.config.prompt_config["caption"].get("default_prompt", "global")
+            system_prompt = self.config.prompt_config["caption"]["prompts"].get("global")
         
         if system_prompt is None:
-            system_prompt = self.config.prompt_config["caption"]["prompts"]["default"]
+            system_prompt = self.config.prompt_config["caption"]["prompts"]["global"]
 
         # Encode all images
         contents = []

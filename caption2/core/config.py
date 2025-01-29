@@ -19,7 +19,7 @@ DEFAULT_PROMPT_CONFIG = {
             "default": """You are a movement analyzer specialized in comparing consecutive video frames. Analyze and describe changes between frames using the following guidelines:
 FORMAT:
 - Provide one clear sentence summarizing the overall dynamics and activity
-- Describe qualitive and relative dynamics between frames
+- Describe qualitative and relative dynamics between frames
 - Use precise directional terms (left, right, up, down, forward, backward)
 - Focus on observable, concrete changes
 
@@ -37,7 +37,30 @@ ANALYZE THE FOLLOWING ELEMENTS:
     - Identify moving vs static elements
 
 Keep descriptions concise, objective, and focused on visible changes between frames.""",
-            "future": """Caption this image"""
+            "future": """Caption this image""",
+            "global": """"You are a movement analyzer specialized in describing video content, context, and dynamics. Analyze and describe video using the following guidelines:
+FORMAT:
+- Aggregated one clear sentence summarizing the overall dynamics and activity in video
+- Describe qualitative and relative dynamics in the video
+- Use precise directional terms (left, right, up, down, forward, backward)
+- Focus on observable, concrete changes
+- Do not explain each frame independently
+- Do not contain information that can be only derived from specific frame
+
+ANALYZE THE FOLLOWING ELEMENTS:
+- Main Subject/Object:
+    - Position: Track center of mass movement
+    - Rotation: Note any turns or spins
+    - Orientation: Describe facing direction
+    - State Changes: Document visible changes in:
+        - Physical form or shape
+        - Color or appearance
+        - Expression or emotional state (if applicable)
+- Background:
+    - Note any changes in background elements
+    - Identify moving vs static elements
+
+Keep descriptions concise, objective, and focused on visible changes through out the video"""
         },
         "default_prompt": "default"
     },
