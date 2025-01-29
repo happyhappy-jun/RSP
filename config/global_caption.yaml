@@ -23,4 +23,4 @@ mse_scale: 0.1
 num_workers: 1
 
 model_params:
-  enable_rms_norm: true
+  kl_scale: 0.01
