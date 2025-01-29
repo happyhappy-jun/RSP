@@ -80,8 +80,8 @@ class PairedKineticsFixed(Dataset):
         tgt_images = []
         
         for _ in range(self.repeated_sampling):
-            frame_cur = self.load_frame(self._process_path(frame_paths[0]))
-            frame_fut = self.load_frame(self._process_path(frame_paths[1]))
+            frame_cur = self.load_frame(frame_paths[0])
+            frame_fut = self.load_frame(frame_paths[1])
             
             src_image, tgt_image = self.transforms(frame_cur, frame_fut)
             src_image = self.basic_transform(src_image)

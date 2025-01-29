@@ -6,10 +6,13 @@ exp_name: rsp_fixed
 
 model_name: rsp_vit_small_patch16
 
+data_root: /data
+
 dataset:
   _target_: util.kinetics_fixed.PairedKineticsFixed
-  frame_root: /data/kinetics400caption/frames
-  frame_info_path: /data/kinetics400caption/frame_info.json
+  frame_root: ${..data_root}/kinetics400caption
+  frame_info_path: ${..data_root}/kinetics400caption/frame_info.json
+  frame_info_additional_path: ${..data_root}/kinetics400caption/frame_info_additional.json
 
 train_loop:
   _target_: engine_pretrain_repsamp.train_one_epoch
