@@ -4,7 +4,7 @@ defaults:
 
 exp_name: rsp_mse_global_caption
 
-model_name: rsp_mse_vit_small_patch16
+model_name: rsp_joint_implicit_vit_small_patch16
 
 dataset:
   _target_: util.kinetics_global_caption.PairedKineticsWithGlobalCaption
