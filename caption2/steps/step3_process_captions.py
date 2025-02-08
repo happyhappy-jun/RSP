@@ -50,12 +50,11 @@ def main():
         # For sanity check, just process first request from first shard
         with open(shard_files[0]) as f:
             first_request = json.loads(f.readline())
-            batch_ids = processor.submit_requests(
+            results = processor.submit_requests(
                 [first_request],
                 description="Sanity check",
                 sanity_check=True
             )
-            results = processor.monitor_batches(batch_ids)
             print("\nSanity check results:")
             print(json.dumps(results, indent=2))
             total_processed = 1

@@ -222,7 +222,8 @@ class BatchProcessor:
                             }]
                         }
                     }
-                return metadata_store.merge_results([result])
+                results = metadata_store.merge_results([result])
+                return results['results'] if isinstance(results, dict) else results
             except Exception as e:
                 print(f"Sanity check failed: {str(e)}")
                 return []
