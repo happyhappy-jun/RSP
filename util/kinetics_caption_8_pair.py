@@ -83,7 +83,7 @@ class PairedKineticsWithCaption8Pair(Dataset):
         with open(frame_info_path, 'r') as f:
             frame_info = json.load(f)
             videos = frame_info['videos']
-            self._process_frame_info(videos, prefix="frames")
+            self._process_frame_info(videos, prefix=None)
 
         # Load main embeddings data
         print("Loading main embeddings data...")
@@ -151,7 +151,7 @@ class PairedKineticsWithCaption8Pair(Dataset):
             
             # Add prefix to frame paths
             processed_paths = [
-                self._process_path(f"{prefix}/{path}") 
+                self._process_path(os.path.join(prefix, path)) if prefix else self._process_path(path)
                 for path in frame_paths
             ]
             

@@ -1,0 +1,21 @@
+defaults:
+  - main
+  - _self_
+
+exp_name: rlbench_rsp_ours
+
+model_name: rsp_joint_implicit_vit_small_patch16
+
+data_root: /data/RSP
+
+dataset:
+  _target_: util.kinetics_caption_8_pair.PairedKineticsWithCaption8Pair
+  frame_root: ${..data_root}/rlbench_frames
+  frame_info_path: ${..data_root}/frame_info.json
+  embeddings_path: ${..data_root}/embedding.jsonl
+
+train_loop:
+  _target_: engine_pretrain_repsamp.train_one_epoch_llm
+  _partial_: true
+
+kl_scale: 0.001

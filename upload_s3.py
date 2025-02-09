@@ -2,12 +2,36 @@ import argparse
 import glob
 import os
 import boto3
+import questionary
+from tqdm import tqdm
 
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--target_dir', type=str, required=True,
                        help='Directory containing checkpoints (e.g., outputs/exp_name)')
     return parser.parse_args()
+
+def upload_with_progress(s3_client, local_file, bucket_name, s3_key):
+    """Upload file with progress bar"""
+    file_size = os.path.getsize(local_file)
+    progress = tqdm(total=file_size, unit='B', unit_scale=True, desc=os.path.basename(local_file))
+    
+    def callback(bytes_transferred):
+        progress.update(bytes_transferred)
+    
+    try:
+        s3_client.upload_file(
+            local_file,
+            bucket_name,
+            s3_key,
+            Callback=callback
+        )
+        progress.close()
+        return True
+    except Exception as e:
+        progress.close()
+        print(f"Error uploading {local_file}: {e}")
+        return False
 
 def upload_checkpoints_to_s3(target_dir):
     # Initialize S3 client
@@ -25,7 +49,15 @@ def upload_checkpoints_to_s3(target_dir):
         print(f"Error creating directory in S3: {e}")
         return
     
-    # Find all checkpoint files
+    # Check for checkpoint-199.pth first
+    default_checkpoint = os.path.join(target_dir, 'checkpoint-199.pth')
+    if os.path.exists(default_checkpoint):
+        print("Found checkpoint-199.pth, uploading...")
+        s3_key = f'{exp_name}/checkpoint-199.pth'
+        upload_with_progress(s3_client, default_checkpoint, bucket_name, s3_key)
+        return
+    
+    # If default checkpoint doesn't exist, find all checkpoint files
     checkpoint_pattern = os.path.join(target_dir, 'checkpoint-*.pth')
     checkpoint_files = glob.glob(checkpoint_pattern)
     
@@ -33,18 +65,31 @@ def upload_checkpoints_to_s3(target_dir):
         print(f"No checkpoint files found in {target_dir}")
         return
     
-    # Upload each checkpoint
+    # Prepare choices for questionary with file sizes
+    choices = []
     for checkpoint_file in checkpoint_files:
-        # Construct S3 key: exp_name/filename
+        size_mb = os.path.getsize(checkpoint_file) / (1024 * 1024)
+        filename = os.path.basename(checkpoint_file)
+        display = f"{filename} ({size_mb:.2f} MB)"
+        choices.append({
+            'name': display,
+            'value': checkpoint_file
+        })
+    
+    # Ask user which checkpoints to upload
+    selected_checkpoints = questionary.checkbox(
+        "Select checkpoints to upload:",
+        choices=choices
+    ).ask()
+    
+    if not selected_checkpoints:  # User cancelled
+        return
+    
+    # Upload selected checkpoints
+    for checkpoint_file in selected_checkpoints:
         filename = os.path.basename(checkpoint_file)
         s3_key = f'{exp_name}/{filename}'
-        
-        try:
-            print(f"Uploading {checkpoint_file} to s3://{bucket_name}/{s3_key}")
-            s3_client.upload_file(checkpoint_file, bucket_name, s3_key)
-            print(f"Successfully uploaded {filename}")
-        except Exception as e:
-            print(f"Error uploading {filename}: {e}")
+        upload_with_progress(s3_client, checkpoint_file, bucket_name, s3_key)
 
 def main():
     args = parse_args()

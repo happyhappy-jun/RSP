@@ -9,7 +9,7 @@ DEFAULT_FRAME_CONFIG = {
     "paired": {
         "min_gap": 4,
         "max_distance": 48,
-        "num_pairs": 6
+        "num_pairs": 8
     }
 }
 

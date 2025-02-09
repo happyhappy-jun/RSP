@@ -25,13 +25,13 @@ torch = "*"
 bitsandbytes = {file = "https://github.com/bitsandbytes-foundation/bitsandbytes/releases/download/continuous-release_multi-backend-refactor/bitsandbytes-0.44.1.dev0-py3-none-manylinux_2_24_x86_64.whl"}
 av = "*"
 datasets = "*"
-questionary = "*"
-boto3 = "*"
 ujson = "*"
 hydra-colorlog = "*"
 joblib = "*"
 nvitop = "*"
 h5pickle = "*"
+boto3 = "*"
+questionary = "*"
 
 [dev-packages]
 

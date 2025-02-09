@@ -126,13 +126,14 @@ class EmbeddingCreator:
         self,
         caption_results: List[Dict[str, Any]],
         output_dir: Path,
+        output_file: Path = "embedding.jsonl",
         max_attempts: int = 30,
         seconds_to_sleep: float = 0.001
     ) -> None:
         """Process caption results and create embeddings asynchronously"""
         
         output_dir.mkdir(parents=True, exist_ok=True)
-        output_file = output_dir / "embedding_6_pair.jsonl"
+        output_file = output_dir / output_file
         if os.path.exists(output_file):
             os.remove(output_file)
         request_url = "https://api.openai.com/v1/embeddings"

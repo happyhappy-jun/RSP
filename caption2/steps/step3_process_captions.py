@@ -50,6 +50,7 @@ def main():
         # For sanity check, just process first request from first shard
         with open(shard_files[0]) as f:
             first_request = json.loads(f.readline())
+            print(first_request)
             results = processor.submit_requests(
                 [first_request],
                 description="Sanity check",
