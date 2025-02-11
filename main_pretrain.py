@@ -41,9 +41,12 @@ def main(cfg: DictConfig):
     
     try:
         misc.init_distributed_mode(cfg)
-    if cfg.distributed:
-        num_tasks = misc.get_world_size()
-        global_rank = misc.get_rank()
+        if cfg.distributed:
+            num_tasks = misc.get_world_size()
+            global_rank = misc.get_rank()
+    except Exception as e:
+        print(f"Error initializing distributed mode: {e}")
+        raise
 
     if not cfg.distributed or global_rank == 0:
         if cfg.log_dir is not None:
