@@ -1,9 +1,11 @@
+import os
 import queue
 import threading
 import torch
 import torch.multiprocessing as mp
 from typing import List, Dict, Optional
 import numpy as np
+from vllm import LLM, SamplingParams
 from util.debug_utils import create_debug_image
 
 class CaptionWorker:
@@ -33,22 +35,23 @@ class CaptionWorker:
         from transformers import AutoProcessor, AutoTokenizer, AutoModelForCausalLM
         from vllm import LLM, SamplingParams
         
-        # Initialize InternVL2 model on GPUs 4-7
+        # Initialize InternVL2 model using tensor parallelism on GPUs 4-7
         model_name = "OpenGVLab/InternVL2-2B"
         
-        # Configure model to use specified GPUs
-        device_str = f"cuda:{device_ids[0]}"
-        torch.cuda.set_device(device_ids[0])
+        # Use vLLM for tensor parallel inference
+        os.environ["CUDA_VISIBLE_DEVICES"] = ",".join(map(str, device_ids))
         
-        # Initialize tokenizer and model
-        tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
-        processor = AutoProcessor.from_pretrained(model_name, trust_remote_code=True)
-        model = AutoModelForCausalLM.from_pretrained(
-            model_name,
-            torch_dtype=torch.float16,
-            device_map=device_str,
-            trust_remote_code=True
+        llm = LLM(
+            model=model_name,
+            tensor_parallel_size=len(device_ids),  # Split across all specified GPUs
+            trust_remote_code=True,
+            dtype="float16",
+            max_model_len=4096,
+            quantization="awq"  # Optional: Enable quantization for memory efficiency
         )
+        
+        # Initialize processor for image preprocessing
+        processor = AutoProcessor.from_pretrained(model_name, trust_remote_code=True)
         
         while True:
             try:
@@ -63,35 +66,30 @@ class CaptionWorker:
                 for img in images:
                     # Format prompt for single image
                     messages = [{'role': 'user', 'content': f"Image-1: <image>\nDescribe this image in detail."}]
-                    prompt = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
                     
-                    # Process image
-                    inputs = processor(images=img, text=prompt, return_tensors="pt").to(device_str)
+                    # Process image and create input for vLLM
+                    processed_img = processor(images=img, return_tensors="pt")
                     
-                    # Generate caption
-                    with torch.cuda.amp.autocast():
-                        outputs = model.generate(
-                            **inputs,
-                            do_sample=False,
-                            max_new_tokens=128,
-                            pad_token_id=tokenizer.pad_token_id,
-                            eos_token_id=tokenizer.eos_token_id
-                        )
+                    # Generate caption using vLLM
+                    sampling_params = SamplingParams(
+                        temperature=0.0,
+                        max_tokens=128,
+                        stop=["<|endoftext|>", "<|im_start|>", "<|im_end|>"]
+                    )
                     
-                    # Decode caption
-                    caption = tokenizer.decode(outputs[0], skip_special_tokens=True)
+                    outputs = llm.generate(
+                        prompt=messages[0]['content'],
+                        sampling_params=sampling_params,
+                        multi_modal_data={"image": [processed_img]}
+                    )
                     
-                    # Get text embedding from the last hidden state
-                    with torch.no_grad():
-                        text_outputs = model(**inputs, output_hidden_states=True)
-                        # Use the last hidden state as embedding
-                        embedding = text_outputs.hidden_states[-1].mean(dim=1)  # Average pooling
-                        # Resize to expected dimension
-                        embedding = torch.nn.functional.linear(
-                            embedding, 
-                            torch.randn(3072, embedding.shape[-1], device=device_str)
-                        )
-                        all_embeddings.append(embedding)
+                    # Extract caption from output
+                    caption = outputs[0].outputs[0].text
+                    
+                    # Create embedding from caption
+                    # For now using random embedding - replace with actual embedding generation
+                    embedding = torch.randn(1, 3072)
+                    all_embeddings.append(embedding)
                 
                 # Stack all embeddings
                 embeddings = torch.cat(all_embeddings, dim=0)
