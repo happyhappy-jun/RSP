@@ -23,6 +23,7 @@ import hydra
 from omegaconf import DictConfig, OmegaConf
 from hydra.utils import instantiate
 from util.misc import NativeScalerWithGradNormCount as NativeScaler
+from util.caption_pipeline import CaptionPipeline
 
 import modeling
 
@@ -31,7 +32,15 @@ from torch.distributed.elastic.multiprocessing.errors import record
 @hydra.main(config_path="config", config_name="main", version_base="1.2")
 @record
 def main(cfg: DictConfig):
-    misc.init_distributed_mode(cfg)
+    # Initialize caption pipeline before distributed training
+    caption_pipeline = CaptionPipeline(
+        caption_device_ids=[4,5,6,7],
+        queue_size=cfg.get('caption_queue_size', 8)
+    )
+    caption_pipeline.start()
+    
+    try:
+        misc.init_distributed_mode(cfg)
     if cfg.distributed:
         num_tasks = misc.get_world_size()
         global_rank = misc.get_rank()
@@ -192,6 +201,9 @@ def main(cfg: DictConfig):
     
     if misc.is_main_process():
         wandb.finish()
+    
+    # Cleanup caption pipeline
+    caption_pipeline.stop()
 
 
 if __name__ == "__main__":
