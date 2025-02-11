@@ -4,10 +4,11 @@ import torch
 
 # Initialize the LLM
 llm = LLM(
-    model="facebook/opt-125m",  # Replace with your preferred multimodal model
-    tensor_parallel_size=1,
+    model="OpenGVLab/InternVL2_5-26B-AWQ",  # Replace with your preferred multimodal model
+    tensor_parallel_size=4,
     gpu_memory_utilization=0.8,
-    trust_remote_code=True
+    trust_remote_code=True,
+    quantization="awq"
 )
 
 # Set up sampling parameters
