@@ -140,3 +140,33 @@ class CaptionPipeline:
             
         # Check if we have the requested batch in pending
         return self.pending_batches.pop(batch_id, None)
+
+if __name__ == "__main__":
+    import PIL.Image
+    from vllm import LLM, SamplingParams
+    
+    # Test InternVL2 loading and inference
+    print("Testing InternVL2 caption generation...")
+    
+    # Create test pipeline
+    pipeline = CaptionPipeline(caption_device_ids=[4,5,6,7])
+    pipeline.start()
+    
+    # Create some test images
+    test_images = [create_debug_image() for _ in range(2)]
+    
+    # Submit batch
+    print("Submitting test batch...")
+    batch_id = pipeline.submit_batch(test_images)
+    
+    # Try to get results with timeout
+    print("Waiting for results...")
+    result = pipeline.get_result(batch_id, timeout=30)
+    
+    if result is not None:
+        print(f"Success! Got embeddings with shape: {result.shape}")
+    else:
+        print("Failed to get results within timeout")
+    
+    # Cleanup
+    pipeline.stop()
