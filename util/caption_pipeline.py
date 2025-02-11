@@ -4,6 +4,7 @@ import torch
 import torch.multiprocessing as mp
 from typing import List, Dict, Optional
 import numpy as np
+from util.debug_utils import create_debug_image
 
 class CaptionWorker:
     """Worker process for caption generation running on GPUs 4-7"""
@@ -37,12 +38,17 @@ class CaptionWorker:
                 break
                 
             batch_id, images = batch
+            
+            # For debugging, create random images
+            debug_images = torch.stack([create_debug_image() for _ in range(len(images))])
+            
             with torch.cuda.amp.autocast():
                 # Generate captions using InternVL2
                 captions = ["Dummy caption" for _ in range(len(images))]  # TODO: Real caption generation
                 
             # For now, generate random embeddings
             embeddings = torch.randn(len(images), 3072)
+            print(f"Debug: Generated embeddings shape: {embeddings.shape}")
             output_queue.put((batch_id, embeddings))
 
 class CaptionPipeline:
