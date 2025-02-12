@@ -7,9 +7,9 @@ from torch.utils.data import Dataset
 from torchvision import transforms
 from decord import VideoReader, cpu
 from PIL import Image
-from lmdeploy import pipeline, GenerationConfig
-from lmdeploy.vl.constants import IMAGE_TOKEN
-from lmdeploy.vl.utils import encode_image_base64
+import requests
+import base64
+import io
 
 from util.transform import PairedRandomResizedCrop
 
@@ -45,33 +45,40 @@ class RLBenchOnlineCaption(Dataset):
         self.max_distance = max_distance
         self.repeated_sampling = repeated_sampling
         
-        # Initialize LLM pipeline
-        print(f"Initializing LLM pipeline with model: {model_path}")
-        self.pipe = pipeline(model_path, log_level='INFO')
+        # LLM server endpoint
+        self.llm_url = "http://0.0.0.0:23333/v1/chat/completions"
 
     def get_caption(self, frame1, frame2):
         """Generate caption comparing two frames using LLM"""
-        # Convert frames to PIL Images
-        img1 = Image.fromarray(frame1)
-        img2 = Image.fromarray(frame2)
+        # Convert frames to base64
+        def frame_to_base64(frame):
+            img = Image.fromarray(frame)
+            buffer = io.BytesIO()
+            img.save(buffer, format="JPEG")
+            return base64.b64encode(buffer.getvalue()).decode('utf-8')
+            
+        img1_b64 = frame_to_base64(frame1)
+        img2_b64 = frame_to_base64(frame2)
         
-        # Construct prompt
-        question = f'Frame1: {IMAGE_TOKEN}\nFrame2: {IMAGE_TOKEN}\nDescribe the main differences between these two frames from a video.'
+        # Prepare request
+        payload = {
+            "model": "internvl2",
+            "messages": [{
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": "Describe the main differences between these two frames from a video."},
+                    {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{img1_b64}"}},
+                    {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{img2_b64}"}}
+                ]
+            }],
+            "temperature": 0.7,
+            "max_tokens": 512
+        }
         
-        # Prepare content for LLM
-        content = [{'type': 'text', 'text': question}]
-        for img in [img1, img2]:
-            content.append({
-                'type': 'image_url',
-                'image_url': {
-                    'max_dynamic_patch': 1,
-                    'url': f'data:image/jpeg;base64,{encode_image_base64(img)}'
-                }
-            })
-        
-        # Generate caption
-        messages = [dict(role='user', content=content)]
-        response = self.pipe(messages, gen_config=GenerationConfig(top_k=1))
+        # Send request to local server
+        response = requests.post(self.llm_url, json=payload)
+        response_json = response.json()
+        caption = response_json['choices'][0]['message']['content']
         
         # Convert response to embedding using mean pooling
         # This is a placeholder - replace with actual text-to-embedding logic
