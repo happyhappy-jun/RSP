@@ -32,13 +32,6 @@ from torch.distributed.elastic.multiprocessing.errors import record
 @hydra.main(config_path="config", config_name="main", version_base="1.2")
 @record
 def main(cfg: DictConfig):
-    # Initialize caption pipeline before distributed training
-    caption_pipeline = CaptionPipeline(
-        caption_device_ids=[4,5,6,7],
-        queue_size=cfg.get('caption_queue_size', 8)
-    )
-    caption_pipeline.start()
-    
     try:
         misc.init_distributed_mode(cfg)
         if cfg.distributed:
@@ -204,10 +197,6 @@ def main(cfg: DictConfig):
     
     if misc.is_main_process():
         wandb.finish()
-    
-    # Cleanup caption pipeline
-    caption_pipeline.stop()
-
 
 if __name__ == "__main__":
     # Set multiprocessing start method and context

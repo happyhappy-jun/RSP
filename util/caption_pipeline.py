@@ -47,7 +47,6 @@ class CaptionWorker:
             trust_remote_code=True,
             dtype="float16",
             max_model_len=4096,
-            quantization="awq"  # Optional: Enable quantization for memory efficiency
         )
         
         # Initialize processor for image preprocessing

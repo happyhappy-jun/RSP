@@ -79,10 +79,7 @@ class RLBenchOnlineCaption(Dataset):
         response_json = response.json()
         caption = response_json['choices'][0]['message']['content']
         request_time = time.time() - start_time
-        
-        logging.info(f"LLM Request took {request_time:.2f} seconds")
-        logging.info(f"Caption: {caption}")
-        
+
         # Convert response to embedding using mean pooling
         # This is a placeholder - replace with actual text-to-embedding logic
         # For now, returning random embedding of expected size
@@ -149,26 +146,25 @@ if __name__ == "__main__":
     # Create dataloader
     dataloader = DataLoader(
         dataset,
-        batch_size=2,
+        batch_size=16,
         shuffle=True,
         num_workers=4,
         pin_memory=True
     )
 
-    logging.info(f"Dataset size: {len(dataset)}")
-    logging.info(f"Number of batches: {len(dataloader)}")
-
-    # Test batch loading
-    start_time = time.time()
-    for batch_idx, batch in enumerate(dataloader):
-        logging.info(f"\nProcessing batch {batch_idx + 1}")
-        logging.info(f"Batch shapes:")
-        for k, v in batch.items():
-            logging.info(f"  {k}: {v.shape}")
-        
-        if batch_idx >= 2:  # Test first 3 batches only
-            break
-    
-    total_time = time.time() - start_time
-    logging.info(f"\nProcessed 3 batches in {total_time:.2f} seconds")
-    logging.info(f"Average time per batch: {total_time/3:.2f} seconds")
+    # logging.info(f"Dataset size: {len(dataset)}")
+    # logging.info(f"Number of batches: {len(dataloader)}")
+    #
+    # # Test batch loading
+    # start_time = time.time()
+    # for batch_idx, batch in enumerate(dataloader):
+    #     logging.info(f"\nProcessing batch {batch_idx + 1}")
+    #     logging.info(f"Batch shapes:")
+    #
+    #     if batch_idx >= 2:  # Test first 3 batches only
+    #         break
+    #
+    # total_time = time.time() - start_time
+    # logging.info(f"\nProcessed 3 batches in {total_time:.2f} seconds")
+    # logging.info(f"Average time per batch: {total_time/3:.2f} seconds")
+    logging.info(len(dataset))
