@@ -1,0 +1,25 @@
+defaults:
+  - main
+  - _self_
+
+exp_name: rsp_kinetics_online_caption
+
+model_name: rsp_caption_vit_small_patch16
+
+data_root: /root
+
+dataset:
+  _target_: util.kinetics_online_caption.RLBenchOnlineCaption
+  root: ${..data_root}/kinetics400caption
+  max_distance: 48
+  repeated_sampling: 2
+  llm_url: "http://0.0.0.0:23333/v1/chat/completions"
+
+train_loop:
+  _target_: engine_pretrain_repsamp.train_one_epoch_llm
+  _partial_: true
+
+model_params:
+  kl_scale: 0.001
+  enable_rms_norm: false
+  embed_scale_factor: 1.0
