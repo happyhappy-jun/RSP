@@ -1,7 +1,7 @@
 import torch
 from torch import nn
 
-from timm.models.layers import DropPath
+from timm.layers import DropPath
 from timm.models.vision_transformer import Mlp
 import torch.nn.functional as F
 

@@ -29,7 +29,7 @@ from torch.utils.tensorboard import SummaryWriter
 
 import timm
 
-from timm.models.layers import trunc_normal_
+from timm.layers import trunc_normal_
 from timm.data.mixup import Mixup
 from timm.loss import LabelSmoothingCrossEntropy, SoftTargetCrossEntropy
 

@@ -15,15 +15,12 @@ import torch
 import torch.backends.cudnn as cudnn
 from torch.utils.tensorboard import SummaryWriter
 
-import timm
-import timm.optim.optim_factory as optim_factory
 import torch.multiprocessing as mp
 import util.misc as misc
 import hydra
 from omegaconf import DictConfig, OmegaConf
 from hydra.utils import instantiate
 from util.misc import NativeScalerWithGradNormCount as NativeScaler
-from util.caption_pipeline import CaptionPipeline
 
 import modeling
 
@@ -115,7 +112,7 @@ def main(cfg: DictConfig):
     # Load embedding model if needed
     embedding_model = None
     if hasattr(cfg, 'embedding_model'):
-        from transformers import AutoModel, AutoTokenizer
+        from transformers import AutoModel
         embedding_model = AutoModel.from_pretrained(
             cfg.embedding_model.name,
             trust_remote_code=True
@@ -135,7 +132,7 @@ def main(cfg: DictConfig):
         model_without_ddp = model.module
 
     # following timm: set wd as 0 for bias and norm layers
-    param_groups = optim_factory.add_weight_decay(model_without_ddp, cfg.weight_decay)
+    param_groups = misc.add_weight_decay(model_without_ddp, cfg.weight_decay)
     optimizer = torch.optim.AdamW(param_groups, lr=cfg.lr, betas=(0.9, 0.95))
     print(optimizer)
     loss_scaler = NativeScaler()

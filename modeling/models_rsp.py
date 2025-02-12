@@ -9,7 +9,7 @@ import torch.nn.functional as F
 from modeling.layers import Block, CrossAttention, Attention
 
 from timm.models.vision_transformer import PatchEmbed
-from timm.models.layers import DropPath
+from timm.layers import DropPath
 from timm.models.vision_transformer import Mlp
 
 from wandb.cli.cli import enabled

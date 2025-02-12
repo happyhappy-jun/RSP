@@ -17,7 +17,7 @@ from torch.utils.tensorboard import SummaryWriter
 import hydra
 from omegaconf import DictConfig, OmegaConf
 
-from timm.models.layers import trunc_normal_
+from timm.layers import trunc_normal_
 
 import util.misc as misc
 from util.pos_embed import interpolate_pos_embed
