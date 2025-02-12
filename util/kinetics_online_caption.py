@@ -101,18 +101,10 @@ class RLBenchOnlineCaption(Dataset):
         for _ in range(self.repeated_sampling):
             # Load frames from both views at same timestamp
             seg_len = min(len(vr_front), len(vr_overhead))
-            least_frames_num = self.max_distance + 1
-            if seg_len >= least_frames_num:
-                idx_cur = random.randint(0, seg_len - least_frames_num)
-                interval = random.randint(4, self.max_distance)
-                idx_fut = idx_cur + interval
-            else:
-                indices = random.sample(range(seg_len), 2)
-                indices.sort()
-                idx_cur, idx_fut = indices
-                
-            frame_front = vr_front[idx_cur].asnumpy()
-            frame_overhead = vr_overhead[idx_cur].asnumpy()
+            frame_idx = random.randint(0, seg_len - 1)
+            
+            frame_front = vr_front[frame_idx].asnumpy()
+            frame_overhead = vr_overhead[frame_idx].asnumpy()
             
             # Apply transforms to both views
             src_image, tgt_image = self.transforms(frame_front, frame_overhead)
