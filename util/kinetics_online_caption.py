@@ -27,7 +27,8 @@ class RLBenchOnlineCaption(Dataset):
         root,
         max_distance=48,
         repeated_sampling=2,
-        llm=None
+        llm=None,
+        max_length=8192
     ):
         super().__init__()
         self.root = root
@@ -87,11 +88,7 @@ class RLBenchOnlineCaption(Dataset):
         caption = response_json['choices'][0]['message']['content']
         request_time = time.time() - start_time
 
-        # Convert response to embedding using mean pooling
-        # This is a placeholder - replace with actual text-to-embedding logic
-        # For now, returning random embedding of expected size
-        embedding = np.random.randn(384).astype(np.float32)
-        return torch.from_numpy(embedding)
+        return caption
 
     def __len__(self):
         return len(self.video_paths)
@@ -122,22 +119,22 @@ class RLBenchOnlineCaption(Dataset):
     def __getitem__(self, index):
         video = self.video_paths[index]
         vr = VideoReader(video, num_threads=1, ctx=cpu(0))
-        embeddings = []
+        captions = []
         src_images = []
         tgt_images = []
 
         for i in range(self.repeated_sampling):
             src_image, tgt_image = self.load_frames(vr)
-            embedding = self.get_caption(src_image, tgt_image)
+            caption = self.get_caption(src_image, tgt_image)
             src_image, tgt_image = self.transform(src_image, tgt_image)
             src_images.append(src_image)
             tgt_images.append(tgt_image)
-            embeddings.append(embedding)
+            captions.append(caption)
         
         return {
             "src_images": torch.stack(src_images, dim=0),
             "tgt_images": torch.stack(tgt_images, dim=0),
-            "embeddings": torch.stack(embeddings, dim=0)
+            "captions": captions  # Return raw captions for tokenization
         }
 
 
