@@ -90,7 +90,7 @@ class RLBenchOnlineCaption(Dataset):
         
         # Prepare request
         payload = {
-            "model": "OpenGVLab/InternVL2_5-8B",
+            "model": self.llm["model"],
             "messages": [{
                 "role": "user",
                 "content": [
