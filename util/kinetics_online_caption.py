@@ -113,7 +113,7 @@ class RLBenchOnlineCaption(Dataset):
             tgt_image = self.basic_transform(tgt_image)
             
             # Get caption embedding
-            embedding = self.get_caption(frame_cur, frame_fut)
+            embedding = self.get_caption(frame_front, frame_overhead)
             
             src_images.append(src_image)
             tgt_images.append(tgt_image)
