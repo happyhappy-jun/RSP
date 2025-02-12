@@ -255,6 +255,91 @@ def train_one_epoch_m3ae(
     return {k: meter.global_avg for k, meter in metric_logger.meters.items()}
 
 
+def train_one_epoch_online(
+    model: torch.nn.Module,
+    data_loader: Iterable,
+    optimizer: torch.optim.Optimizer,
+    device: torch.device,
+    epoch: int,
+    loss_scaler,
+    embedding_model=None,
+    log_writer=None,
+    args=None,
+):
+    model.train(True)
+    metric_logger = misc.MetricLogger(delimiter="  ")
+    metric_logger.add_meter("lr", misc.SmoothedValue(window_size=1, fmt="{value:.6f}"))
+    header = "Epoch: [{}]".format(epoch)
+    print_freq = 100
+
+    accum_iter = args.accum_iter
+    optimizer.zero_grad(set_to_none=True)
+
+    if log_writer is not None:
+        print("log_dir: {}".format(log_writer.log_dir))
+
+    for data_iter_step, batch in enumerate(
+        metric_logger.log_every(data_loader, print_freq, header)
+    ):
+        # we use a per iteration (instead of per epoch) lr scheduler
+        if data_iter_step % accum_iter == 0:
+            lr_sched.adjust_learning_rate(
+                optimizer, data_iter_step / len(data_loader) + epoch, args
+            )
+
+        src_samples = batch["src_images"].to(device, non_blocking=True)
+        tgt_samples = batch["tgt_images"].to(device, non_blocking=True)
+        captions = batch["captions"]  # This should be already tokenized text
+
+        # Get embeddings from the text model
+        with torch.cuda.amp.autocast(enabled=args.amp):
+            with torch.no_grad():
+                outputs = embedding_model(**captions)
+                embeddings = outputs.last_hidden_state[:, 0]  # Take CLS token
+                embeddings = F.normalize(embeddings, p=2, dim=1)
+
+            # Forward pass through RSP model
+            loss, _, detailed_loss = model(
+                src_samples, tgt_samples, embeddings,
+                data_iter_step / len(data_loader) + epoch
+            )
+
+        loss_value = loss.item()
+
+        if not math.isfinite(loss_value):
+            print("Loss is {}, stopping training".format(loss_value))
+            sys.exit(1)
+
+        loss = loss / accum_iter
+        loss_scaler(
+            loss,
+            optimizer,
+            clip_grad=1.0,
+            parameters=model.parameters(),
+            update_grad=(data_iter_step + 1) % accum_iter == 0,
+        )
+        if (data_iter_step + 1) % accum_iter == 0:
+            optimizer.zero_grad(set_to_none=True)
+
+        torch.cuda.synchronize()
+
+        metric_logger.update(**detailed_loss)
+        metric_logger.update(loss=loss_value)
+        lr = optimizer.param_groups[0]["lr"]
+        metric_logger.update(lr=lr)
+
+        loss_value_reduce = misc.all_reduce_mean(loss_value)
+        if log_writer is not None and (data_iter_step + 1) % accum_iter == 0:
+            epoch_1000x = int((data_iter_step / len(data_loader) + epoch) * 1000)
+            log_writer.add_scalar("train_loss", loss_value_reduce, epoch_1000x)
+            log_writer.add_scalar("lr", lr, epoch_1000x)
+            for k, v in detailed_loss.items():
+                log_writer.add_scalar(k, v.item(), epoch_1000x)
+
+    metric_logger.synchronize_between_processes()
+    print("Averaged stats:", metric_logger)
+    return {k: meter.global_avg for k, meter in metric_logger.meters.items()}
+
 def train_one_epoch_m3ae_token(
     model: torch.nn.Module,
     data_loader: Iterable,

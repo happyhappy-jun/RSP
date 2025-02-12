@@ -112,6 +112,16 @@ def main(cfg: DictConfig):
         multiprocessing_context=torch.multiprocessing.get_context("spawn"),
     )
 
+    # Load embedding model if needed
+    embedding_model = None
+    if hasattr(cfg, 'embedding_model'):
+        from transformers import AutoModel, AutoTokenizer
+        embedding_model = AutoModel.from_pretrained(
+            cfg.embedding_model.name,
+            trust_remote_code=True
+        ).to(device)
+        embedding_model.eval()
+
     # define the model
     model = modeling.__dict__[cfg.model_name](**cfg.model_params)
 
@@ -154,6 +164,7 @@ def main(cfg: DictConfig):
             device,
             epoch,
             loss_scaler,
+            embedding_model=embedding_model,
             log_writer=log_writer,
             args=cfg,
         )

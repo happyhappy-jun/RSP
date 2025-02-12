@@ -20,8 +20,13 @@ dataset:
     postfix: "/v1/chat/completions"
 
 train_loop:
-  _target_: engine_pretrain_repsamp.train_one_epoch_llm
+  _target_: engine_pretrain_repsamp.train_one_epoch_online
   _partial_: true
+
+embedding_model:
+  name: "Alibaba-NLP/gte-base-en-v1.5"
+  max_length: 8192
+  device: "cuda"
 
 model_params:
   kl_scale: 0.001
