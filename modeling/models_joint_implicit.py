@@ -4,6 +4,7 @@ import torch.nn as nn
 
 from modeling.layers import CrossAttentionBlock
 from modeling.models_rsp_caption import RspCaption
+import torch.nn.functional as F
 
 
 class RspCaptionJointImplicit(RspCaption):
@@ -86,6 +87,15 @@ class RspCaptionJointImplicit(RspCaption):
         q = self.joint_emb_norm(q)
         return q
 
+    def patchify_embedding(self, embedding):
+        # Add sequence dimension if not present
+        if len(embedding.shape) == 2:
+            embedding = embedding.unsqueeze(1)
+
+        # normalize
+        embedding = F.normalize(embedding, p=2, dim=-1)
+        embedding_patch = embedding.reshape(embedding.shape[0], -1, self.embed_dim)
+        return embedding_patch
 
     def forward(self, src_imgs, tgt_imgs, embedding, epoch):
         # Extract embeddings
@@ -93,7 +103,7 @@ class RspCaptionJointImplicit(RspCaption):
         tgt_imgs = tgt_imgs.reshape(-1, *tgt_imgs.shape[2:])
         embedding = embedding.reshape(-1, embedding.size(-1))
         embedding = embedding.unsqueeze(1)
-        h_context_embed_dim = self.resize_embed(embedding, self.embed_dim)
+        h_context_embed_dim = self.patchify_embedding(embedding)
         src_h, _, _ = self.forward_encoder(src_imgs, mask_ratio=0)
         tgt_h, _, _ = self.forward_encoder(self.perturb(tgt_imgs), mask_ratio=0)
 

@@ -4,7 +4,7 @@ defaults:
 
 exp_name: rsp_kinetics_online_caption
 
-model_name: rsp_cos_joint_cut_vit_small_patch16
+model_name: rsp_joint_implicit_vit_small_patch16
 
 data_root: /data/RSP/rlbench/demo
 
