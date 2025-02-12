@@ -43,9 +43,7 @@ class RLBenchOnlineCaption(Dataset):
         # Convert frames to base64
         def frame_to_base64(frame):
             img = Image.fromarray(frame)
-            buffer = io.BytesIO()
-            img.save(buffer, format="JPEG")
-            return base64.b64encode(buffer.getvalue()).decode('utf-8')
+            return base64.b64encode(img.tobytes()).decode('utf-8')
             
         img1_b64 = frame_to_base64(frame1)
         img2_b64 = frame_to_base64(frame2)
