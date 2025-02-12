@@ -122,3 +122,31 @@ class RLBenchOnlineCaption(Dataset):
             "embeddings": torch.stack(embeddings, dim=0)
         }
 
+
+if __name__ == "__main__":
+    from torch.utils.data import DataLoader
+    
+    # Initialize dataset
+    dataset = RLBenchOnlineCaption(
+        root="/data/RSP/rlbench/demo",
+        repeated_sampling=2
+    )
+    
+    # Create dataloader
+    dataloader = DataLoader(
+        dataset,
+        batch_size=1,
+        shuffle=True,
+        num_workers=4
+    )
+    
+    # Test a few batches
+    for i, batch in enumerate(dataloader):
+        print(f"\nBatch {i+1}")
+        print("Source image shape:", batch["src_images"].shape)
+        print("Target image shape:", batch["tgt_images"].shape)
+        print("Embedding shape:", batch["embeddings"].shape)
+        
+        if i >= 2:  # Test first 3 batches only
+            break
+
