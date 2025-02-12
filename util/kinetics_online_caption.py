@@ -24,7 +24,9 @@ class RLBenchOnlineCaption(Dataset):
         self.root = root
         
         # Find all task directories
-        self.video_paths = glob.glob(os.path.join(root, "*_*{overhead,front}.mp4"))
+        self.video_paths = (glob.glob(os.path.join(root, "**/*_front.mp4")) +
+                            glob.glob(os.path.join(root, "**/*_overhead.mp4")))
+
 
         self.transforms = PairedRandomResizedCrop()
         self.basic_transform = transforms.Compose(
@@ -64,6 +66,7 @@ class RLBenchOnlineCaption(Dataset):
         }
         
         # Send request to local server
+
         response = requests.post(self.llm_url, json=payload)
         response_json = response.json()
         caption = response_json['choices'][0]['message']['content']
@@ -131,22 +134,5 @@ if __name__ == "__main__":
         root="/data/RSP/rlbench/demo",
         repeated_sampling=2
     )
-    
-    # Create dataloader
-    dataloader = DataLoader(
-        dataset,
-        batch_size=1,
-        shuffle=True,
-        num_workers=4
-    )
-    
-    # Test a few batches
-    for i, batch in enumerate(dataloader):
-        print(f"\nBatch {i+1}")
-        print("Source image shape:", batch["src_images"].shape)
-        print("Target image shape:", batch["tgt_images"].shape)
-        print("Embedding shape:", batch["embeddings"].shape)
-        
-        if i >= 2:  # Test first 3 batches only
-            break
 
+    print(dataset[0])
