@@ -1,6 +1,7 @@
 import os
 import random
 import glob
+import time
 import numpy as np
 import torch
 from torch.utils.data import Dataset
@@ -10,6 +11,13 @@ from PIL import Image
 import requests
 import base64
 import io
+import logging
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
 
 from util.transform import PairedRandomResizedCrop
 
@@ -65,12 +73,15 @@ class RLBenchOnlineCaption(Dataset):
             "max_tokens": 512
         }
         
-        # Send request to local server
-
+        # Send request to local server and measure time
+        start_time = time.time()
         response = requests.post(self.llm_url, json=payload)
         response_json = response.json()
         caption = response_json['choices'][0]['message']['content']
-        print(caption)
+        request_time = time.time() - start_time
+        
+        logging.info(f"LLM Request took {request_time:.2f} seconds")
+        logging.info(f"Caption: {caption}")
         
         # Convert response to embedding using mean pooling
         # This is a placeholder - replace with actual text-to-embedding logic
@@ -135,4 +146,9 @@ if __name__ == "__main__":
         repeated_sampling=2
     )
 
-    print(dataset[0])
+    logging.info("Testing dataset with first sample...")
+    start_time = time.time()
+    sample = dataset[0]
+    total_time = time.time() - start_time
+    logging.info(f"Total processing time: {total_time:.2f} seconds")
+    logging.info(f"Sample shapes: {[(k, v.shape) for k, v in sample.items()]}")
