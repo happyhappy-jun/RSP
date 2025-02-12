@@ -295,7 +295,12 @@ def train_one_epoch_online(
         # Get embeddings from the text model
         with torch.cuda.amp.autocast(enabled=args.amp):
             with torch.no_grad():
-                outputs = embedding_model(**{k: v.to(device) for k, v in captions.items()})
+                # Reshape inputs if needed and move to device
+                inputs = {k: v.reshape(-1, v.size(-1)) if k == 'input_ids' else v.reshape(-1, v.size(-1))
+                         for k, v in captions.items()}
+                inputs = {k: v.to(device) for k, v in inputs.items()}
+                
+                outputs = embedding_model(**inputs)
                 embeddings = outputs.last_hidden_state[:, 0]  # Take CLS token
                 embeddings = F.normalize(embeddings, dim=1)
 
