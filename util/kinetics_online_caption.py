@@ -50,7 +50,7 @@ class RLBenchOnlineCaption(Dataset):
         
         # Prepare request
         payload = {
-            "model": "internvl2",
+            "model": "OpenGVLab/InternVL2_5-8B",
             "messages": [{
                 "role": "user",
                 "content": [
@@ -67,6 +67,7 @@ class RLBenchOnlineCaption(Dataset):
         response = requests.post(self.llm_url, json=payload)
         response_json = response.json()
         caption = response_json['choices'][0]['message']['content']
+        print(caption)
         
         # Convert response to embedding using mean pooling
         # This is a placeholder - replace with actual text-to-embedding logic
@@ -75,33 +76,42 @@ class RLBenchOnlineCaption(Dataset):
         return torch.from_numpy(embedding)
 
     def __len__(self):
-        return len(self.samples)
+        return len(self.video_paths)
+
+    def transform(self, src_image, tgt_image):
+        src_image, tgt_image = self.transforms(src_image, tgt_image)
+        src_image = self.basic_transform(src_image)
+        tgt_image = self.basic_transform(tgt_image)
+        return src_image, tgt_image
+
+    def load_frames(self, vr):
+        # handle temporal segments
+        seg_len = len(vr)
+        least_frames_num = self.max_distance + 1
+        if seg_len >= least_frames_num:
+            idx_cur = random.randint(0, seg_len - least_frames_num)
+            interval = random.randint(4, self.max_distance)
+            idx_fut = idx_cur + interval
+        else:
+            indices = random.sample(range(seg_len), 2)
+            indices.sort()
+            idx_cur, idx_fut = indices
+        frame_cur = vr[idx_cur].asnumpy()
+        frame_fut = vr[idx_fut].asnumpy()
+
+        return frame_cur, frame_fut
 
     def __getitem__(self, index):
-        front_video, overhead_video = self.samples[index]
-        vr_front = VideoReader(front_video, num_threads=1, ctx=cpu(0))
-        vr_overhead = VideoReader(overhead_video, num_threads=1, ctx=cpu(0))
-        
+        video = self.video_paths[index]
+        vr = VideoReader(video, num_threads=1, ctx=cpu(0))
+        embeddings = []
         src_images = []
         tgt_images = []
-        embeddings = []
-        
-        for _ in range(self.repeated_sampling):
-            # Load frames from both views at same timestamp
-            seg_len = min(len(vr_front), len(vr_overhead))
-            frame_idx = random.randint(0, seg_len - 1)
-            
-            frame_front = vr_front[frame_idx].asnumpy()
-            frame_overhead = vr_overhead[frame_idx].asnumpy()
-            
-            # Apply transforms to both views
-            src_image, tgt_image = self.transforms(frame_front, frame_overhead)
-            src_image = self.basic_transform(src_image)
-            tgt_image = self.basic_transform(tgt_image)
-            
-            # Get caption embedding
-            embedding = self.get_caption(frame_front, frame_overhead)
-            
+
+        for i in range(self.repeated_sampling):
+            src_image, tgt_image = self.load_frames(vr)
+            embedding = self.get_caption(src_image, tgt_image)
+            src_image, tgt_image = self.transform(src_image, tgt_image)
             src_images.append(src_image)
             tgt_images.append(tgt_image)
             embeddings.append(embedding)
