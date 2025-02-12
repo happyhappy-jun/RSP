@@ -19,22 +19,12 @@ class RLBenchOnlineCaption(Dataset):
         root,
         max_distance=48,
         repeated_sampling=2,
-        model_path='OpenGVLab/InternVL2-8B'
     ):
         super().__init__()
         self.root = root
         
         # Find all task directories
-        task_dirs = glob.glob(os.path.join(root, "*"))
-        self.samples = []
-        
-        # Collect front and overhead video pairs
-        for task_dir in task_dirs:
-            front_videos = glob.glob(os.path.join(task_dir, "*_front.mp4"))
-            for front_video in front_videos:
-                overhead_video = front_video.replace("_front.mp4", "_overhead.mp4")
-                if os.path.exists(overhead_video):
-                    self.samples.append((front_video, overhead_video))
+        self.video_paths = glob.glob(os.path.join(root, "*_*{overhead,front}.mp4"))
 
         self.transforms = PairedRandomResizedCrop()
         self.basic_transform = transforms.Compose(
