@@ -27,6 +27,7 @@ embedding_model:
   name: "Alibaba-NLP/gte-base-en-v1.5"
   max_length: 8192
   device: "cuda"
+  tokenizer_name: "Alibaba-NLP/gte-base-en-v1.5"
 
 model_params:
   kl_scale: 0.001

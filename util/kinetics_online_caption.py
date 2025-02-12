@@ -57,8 +57,9 @@ class RLBenchOnlineCaption(Dataset):
         }
         self.llm_url = f"http://{self.llm['host']}:{self.llm['port']}{self.llm['postfix']}"
         
-        # Initialize tokenizer
-        self.tokenizer = AutoTokenizer.from_pretrained('Alibaba-NLP/gte-base-en-v1.5')
+        # Initialize tokenizer from config
+        tokenizer_name = llm.get('tokenizer_name', 'Alibaba-NLP/gte-base-en-v1.5')
+        self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_name)
         self.max_length = max_length
 
     def get_caption(self, frame1, frame2):
