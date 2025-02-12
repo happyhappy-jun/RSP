@@ -30,6 +30,7 @@ class RLBenchOnlineCaption(Dataset):
         llm=None,
         max_length=8192
     ):
+        from transformers import AutoTokenizer
         super().__init__()
         self.root = root
         
@@ -55,6 +56,10 @@ class RLBenchOnlineCaption(Dataset):
             "postfix": "/v1/chat/completions"
         }
         self.llm_url = f"http://{self.llm['host']}:{self.llm['port']}{self.llm['postfix']}"
+        
+        # Initialize tokenizer
+        self.tokenizer = AutoTokenizer.from_pretrained('Alibaba-NLP/gte-base-en-v1.5')
+        self.max_length = max_length
 
     def get_caption(self, frame1, frame2):
         """Generate caption comparing two frames using LLM"""
@@ -131,10 +136,19 @@ class RLBenchOnlineCaption(Dataset):
             tgt_images.append(tgt_image)
             captions.append(caption)
         
+        # Tokenize captions
+        tokenized = self.tokenizer(
+            captions,
+            max_length=self.max_length,
+            padding=True,
+            truncation=True,
+            return_tensors='pt'
+        )
+        
         return {
             "src_images": torch.stack(src_images, dim=0),
             "tgt_images": torch.stack(tgt_images, dim=0),
-            "captions": captions  # Return raw captions for tokenization
+            "captions": tokenized
         }
 
 
