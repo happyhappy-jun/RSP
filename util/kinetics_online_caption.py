@@ -146,9 +146,29 @@ if __name__ == "__main__":
         repeated_sampling=2
     )
 
-    logging.info("Testing dataset with first sample...")
+    # Create dataloader
+    dataloader = DataLoader(
+        dataset,
+        batch_size=2,
+        shuffle=True,
+        num_workers=4,
+        pin_memory=True
+    )
+
+    logging.info(f"Dataset size: {len(dataset)}")
+    logging.info(f"Number of batches: {len(dataloader)}")
+
+    # Test batch loading
     start_time = time.time()
-    sample = dataset[0]
+    for batch_idx, batch in enumerate(dataloader):
+        logging.info(f"\nProcessing batch {batch_idx + 1}")
+        logging.info(f"Batch shapes:")
+        for k, v in batch.items():
+            logging.info(f"  {k}: {v.shape}")
+        
+        if batch_idx >= 2:  # Test first 3 batches only
+            break
+    
     total_time = time.time() - start_time
-    logging.info(f"Total processing time: {total_time:.2f} seconds")
-    logging.info(f"Sample shapes: {[(k, v.shape) for k, v in sample.items()]}")
+    logging.info(f"\nProcessed 3 batches in {total_time:.2f} seconds")
+    logging.info(f"Average time per batch: {total_time/3:.2f} seconds")
