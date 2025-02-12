@@ -27,7 +27,7 @@ class RLBenchOnlineCaption(Dataset):
         root,
         max_distance=48,
         repeated_sampling=2,
-        **kwargs
+        llm=None
     ):
         super().__init__()
         self.root = root
@@ -46,8 +46,14 @@ class RLBenchOnlineCaption(Dataset):
         self.max_distance = max_distance
         self.repeated_sampling = repeated_sampling
         
-        # LLM server endpoint from config
-        self.llm_url = kwargs.get('llm_url', "http://0.0.0.0:23333/v1/chat/completions")
+        # LLM configuration
+        self.llm = llm or {
+            "model": self.llm["model"],
+            "host": "0.0.0.0",
+            "port": 23333,
+            "postfix": "/v1/chat/completions"
+        }
+        self.llm_url = f"http://{self.llm['host']}:{self.llm['port']}{self.llm['postfix']}"
 
     def get_caption(self, frame1, frame2):
         """Generate caption comparing two frames using LLM"""

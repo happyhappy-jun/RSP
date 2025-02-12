@@ -13,7 +13,11 @@ dataset:
   root: ${..data_root}/kinetics400caption
   max_distance: 48
   repeated_sampling: 2
-  llm_url: "http://0.0.0.0:23333/v1/chat/completions"
+  llm:
+    model: "OpenGVLab/InternVL2_5-8B"
+    host: "0.0.0.0"
+    port: 23333
+    postfix: "/v1/chat/completions"
 
 train_loop:
   _target_: engine_pretrain_repsamp.train_one_epoch_llm
