@@ -28,7 +28,8 @@ class RLBenchOnlineCaption(Dataset):
         max_distance=48,
         repeated_sampling=2,
         llm=None,
-        max_length=8192
+        max_length=8192,
+        embedding_model=None
     ):
         from transformers import AutoTokenizer
         super().__init__()
@@ -58,8 +59,7 @@ class RLBenchOnlineCaption(Dataset):
         self.llm_url = f"http://{self.llm['host']}:{self.llm['port']}{self.llm['postfix']}"
         
         # Initialize tokenizer from config
-        tokenizer_name = llm.get('tokenizer_name', 'Alibaba-NLP/gte-base-en-v1.5')
-        self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_name)
+        self.tokenizer = AutoTokenizer.from_pretrained(embedding_model)
         self.max_length = max_length
 
     def get_caption(self, frame1, frame2):
