@@ -36,8 +36,8 @@ class RLBenchOnlineCaption(Dataset):
         self.root = root
         
         # Find all task directories
-        self.video_paths = (glob.glob(os.path.join(root, "**/*_front.mp4")) +
-                            glob.glob(os.path.join(root, "**/*_overhead.mp4")))
+        self.video_paths = (glob.glob(os.path.join(root, "*_front.mp4")) +
+                            glob.glob(os.path.join(root, "*_overhead.mp4")))
 
 
         self.transforms = PairedRandomResizedCrop()
@@ -62,15 +62,31 @@ class RLBenchOnlineCaption(Dataset):
         self.tokenizer = AutoTokenizer.from_pretrained(embedding_model)
         self.max_length = max_length
 
+    def frame_to_base64(self, frame: np.ndarray) -> str:
+        """Convert numpy array frame to base64 string."""
+        try:
+            # Ensure frame is uint8
+            if frame.dtype != np.uint8:
+                frame = (frame * 255).astype(np.uint8)
+
+            # Convert to PIL Image
+            img = Image.fromarray(frame)
+
+            # Save to bytes buffer
+            buffer = io.BytesIO()
+            img.save(buffer, format='JPEG')
+
+            # Convert to base64
+            return base64.b64encode(buffer.getvalue()).decode('utf-8')
+        except Exception as e:
+            logger.error(f"Failed to convert frame to base64: {e}")
+            raise
+
     def get_caption(self, frame1, frame2):
         """Generate caption comparing two frames using LLM"""
         # Convert frames to base64
-        def frame_to_base64(frame):
-            img = Image.fromarray(frame)
-            return base64.b64encode(img.tobytes()).decode('utf-8')
-            
-        img1_b64 = frame_to_base64(frame1)
-        img2_b64 = frame_to_base64(frame2)
+        img1_b64 = self.frame_to_base64(frame1)
+        img2_b64 = self.frame_to_base64(frame2)
         
         # Prepare request
         payload = {
@@ -83,8 +99,7 @@ class RLBenchOnlineCaption(Dataset):
                     {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{img2_b64}"}}
                 ]
             }],
-            "temperature": 0.7,
-            "max_tokens": 512
+            "temperature": 1.0,
         }
         
         # Send request to local server and measure time
