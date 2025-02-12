@@ -137,19 +137,31 @@ class RLBenchOnlineCaption(Dataset):
             tgt_images.append(tgt_image)
             captions.append(caption)
         
-        # Tokenize captions
-        tokenized = self.tokenizer(
-            captions,
-            max_length=self.max_length,
-            padding=True,
-            truncation=True,
-            return_tensors='pt'
-        )
+        # Tokenize captions individually to avoid collation issues
+        tokenized_list = []
+        for caption in captions:
+            tokens = self.tokenizer(
+                caption,
+                max_length=self.max_length,
+                padding='max_length',
+                truncation=True,
+                return_tensors='pt'
+            )
+            # Squeeze out the batch dimension since we're processing one at a time
+            tokenized_list.append({
+                k: v.squeeze(0) for k, v in tokens.items()
+            })
+        
+        # Stack all tokenized outputs
+        tokenized_batch = {
+            k: torch.stack([item[k] for item in tokenized_list])
+            for k in tokenized_list[0].keys()
+        }
         
         return {
             "src_images": torch.stack(src_images, dim=0),
             "tgt_images": torch.stack(tgt_images, dim=0),
-            "captions": tokenized
+            "captions": tokenized_batch
         }
 
 
