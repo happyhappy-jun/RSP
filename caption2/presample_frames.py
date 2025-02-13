@@ -141,7 +141,7 @@ def process_video(
     for first_idx, second_idx in frame_pairs:
         try:
             frames = load_frames(video_path, [first_idx, second_idx])
-            caption = caption_dataset.get_caption(frames[0], frames[1])
+            caption = caption_generator.get_caption(frames[0], frames[1])
             
             pair_result = {
                 "frame_indices": [first_idx, second_idx],
@@ -169,7 +169,7 @@ def process_video(
         for first_idx, second_idx in current_queue:
             try:
                 frames = load_frames(video_path, [first_idx, second_idx])
-                caption = caption_dataset.get_caption(frames[0], frames[1])
+                caption = caption_generator.get_caption(frames[0], frames[1])
                 
                 pair_result = {
                     "frame_indices": [first_idx, second_idx],
