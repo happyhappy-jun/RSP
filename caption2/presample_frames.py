@@ -73,19 +73,15 @@ class CaptionTask:
 
 
 class CaptionGenerator:
-    def __init__(self, model: str, endpoints: List[Dict], rpm: int = 5, max_concurrent: int = 128):
+    def __init__(self, model: str, endpoints: List[Dict], max_concurrent: int = 128):
         """
         Initialize with multiple endpoints
         endpoints: List of dicts with host and port for each endpoint
-        rpm: Requests per minute per endpoint
         max_concurrent: Maximum number of concurrent requests
         """
         self.model = model
         self.urls = [f"http://{ep['host']}:{ep['port']}/v1/chat/completions" for ep in endpoints]
-        self.rpm = rpm
-        self.min_interval = 60.0 / rpm  # Minimum time between requests
         self.results_by_video = defaultdict(lambda: {"frame_pairs": [], "failed_pairs": []})
-        self.endpoint_last_request = [0.0 for _ in self.urls]
         self.current_endpoint = 0  # Track current endpoint
         self.semaphore = Semaphore(max_concurrent)
         self.session = None
@@ -109,13 +105,7 @@ class CaptionGenerator:
 
     def get_next_endpoint(self) -> int:
         """Use endpoints in round-robin fashion"""
-        current_time = time.time()
-        time_since_last = current_time - self.endpoint_last_request[self.current_endpoint]
-
-        # If not enough time has passed for current endpoint, try the other one
-        if time_since_last < self.min_interval:
-            self.current_endpoint = (self.current_endpoint + 1) % len(self.urls)
-
+        self.current_endpoint = (self.current_endpoint + 1) % len(self.urls)
         return self.current_endpoint
 
     async def process_task(self, task: CaptionTask, progress: Optional[ProgressTracker] = None) -> bool:
@@ -147,14 +137,8 @@ class CaptionGenerator:
                 "temperature": 1.0,
             }
 
-            # Select endpoint and enforce rate limit
+            # Select endpoint and send request
             endpoint_idx = self.get_next_endpoint()
-            current_time = time.time()
-            time_since_last = current_time - self.endpoint_last_request[endpoint_idx]
-            if time_since_last < self.min_interval:
-                time.sleep(self.min_interval - time_since_last)
-
-            # Send request
             url = self.urls[endpoint_idx]
             progress_msg = progress.update() if progress else None
             if progress_msg:
@@ -164,8 +148,6 @@ class CaptionGenerator:
                 async with self.session.post(url, json=payload, timeout=300) as response:
                     response.raise_for_status()
                     response_json = await response.json()
-                    
-            self.endpoint_last_request[endpoint_idx] = time.time()
             task.caption = response_json['choices'][0]['message']['content']
 
             # Store result
@@ -334,7 +316,6 @@ async def main():
     parser.add_argument("--llm-ports", nargs="+", type=int, default=[23333, 23334], help="LLM API ports")
     parser.add_argument("--num-pairs", type=int, default=64, help="Number of frame pairs to sample per video")
     parser.add_argument("--max-distance", type=int, default=48, help="Maximum frame distance in pairs")
-    parser.add_argument("--rpm", type=int, default=300, help="Requests per minute per endpoint")
     args = parser.parse_args()
 
     # Create output directory
@@ -374,8 +355,7 @@ async def main():
 
     caption_generator = CaptionGenerator(
         model=args.llm_model,
-        endpoints=endpoints,
-        rpm=args.rpm
+        endpoints=endpoints
     )
 
     try:
