@@ -85,7 +85,7 @@ class CaptionGenerator:
         self.current_endpoint = 0  # Track current endpoint
         self.semaphore = Semaphore(max_concurrent)
         self.session = None
-        logger.info(f"Initialized {len(endpoints)} endpoints with {rpm} RPM limit")
+        logger.info(f"Initialized {len(endpoints)} endpoints")
         logger.info(f"Maximum concurrent requests: {max_concurrent}")
         for i, url in enumerate(self.urls):
             logger.info(f"Endpoint {i}: {url}")
