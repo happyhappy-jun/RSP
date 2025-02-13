@@ -250,28 +250,31 @@ async def process_videos(
         video_result["failed_pairs"].append([task.first_idx, task.second_idx])
         return False
 
-    # Process all tasks concurrently
-    await asyncio.gather(*(process_task_with_retry(task) for task in tasks))
-
-        # Save intermediate results every 1000 tasks
-        if completed_tasks % 1000 == 0:
-            intermediate_results = []
-            for video_path in video_paths:
-                if video_path in caption_generator.results_by_video:
-                    rel_path = os.path.relpath(video_path, data_root)
-                    video_name = os.path.basename(video_path)
-                    result = caption_generator.results_by_video[video_path]
-                    intermediate_results.append({
-                        "video_path": rel_path,
-                        "video_name": video_name,
-                        "frame_pairs": result["frame_pairs"],
-                        "failed_pairs": result["failed_pairs"]
-                    })
-
-            output_path = os.path.join(output_dir, f"captions_intermediate_{completed_tasks}.json")
-            save_results(intermediate_results, output_path)
-
-        time.sleep(1)  # Prevent busy waiting
+    # Create chunks of tasks for intermediate saving
+    chunk_size = 1000
+    task_chunks = [tasks[i:i + chunk_size] for i in range(0, len(tasks), chunk_size)]
+    
+    for chunk_idx, task_chunk in enumerate(task_chunks):
+        # Process chunk of tasks concurrently
+        await asyncio.gather(*(process_task_with_retry(task) for task in task_chunk))
+        
+        # Save intermediate results after each chunk
+        intermediate_results = []
+        for video_path in video_paths:
+            if video_path in caption_generator.results_by_video:
+                rel_path = os.path.relpath(video_path, data_root)
+                video_name = os.path.basename(video_path)
+                result = caption_generator.results_by_video[video_path]
+                intermediate_results.append({
+                    "video_path": rel_path,
+                    "video_name": video_name,
+                    "frame_pairs": result["frame_pairs"],
+                    "failed_pairs": result["failed_pairs"]
+                })
+        
+        completed_tasks = (chunk_idx + 1) * chunk_size
+        output_path = os.path.join(output_dir, f"captions_intermediate_{completed_tasks}.json")
+        save_results(intermediate_results, output_path)
 
     # Format final results
     final_results = []
