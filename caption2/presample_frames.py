@@ -162,23 +162,32 @@ async def process_videos(
         caption_generator: CaptionGenerator,
         num_pairs: int = 64,
         max_distance: int = 48,
-        max_retries: int = 20
+        max_retries: int = 20,
+        batch_size: int = 100
 ) -> Dict:
     """Process multiple videos concurrently"""
     # Create frame pairs for all videos
     all_pairs = []
+    logger.info("Sampling frame pairs from videos...")
     for video_path in tqdm(video_paths):
-        pairs = sample_frame_pairs(video_path, num_pairs, max_distance)
-        all_pairs.extend([
-            FramePair(video_path=video_path, first_idx=first, second_idx=second)
-            for first, second in pairs
-        ])
+        try:
+            pairs = sample_frame_pairs(video_path, num_pairs, max_distance)
+            all_pairs.extend([
+                FramePair(video_path=video_path, first_idx=first, second_idx=second)
+                for first, second in pairs
+            ])
+        except Exception as e:
+            logger.error(f"Error sampling frames from {video_path}: {str(e)}", exc_info=True)
+            continue
 
     # Process all pairs
     results_by_video = defaultdict(lambda: {"frame_pairs": [], "failed_pairs": []})
     retry_queue = []
+    total_pairs = len(all_pairs)
+    processed_pairs = 0
 
     async def process_pair(pair: FramePair):
+        nonlocal processed_pairs
         try:
             await caption_generator.process_frame_pair(pair)
             video_result = results_by_video[pair.video_path]
@@ -186,27 +195,59 @@ async def process_videos(
                 "frame_indices": [pair.first_idx, pair.second_idx],
                 "caption": pair.caption
             })
+            processed_pairs += 1
+            if processed_pairs % 100 == 0:
+                logger.info(f"Processed {processed_pairs}/{total_pairs} pairs")
         except Exception as e:
             if pair.retries < max_retries:
                 retry_queue.append(pair)
             else:
                 video_result = results_by_video[pair.video_path]
                 video_result["failed_pairs"].append([pair.first_idx, pair.second_idx])
+                logger.error(f"Failed to process pair after {max_retries} retries: {str(e)}")
 
-    # Initial processing
-    tasks = [process_pair(pair) for pair in all_pairs]
-    await asyncio.gather(*tasks, return_exceptions=True)
+    # Process in batches
+    logger.info(f"Processing {total_pairs} pairs in batches of {batch_size}...")
+    for i in range(0, len(all_pairs), batch_size):
+        batch = all_pairs[i:i + batch_size]
+        tasks = [process_pair(pair) for pair in batch]
+        await asyncio.gather(*tasks, return_exceptions=True)
+        
+        # Save intermediate results every 1000 pairs
+        if i % 1000 == 0:
+            intermediate_results = []
+            for video_path in video_paths:
+                if video_path in results_by_video:
+                    rel_path = os.path.relpath(video_path, data_root)
+                    video_name = os.path.basename(video_path)
+                    result = results_by_video[video_path]
+                    intermediate_results.append({
+                        "video_path": rel_path,
+                        "video_name": video_name,
+                        "frame_pairs": result["frame_pairs"],
+                        "failed_pairs": result["failed_pairs"]
+                    })
+            
+            output_path = os.path.join(os.path.dirname(data_root), f"captions_intermediate_{i}.json")
+            with open(output_path, 'w') as f:
+                json.dump(intermediate_results, f, indent=2)
+            logger.info(f"Saved intermediate results to {output_path}")
 
     # Process retry queue with exponential backoff
-    while retry_queue:
-        next_retry = []
-        wait_time = min(60 * (2 ** len(str(retry_queue))) + random.uniform(0, 10), 300)
-        logger.info(f"Waiting {wait_time:.1f} seconds before retrying {len(retry_queue)} pairs")
+    retry_count = 0
+    while retry_queue and retry_count < max_retries:
+        retry_count += 1
+        current_queue = retry_queue[:]
+        retry_queue = []
+        
+        wait_time = min(60 * (2 ** retry_count) + random.uniform(0, 10), 300)
+        logger.info(f"Waiting {wait_time:.1f} seconds before retrying {len(current_queue)} pairs (attempt {retry_count})")
         await asyncio.sleep(wait_time)
 
-        tasks = [process_pair(pair) for pair in retry_queue]
-        await asyncio.gather(*tasks, return_exceptions=True)
-        retry_queue = next_retry
+        for i in range(0, len(current_queue), batch_size):
+            batch = current_queue[i:i + batch_size]
+            tasks = [process_pair(pair) for pair in batch]
+            await asyncio.gather(*tasks, return_exceptions=True)
 
     # Format results
     final_results = []
@@ -234,6 +275,7 @@ async def main():
     parser.add_argument("--num-pairs", type=int, default=64, help="Number of frame pairs to sample per video")
     parser.add_argument("--max-distance", type=int, default=48, help="Maximum frame distance in pairs")
     parser.add_argument("--max-concurrent", type=int, default=5, help="Maximum concurrent requests")
+    parser.add_argument("--batch-size", type=int, default=100, help="Number of pairs to process in each batch")
     args = parser.parse_args()
 
     # Create output directory
@@ -259,7 +301,8 @@ async def main():
             args.data_root,
             caption_generator,
             args.num_pairs,
-            args.max_distance
+            args.max_distance,
+            batch_size=args.batch_size
         )
 
         # Save results periodically (every 100 processed pairs)
