@@ -1,7 +1,7 @@
 """
 Script to presample frames from videos and generate captions using API endpoints.
 """
-
+import glob
 import os
 import json
 import random
@@ -149,9 +149,8 @@ def main():
     os.makedirs(args.output_dir, exist_ok=True)
     
     # Get list of all video files
-    video_files = []
-    for ext in ['.mp4', '.avi', '.mov']:
-        video_files.extend(Path(args.data_root).rglob(f'*{ext}'))
+    video_files = (glob.glob(os.path.join(args.data_root, "*_front.mp4")) +
+                            glob.glob(os.path.join(args.data_root, "*_overhead.mp4")))
     
     # Initialize caption dataset
     caption_dataset = RLBenchOnlineCaption(
