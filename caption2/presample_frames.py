@@ -168,7 +168,7 @@ async def process_videos(
     """Process multiple videos concurrently"""
     # Create frame pairs for all videos
     all_pairs = []
-    for video_path in video_paths:
+    for video_path in tqdm(video_paths):
         pairs = sample_frame_pairs(video_path, num_pairs, max_distance)
         all_pairs.extend([
             FramePair(video_path=video_path, first_idx=first, second_idx=second)
@@ -244,6 +244,7 @@ async def main():
     video_files = (glob.glob(os.path.join(args.data_root, "*_front.mp4")) +
                    glob.glob(os.path.join(args.data_root, "*_overhead.mp4")))
 
+    logger.info(f"Found {len(video_files)} video files")
     # Initialize caption generator
     caption_generator = CaptionGenerator(
         model=args.llm_model,
