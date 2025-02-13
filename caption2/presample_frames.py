@@ -31,6 +31,7 @@ logging.basicConfig(
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
 
+
 @dataclass
 class FramePair:
     video_path: str
@@ -39,6 +40,7 @@ class FramePair:
     frames: List[np.ndarray] = None
     caption: str = None
     retries: int = 0
+
 
 class CaptionGenerator:
     def __init__(self, model: str, host: str = "0.0.0.0", port: int = 23333, max_concurrent: int = 5):
@@ -72,21 +74,22 @@ class CaptionGenerator:
         # Convert frames to base64
         img1_b64 = self.frame_to_base64(frame1)
         img2_b64 = self.frame_to_base64(frame2)
-        
+
         # Prepare request
         payload = {
             "model": self.model,
             "messages": [{
                 "role": "user",
                 "content": [
-                    {"type": "text", "text": "Describe the main differences between these two frames from a video."},
+                    {"type": "text",
+                     "text": "Describe followings. Keep the answer concise. 1. differences between these two frames from a video\n2. temporal change\n3. motion and dynamics\n4. Task of robot\n5. Environment of robot"},
                     {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{img1_b64}"}},
                     {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{img2_b64}"}}
                 ]
             }],
             "temperature": 1.0,
         }
-        
+
         retry_count = 0
         async with self.semaphore:  # Limit concurrent requests
             async with aiohttp.ClientSession() as session:
@@ -132,7 +135,7 @@ def sample_frame_pairs(video_path: str, num_pairs: int = 64, max_distance: int =
     """Sample pairs of frame indices from a video."""
     vr = VideoReader(video_path)
     video_length = len(vr)
-    
+
     pairs = []
     for _ in range(num_pairs):
         least_frames_num = max_distance + 1
@@ -149,12 +152,12 @@ def sample_frame_pairs(video_path: str, num_pairs: int = 64, max_distance: int =
 
 
 async def process_videos(
-    video_paths: List[str],
-    data_root: str,
-    caption_generator: CaptionGenerator,
-    num_pairs: int = 64,
-    max_distance: int = 48,
-    max_retries: int = 20
+        video_paths: List[str],
+        data_root: str,
+        caption_generator: CaptionGenerator,
+        num_pairs: int = 64,
+        max_distance: int = 48,
+        max_retries: int = 20
 ) -> Dict:
     """Process multiple videos concurrently"""
     # Create frame pairs for all videos
@@ -169,7 +172,7 @@ async def process_videos(
     # Process all pairs
     results_by_video = defaultdict(lambda: {"frame_pairs": [], "failed_pairs": []})
     retry_queue = []
-    
+
     async def process_pair(pair: FramePair):
         try:
             await caption_generator.process_frame_pair(pair)
@@ -195,7 +198,7 @@ async def process_videos(
         wait_time = min(60 * (2 ** len(str(retry_queue))) + random.uniform(0, 10), 300)
         logging.info(f"Waiting {wait_time:.1f} seconds before retrying {len(retry_queue)} pairs")
         await asyncio.sleep(wait_time)
-        
+
         tasks = [process_pair(pair) for pair in retry_queue]
         await asyncio.gather(*tasks, return_exceptions=True)
         retry_queue = next_retry
@@ -230,11 +233,11 @@ async def main():
 
     # Create output directory
     os.makedirs(args.output_dir, exist_ok=True)
-    
+
     # Get list of all video files
     video_files = (glob.glob(os.path.join(args.data_root, "*_front.mp4")) +
-                  glob.glob(os.path.join(args.data_root, "*_overhead.mp4")))
-    
+                   glob.glob(os.path.join(args.data_root, "*_overhead.mp4")))
+
     # Initialize caption generator
     caption_generator = CaptionGenerator(
         model=args.llm_model,
@@ -252,19 +255,19 @@ async def main():
             args.num_pairs,
             args.max_distance
         )
-        
+
         # Save results periodically (every 100 processed pairs)
         processed_pairs = sum(len(r["frame_pairs"]) for r in results)
         if processed_pairs % 100000 == 0:
             output_path = os.path.join(args.output_dir, f"captions_batch_{processed_pairs}.json")
             with open(output_path, 'w') as f:
                 json.dump(results, f, indent=2)
-        
+
         # Save final results
         final_output = os.path.join(args.output_dir, "captions_final.json")
         with open(final_output, 'w') as f:
             json.dump(results, f, indent=2)
-            
+
     except Exception as e:
         logging.error(f"Error during processing: {e}")
         raise
