@@ -329,6 +329,7 @@ async def main():
     os.makedirs(args.output_dir, exist_ok=True)
 
     # Get list of all video files, excluding specific tasks
+    # Get list of all video files, excluding specific tasks
     excluded_tasks = [
         "push_button",
         "take_lid_off_saucepan",
@@ -337,12 +338,23 @@ async def main():
         "stack_wine",
         "put_rubbish_in_bin"
     ]
-    
-    video_files = glob.glob(os.path.join(args.data_root, "*_front.mp4"))
-    video_files = [v for v in video_files if not any(task in v for task in excluded_tasks)]
 
-    logger.info(f"Found {len(video_files)} video files")
-    # Initialize caption generator
+    all_video_files = glob.glob(os.path.join(args.data_root, "*_front.mp4"))
+    video_files = [v for v in all_video_files if not any(task in v for task in excluded_tasks)]
+
+    # Log information about excluded videos
+    total_videos = len(all_video_files)
+    excluded_videos = total_videos - len(video_files)
+    logger.info(f"Found total of {total_videos} video files")
+    logger.info(f"Excluded {excluded_videos} videos containing excluded tasks")
+    logger.info(f"Processing {len(video_files)} videos")
+
+    # Log breakdown of excluded videos by task
+    for task in excluded_tasks:
+        task_count = sum(1 for v in all_video_files if task in v)
+        if task_count > 0:
+            logger.info(f"- Excluded {task_count} videos containing '{task}'")
+
     # Create list of endpoints from hosts and ports
     endpoints = [
         {"host": host, "port": port} 
