@@ -94,7 +94,6 @@ class CaptionGenerator:
             }],
             "temperature": 1.0,
         }
-        logger.info(f"Sending request to LLM: {payload}")
         retry_count = 0
         async with self.semaphore:  # Limit concurrent requests
             async with aiohttp.ClientSession() as session:
