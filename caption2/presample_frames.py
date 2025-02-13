@@ -94,7 +94,7 @@ class CaptionGenerator:
             }],
             "temperature": 1.0,
         }
-
+        logger.info(f"Sending request to LLM: {payload}")
         retry_count = 0
         async with self.semaphore:  # Limit concurrent requests
             async with aiohttp.ClientSession() as session:
@@ -106,6 +106,7 @@ class CaptionGenerator:
                             response.raise_for_status()
                             response_json = await response.json()
                             caption = response_json['choices'][0]['message']['content']
+                            logger.info(caption)
                             request_time = time.time() - start_time
                             return caption
                     except Exception as e:
