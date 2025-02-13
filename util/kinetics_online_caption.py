@@ -82,7 +82,7 @@ class RLBenchOnlineCaption(Dataset):
             logger.error(f"Failed to convert frame to base64: {e}")
             raise
 
-    def get_caption(self, frame1, frame2):
+    def get_caption(self, frame1, frame2, max_retries=3):
         """Generate caption comparing two frames using LLM"""
         # Convert frames to base64
         img1_b64 = self.frame_to_base64(frame1)
@@ -102,14 +102,23 @@ class RLBenchOnlineCaption(Dataset):
             "temperature": 1.0,
         }
         
-        # Send request to local server and measure time
-        start_time = time.time()
-        response = requests.post(self.llm_url, json=payload)
-        response_json = response.json()
-        caption = response_json['choices'][0]['message']['content']
-        request_time = time.time() - start_time
-
-        return caption
+        retry_count = 0
+        while retry_count < max_retries:
+            try:
+                # Send request to local server and measure time
+                start_time = time.time()
+                response = requests.post(self.llm_url, json=payload)
+                response.raise_for_status()  # Raise exception for bad status codes
+                response_json = response.json()
+                caption = response_json['choices'][0]['message']['content']
+                request_time = time.time() - start_time
+                return caption
+            except Exception as e:
+                retry_count += 1
+                if retry_count == max_retries:
+                    raise Exception(f"Failed to get caption after {max_retries} retries: {str(e)}")
+                logging.warning(f"Request failed (attempt {retry_count}/{max_retries}): {str(e)}")
+                time.sleep(60)  # Wait 1 minute before retrying
 
     def __len__(self):
         return len(self.video_paths)

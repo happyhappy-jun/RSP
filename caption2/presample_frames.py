@@ -62,7 +62,8 @@ def process_video(
     data_root: str,
     caption_dataset: RLBenchOnlineCaption,
     num_pairs: int = 64,
-    max_distance: int = 48
+    max_distance: int = 48,
+    max_retries: int = 3
 ) -> Dict:
     """Process a single video, sampling frames and getting captions."""
     # Get relative path by removing data_root
@@ -74,25 +75,62 @@ def process_video(
     
     # Load and process frames
     results = []
+    retry_queue = []  # Store failed pairs for retry
+    
     for first_idx, second_idx in frame_pairs:
-        frames = load_frames(video_path, [first_idx, second_idx])
+        try:
+            frames = load_frames(video_path, [first_idx, second_idx])
+            caption = caption_dataset.get_caption(frames[0], frames[1])
+            
+            pair_result = {
+                "frame_indices": [first_idx, second_idx],
+                "caption": caption
+            }
+            results.append(pair_result)
+            
+            # Add small delay to avoid overwhelming the API
+            time.sleep(0.1)
+            
+        except Exception as e:
+            logging.warning(f"Failed to process pair ({first_idx}, {second_idx}): {str(e)}")
+            retry_queue.append((first_idx, second_idx))
+            time.sleep(60)  # Wait 1 minute before continuing
+    
+    # Process retry queue
+    retry_count = 0
+    while retry_queue and retry_count < max_retries:
+        retry_count += 1
+        current_queue = retry_queue[:]
+        retry_queue = []
         
-        # Get caption using dataset's method
-        caption = caption_dataset.get_caption(frames[0], frames[1])
+        logging.info(f"Attempting retry {retry_count}/{max_retries} for {len(current_queue)} pairs")
         
-        pair_result = {
-            "frame_indices": [first_idx, second_idx],
-            "caption": caption
-        }
-        results.append(pair_result)
-        
-        # Add small delay to avoid overwhelming the API
-        time.sleep(0.1)
+        for first_idx, second_idx in current_queue:
+            try:
+                frames = load_frames(video_path, [first_idx, second_idx])
+                caption = caption_dataset.get_caption(frames[0], frames[1])
+                
+                pair_result = {
+                    "frame_indices": [first_idx, second_idx],
+                    "caption": caption
+                }
+                results.append(pair_result)
+                
+                time.sleep(0.1)
+                
+            except Exception as e:
+                logging.warning(f"Retry {retry_count} failed for pair ({first_idx}, {second_idx}): {str(e)}")
+                retry_queue.append((first_idx, second_idx))
+                time.sleep(60)
+    
+    if retry_queue:
+        logging.error(f"Failed to process {len(retry_queue)} pairs after {max_retries} retries")
     
     return {
         "video_path": rel_path,
         "video_name": video_name,
-        "frame_pairs": results
+        "frame_pairs": results,
+        "failed_pairs": retry_queue
     }
 
 
