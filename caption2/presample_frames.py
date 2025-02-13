@@ -82,6 +82,7 @@ class GracefulExit(SystemExit):
 def handle_sigterm(signum, frame):
     raise GracefulExit()
 
+
 class CaptionGenerator:
     def __init__(self, model: str, endpoints: List[Dict], max_concurrent: int = 5, timeout: int = 300):
         """
@@ -96,6 +97,17 @@ class CaptionGenerator:
         self.timeout = aiohttp.ClientTimeout(total=timeout)
         self.session = None
         self.active_tasks: Set[asyncio.Task] = set()
+        self.endpoint_usage = [0 for _ in self.urls]  # Track usage count per endpoint
+        logger.info(f"Initialized endpoints: {self.urls}")
+        logger.info(f"Max concurrent per endpoint: {self.max_concurrent_per_endpoint}")
+
+    def get_next_endpoint(self) -> int:
+        """Get the least used endpoint index"""
+        min_usage = min(self.endpoint_usage)
+        candidates = [i for i, usage in enumerate(self.endpoint_usage) if usage == min_usage]
+        endpoint_idx = random.choice(candidates)
+        self.endpoint_usage[endpoint_idx] += 1
+        return endpoint_idx
 
     def frame_to_base64(self, frame: np.ndarray) -> str:
         """Convert numpy array frame to base64 string."""
@@ -167,13 +179,18 @@ class CaptionGenerator:
                         async with session.post(url, json=payload) as response:
                             response.raise_for_status()
                             response_json = await response.json()
-                            return response_json['choices'][0]['message']['content']
+                            caption = response_json['choices'][0]['message']['content']
+                            logger.info(f"Successfully got caption from endpoint {endpoint_idx} ({url})")
+                            return caption
             except (asyncio.TimeoutError, aiohttp.ClientError) as e:
                 last_error = e
                 logger.warning(f"Request failed for endpoint {url} (attempt {retry_count + 1}/{max_retries}): {str(e)}")
             except Exception as e:
                 last_error = e
-                logger.warning(f"Unexpected error for endpoint {url} (attempt {retry_count + 1}/{max_retries}): {str(e)}")
+                logger.warning(
+                    f"Unexpected error for endpoint {url} (attempt {retry_count + 1}/{max_retries}): {str(e)}")
+            finally:
+                self.endpoint_usage[endpoint_idx] -= 1
 
             retry_count += 1
             if retry_count < max_retries:
@@ -181,7 +198,8 @@ class CaptionGenerator:
                 logger.info(f"Waiting {wait_time:.1f} seconds before retry for endpoint {url}")
                 await asyncio.sleep(wait_time)
 
-        raise Exception(f"Failed to get caption from endpoint {url} after {max_retries} retries. Last error: {str(last_error)}")
+        raise Exception(
+            f"Failed to get caption from endpoint {url} after {max_retries} retries. Last error: {str(last_error)}")
 
     async def process_frame_pair(self, pair: FramePair, endpoint_idx: int) -> None:
         """Process a single frame pair using specified endpoint"""
@@ -191,8 +209,10 @@ class CaptionGenerator:
             pair.caption = await self.get_caption(pair.frames[0], pair.frames[1], endpoint_idx)
         except Exception as e:
             pair.retries += 1
-            logger.error(f"Failed to process pair from video {pair.video_path} using endpoint {self.urls[endpoint_idx]}: {str(e)}")
+            logger.error(
+                f"Failed to process pair from video {pair.video_path} using endpoint {self.urls[endpoint_idx]}: {str(e)}")
             raise e
+
 
 def load_frames(video_path: str, indices: List[int]) -> List[np.ndarray]:
     """Load specific frames from a video file."""
@@ -277,6 +297,10 @@ async def process_videos(
             progress_msg = progress.update()
             if progress_msg:
                 logger.info(f"{progress_msg} (Active tasks: {len(caption_generator.active_tasks)})")
+                # Add endpoint usage logging
+                usage_str = ", ".join(
+                    f"endpoint {i}: {count}" for i, count in enumerate(caption_generator.endpoint_usage))
+                logger.info(f"Endpoint usage: {usage_str}")
         except Exception as e:
             if pair.retries < max_retries:
                 retry_queue.append(pair)
@@ -293,11 +317,10 @@ async def process_videos(
         for i in range(0, len(all_pairs), batch_size):
             batch = all_pairs[i:i + batch_size]
             tasks = []
-            for idx, pair in enumerate(batch):
-                endpoint_idx = idx % len(caption_generator.urls)
-                task = asyncio.create_task(process_pair(pair, endpoint_idx))
-                tasks.append(task)
-
+            for pair in batch:
+                endpoint_idx = caption_generator.get_next_endpoint()
+                logger.debug(f"Assigning request to endpoint {endpoint_idx} ({caption_generator.urls[endpoint_idx]})")
+                tasks.append(process_pair(pair, endpoint_idx))
             try:
                 await asyncio.wait_for(asyncio.gather(*tasks, return_exceptions=True),
                                      timeout=caption_generator.timeout.total * 2)
