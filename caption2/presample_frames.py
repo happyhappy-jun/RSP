@@ -6,6 +6,7 @@ import os
 import json
 import random
 import argparse
+import logging
 from pathlib import Path
 from typing import List, Dict, Tuple
 
@@ -14,6 +15,19 @@ import torch
 import numpy as np
 from decord import VideoReader
 from tqdm import tqdm
+from PIL import Image
+import io
+import base64
+import requests
+import time
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
+
+from util.kinetics_online_caption import RLBenchOnlineCaption
 
 
 def load_frames(video_path: str, indices: List[int]) -> List[np.ndarray]:
@@ -42,8 +56,7 @@ def sample_frame_pairs(video_path: str, num_pairs: int = 64, max_distance: int =
 def process_video(
     video_path: str,
     data_root: str,
-    caption_endpoint_1: str,
-    caption_endpoint_2: str,
+    caption_dataset: RLBenchOnlineCaption,
     num_pairs: int = 64,
     max_distance: int = 48
 ) -> Dict:
@@ -60,16 +73,17 @@ def process_video(
     for first_idx, second_idx in frame_pairs:
         frames = load_frames(video_path, [first_idx, second_idx])
         
-        # TODO: Implement API calls to caption endpoints
-        caption_1 = "Placeholder caption 1"  # Replace with actual API call
-        caption_2 = "Placeholder caption 2"  # Replace with actual API call
+        # Get caption using dataset's method
+        caption = caption_dataset.get_caption(frames[0], frames[1])
         
         pair_result = {
             "frame_indices": [first_idx, second_idx],
-            "caption_1": caption_1,
-            "caption_2": caption_2
+            "caption": caption
         }
         results.append(pair_result)
+        
+        # Add small delay to avoid overwhelming the API
+        time.sleep(0.1)
     
     return {
         "video_path": rel_path,
@@ -82,8 +96,9 @@ def main():
     parser = argparse.ArgumentParser(description="Presample frames and generate captions")
     parser.add_argument("--data-root", required=True, help="Root directory containing videos")
     parser.add_argument("--output-dir", required=True, help="Output directory for caption files")
-    parser.add_argument("--caption-endpoint-1", required=True, help="First caption API endpoint")
-    parser.add_argument("--caption-endpoint-2", required=True, help="Second caption API endpoint")
+    parser.add_argument("--llm-model", required=True, help="LLM model name")
+    parser.add_argument("--llm-host", default="0.0.0.0", help="LLM API host")
+    parser.add_argument("--llm-port", type=int, default=23333, help="LLM API port")
     parser.add_argument("--num-pairs", type=int, default=64, help="Number of frame pairs to sample per video")
     parser.add_argument("--max-distance", type=int, default=48, help="Maximum frame distance in pairs")
     args = parser.parse_args()
@@ -96,6 +111,18 @@ def main():
     for ext in ['.mp4', '.avi', '.mov']:
         video_files.extend(Path(args.data_root).rglob(f'*{ext}'))
     
+    # Initialize caption dataset
+    caption_dataset = RLBenchOnlineCaption(
+        root=args.data_root,
+        max_distance=args.max_distance,
+        llm={
+            "model": args.llm_model,
+            "host": args.llm_host,
+            "port": args.llm_port,
+            "postfix": "/v1/chat/completions"
+        }
+    )
+
     # Process each video
     results = []
     for video_path in tqdm(video_files):
@@ -103,8 +130,7 @@ def main():
             result = process_video(
                 str(video_path),
                 args.data_root,
-                args.caption_endpoint_1,
-                args.caption_endpoint_2,
+                caption_dataset,
                 args.num_pairs,
                 args.max_distance
             )
