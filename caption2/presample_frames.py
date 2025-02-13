@@ -18,8 +18,12 @@ from tqdm import tqdm
 from PIL import Image
 import io
 import base64
-import requests
+import asyncio
+import aiohttp
 import time
+from itertools import chain
+from dataclasses import dataclass
+from collections import defaultdict
 
 # Configure logging
 logging.basicConfig(
@@ -27,10 +31,21 @@ logging.basicConfig(
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
 
+@dataclass
+class FramePair:
+    video_path: str
+    first_idx: int
+    second_idx: int
+    frames: List[np.ndarray] = None
+    caption: str = None
+    retries: int = 0
+
 class CaptionGenerator:
-    def __init__(self, model: str, host: str = "0.0.0.0", port: int = 23333):
+    def __init__(self, model: str, host: str = "0.0.0.0", port: int = 23333, max_concurrent: int = 5):
         self.model = model
         self.url = f"http://{host}:{port}/v1/chat/completions"
+        self.max_concurrent = max_concurrent
+        self.semaphore = asyncio.Semaphore(max_concurrent)
 
     def frame_to_base64(self, frame: np.ndarray) -> str:
         """Convert numpy array frame to base64 string."""
@@ -52,7 +67,7 @@ class CaptionGenerator:
             logging.error(f"Failed to convert frame to base64: {e}")
             raise
 
-    def get_caption(self, frame1: np.ndarray, frame2: np.ndarray, max_retries: int = 3) -> str:
+    async def get_caption(self, frame1: np.ndarray, frame2: np.ndarray, max_retries: int = 3) -> str:
         """Generate caption comparing two frames using LLM"""
         # Convert frames to base64
         img1_b64 = self.frame_to_base64(frame1)
@@ -73,25 +88,37 @@ class CaptionGenerator:
         }
         
         retry_count = 0
-        while retry_count < max_retries:
-            try:
-                # Send request to local server and measure time
-                start_time = time.time()
-                response = requests.post(self.url, json=payload)
-                response.raise_for_status()
-                response_json = response.json()
-                caption = response_json['choices'][0]['message']['content']
-                request_time = time.time() - start_time
-                return caption
-            except Exception as e:
-                retry_count += 1
-                if retry_count == max_retries:
-                    raise Exception(f"Failed to get caption after {max_retries} retries: {str(e)}")
-                logging.warning(f"Request failed (attempt {retry_count}/{max_retries}): {str(e)}")
-                # Exponential backoff with jitter
-                wait_time = min(60 * (2 ** retry_count) + random.uniform(0, 10), 300)  # Cap at 5 minutes
-                logging.info(f"Waiting {wait_time:.1f} seconds before retry {retry_count + 1}")
-                time.sleep(wait_time)
+        async with self.semaphore:  # Limit concurrent requests
+            async with aiohttp.ClientSession() as session:
+                while retry_count < max_retries:
+                    try:
+                        # Send request to local server and measure time
+                        start_time = time.time()
+                        async with session.post(self.url, json=payload) as response:
+                            response.raise_for_status()
+                            response_json = await response.json()
+                            caption = response_json['choices'][0]['message']['content']
+                            request_time = time.time() - start_time
+                            return caption
+                    except Exception as e:
+                        retry_count += 1
+                        if retry_count == max_retries:
+                            raise Exception(f"Failed to get caption after {max_retries} retries: {str(e)}")
+                        logging.warning(f"Request failed (attempt {retry_count}/{max_retries}): {str(e)}")
+                        # Exponential backoff with jitter
+                        wait_time = min(60 * (2 ** retry_count) + random.uniform(0, 10), 300)  # Cap at 5 minutes
+                        logging.info(f"Waiting {wait_time:.1f} seconds before retry {retry_count + 1}")
+                        await asyncio.sleep(wait_time)
+
+    async def process_frame_pair(self, pair: FramePair) -> None:
+        """Process a single frame pair"""
+        try:
+            if pair.frames is None:
+                pair.frames = load_frames(pair.video_path, [pair.first_idx, pair.second_idx])
+            pair.caption = await self.get_caption(pair.frames[0], pair.frames[1])
+        except Exception as e:
+            pair.retries += 1
+            raise e
 
 
 def load_frames(video_path: str, indices: List[int]) -> List[np.ndarray]:
@@ -121,90 +148,75 @@ def sample_frame_pairs(video_path: str, num_pairs: int = 64, max_distance: int =
     return pairs
 
 
-def process_video(
-    video_path: str,
+async def process_videos(
+    video_paths: List[str],
     data_root: str,
     caption_generator: CaptionGenerator,
     num_pairs: int = 64,
     max_distance: int = 48,
     max_retries: int = 20
 ) -> Dict:
-    """Process a single video, sampling frames and getting captions."""
-    # Get relative path by removing data_root
-    rel_path = os.path.relpath(video_path, data_root)
-    video_name = os.path.basename(video_path)
+    """Process multiple videos concurrently"""
+    # Create frame pairs for all videos
+    all_pairs = []
+    for video_path in video_paths:
+        pairs = sample_frame_pairs(video_path, num_pairs, max_distance)
+        all_pairs.extend([
+            FramePair(video_path=video_path, first_idx=first, second_idx=second)
+            for first, second in pairs
+        ])
+
+    # Process all pairs
+    results_by_video = defaultdict(lambda: {"frame_pairs": [], "failed_pairs": []})
+    retry_queue = []
     
-    # Sample frame pairs
-    frame_pairs = sample_frame_pairs(video_path, num_pairs, max_distance)
-    
-    # Load and process frames
-    results = []
-    retry_queue = []  # Store failed pairs for retry
-    
-    for first_idx, second_idx in frame_pairs:
+    async def process_pair(pair: FramePair):
         try:
-            frames = load_frames(video_path, [first_idx, second_idx])
-            caption = caption_generator.get_caption(frames[0], frames[1])
-            
-            pair_result = {
-                "frame_indices": [first_idx, second_idx],
-                "caption": caption
-            }
-            results.append(pair_result)
-            
-            # Add small delay to avoid overwhelming the API
-            time.sleep(0.1)
-            
+            await caption_generator.process_frame_pair(pair)
+            video_result = results_by_video[pair.video_path]
+            video_result["frame_pairs"].append({
+                "frame_indices": [pair.first_idx, pair.second_idx],
+                "caption": pair.caption
+            })
         except Exception as e:
-            logging.warning(f"Failed to process pair ({first_idx}, {second_idx}): {str(e)}")
-            retry_queue.append((first_idx, second_idx))
-            # Exponential backoff with jitter
-            wait_time = min(60 * (2 ** len(retry_queue)) + random.uniform(0, 10), 300)  # Cap at 5 minutes
-            logging.info(f"Waiting {wait_time:.1f} seconds before continuing")
-            time.sleep(wait_time)
-    
-    # Process retry queue
-    retry_count = 0
-    while retry_queue and retry_count < max_retries:
-        retry_count += 1
-        current_queue = retry_queue[:]
-        retry_queue = []
+            if pair.retries < max_retries:
+                retry_queue.append(pair)
+            else:
+                video_result = results_by_video[pair.video_path]
+                video_result["failed_pairs"].append([pair.first_idx, pair.second_idx])
+
+    # Initial processing
+    tasks = [process_pair(pair) for pair in all_pairs]
+    await asyncio.gather(*tasks, return_exceptions=True)
+
+    # Process retry queue with exponential backoff
+    while retry_queue:
+        next_retry = []
+        wait_time = min(60 * (2 ** len(str(retry_queue))) + random.uniform(0, 10), 300)
+        logging.info(f"Waiting {wait_time:.1f} seconds before retrying {len(retry_queue)} pairs")
+        await asyncio.sleep(wait_time)
         
-        logging.info(f"Attempting retry {retry_count}/{max_retries} for {len(current_queue)} pairs")
-        
-        for first_idx, second_idx in current_queue:
-            try:
-                frames = load_frames(video_path, [first_idx, second_idx])
-                caption = caption_generator.get_caption(frames[0], frames[1])
-                
-                pair_result = {
-                    "frame_indices": [first_idx, second_idx],
-                    "caption": caption
-                }
-                results.append(pair_result)
-                
-                time.sleep(0.1)
-                
-            except Exception as e:
-                logging.warning(f"Retry {retry_count} failed for pair ({first_idx}, {second_idx}): {str(e)}")
-                retry_queue.append((first_idx, second_idx))
-                # Exponential backoff with jitter
-                wait_time = min(60 * (2 ** retry_count) + random.uniform(0, 10), 300)  # Cap at 5 minutes
-                logging.info(f"Waiting {wait_time:.1f} seconds before retry {retry_count + 1}")
-                time.sleep(wait_time)
-    
-    if retry_queue:
-        logging.error(f"Failed to process {len(retry_queue)} pairs after {max_retries} retries")
-    
-    return {
-        "video_path": rel_path,
-        "video_name": video_name,
-        "frame_pairs": results,
-        "failed_pairs": retry_queue
-    }
+        tasks = [process_pair(pair) for pair in retry_queue]
+        await asyncio.gather(*tasks, return_exceptions=True)
+        retry_queue = next_retry
+
+    # Format results
+    final_results = []
+    for video_path in video_paths:
+        rel_path = os.path.relpath(video_path, data_root)
+        video_name = os.path.basename(video_path)
+        result = results_by_video[video_path]
+        final_results.append({
+            "video_path": rel_path,
+            "video_name": video_name,
+            "frame_pairs": result["frame_pairs"],
+            "failed_pairs": result["failed_pairs"]
+        })
+
+    return final_results
 
 
-def main():
+async def main():
     parser = argparse.ArgumentParser(description="Presample frames and generate captions")
     parser.add_argument("--data-root", required=True, help="Root directory containing videos")
     parser.add_argument("--output-dir", required=True, help="Output directory for caption files")
@@ -213,6 +225,7 @@ def main():
     parser.add_argument("--llm-port", type=int, default=23333, help="LLM API port")
     parser.add_argument("--num-pairs", type=int, default=64, help="Number of frame pairs to sample per video")
     parser.add_argument("--max-distance", type=int, default=48, help="Maximum frame distance in pairs")
+    parser.add_argument("--max-concurrent", type=int, default=5, help="Maximum concurrent requests")
     args = parser.parse_args()
 
     # Create output directory
@@ -220,42 +233,42 @@ def main():
     
     # Get list of all video files
     video_files = (glob.glob(os.path.join(args.data_root, "*_front.mp4")) +
-                            glob.glob(os.path.join(args.data_root, "*_overhead.mp4")))
+                  glob.glob(os.path.join(args.data_root, "*_overhead.mp4")))
     
     # Initialize caption generator
     caption_generator = CaptionGenerator(
         model=args.llm_model,
         host=args.llm_host,
-        port=args.llm_port
+        port=args.llm_port,
+        max_concurrent=args.max_concurrent
     )
 
-    # Process each video
-    results = []
-    for video_path in tqdm(video_files):
-        try:
-            result = process_video(
-                str(video_path),
-                args.data_root,
-                caption_generator,
-                args.num_pairs,
-                args.max_distance
-            )
-            results.append(result)
-        except Exception as e:
-            print(f"Error processing {video_path}: {e}")
-            continue
+    try:
+        # Process all videos concurrently
+        results = await process_videos(
+            video_files,
+            args.data_root,
+            caption_generator,
+            args.num_pairs,
+            args.max_distance
+        )
         
-        # Save results periodically
-        if len(results) % 100 == 0:
-            output_path = os.path.join(args.output_dir, f"captions_batch_{len(results)}.json")
+        # Save results periodically (every 100 processed pairs)
+        processed_pairs = sum(len(r["frame_pairs"]) for r in results)
+        if processed_pairs % 100 == 0:
+            output_path = os.path.join(args.output_dir, f"captions_batch_{processed_pairs}.json")
             with open(output_path, 'w') as f:
                 json.dump(results, f, indent=2)
-    
-    # Save final results
-    final_output = os.path.join(args.output_dir, "captions_final.json")
-    with open(final_output, 'w') as f:
-        json.dump(results, f, indent=2)
+        
+        # Save final results
+        final_output = os.path.join(args.output_dir, "captions_final.json")
+        with open(final_output, 'w') as f:
+            json.dump(results, f, indent=2)
+            
+    except Exception as e:
+        logging.error(f"Error during processing: {e}")
+        raise
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
