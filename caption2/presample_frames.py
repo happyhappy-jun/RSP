@@ -21,6 +21,40 @@ import time
 from itertools import chain
 from dataclasses import dataclass
 from collections import defaultdict
+import datetime
+from typing import Optional
+
+class ProgressTracker:
+    def __init__(self, total: int, name: str = ""):
+        self.total = total
+        self.current = 0
+        self.start_time = time.time()
+        self.name = name
+        self.last_update_time = self.start_time
+        self.update_interval = 1  # Update ETA every second
+
+    def update(self, n: int = 1) -> Optional[str]:
+        self.current += n
+        current_time = time.time()
+        
+        # Only update message if enough time has passed
+        if current_time - self.last_update_time < self.update_interval:
+            return None
+            
+        self.last_update_time = current_time
+        
+        # Calculate ETA
+        elapsed = current_time - self.start_time
+        if self.current == 0:
+            eta = "unknown"
+        else:
+            items_per_sec = self.current / elapsed
+            remaining_items = self.total - self.current
+            eta_seconds = remaining_items / items_per_sec
+            eta = str(datetime.timedelta(seconds=int(eta_seconds)))
+        
+        return (f"{self.name + ' ' if self.name else ''}Progress: {self.current}/{self.total} "
+                f"({self.current/self.total*100:.1f}%) [ETA: {eta}]")
 
 # Configure logging
 logging.basicConfig(
@@ -187,10 +221,9 @@ async def process_videos(
     results_by_video = defaultdict(lambda: {"frame_pairs": [], "failed_pairs": []})
     retry_queue = []
     total_pairs = len(all_pairs)
-    processed_pairs = 0
+    progress = ProgressTracker(total_pairs, "Processing pairs")
 
     async def process_pair(pair: FramePair, endpoint_idx: int):
-        nonlocal processed_pairs
         try:
             await caption_generator.process_frame_pair(pair, endpoint_idx)
             video_result = results_by_video[pair.video_path]
@@ -198,9 +231,9 @@ async def process_videos(
                 "frame_indices": [pair.first_idx, pair.second_idx],
                 "caption": pair.caption
             })
-            processed_pairs += 1
-            if processed_pairs % 100 == 0:
-                logger.info(f"Processed {processed_pairs}/{total_pairs} pairs")
+            progress_msg = progress.update()
+            if progress_msg:
+                logger.info(progress_msg)
         except Exception as e:
             if pair.retries < max_retries:
                 retry_queue.append(pair)
@@ -248,6 +281,7 @@ async def process_videos(
         retry_queue = []
         
         wait_time = min(60 * (2 ** retry_count) + random.uniform(0, 10), 300)
+        retry_progress = ProgressTracker(len(current_queue), f"Retry attempt {retry_count}")
         logger.info(f"Waiting {wait_time:.1f} seconds before retrying {len(current_queue)} pairs (attempt {retry_count})")
         await asyncio.sleep(wait_time)
 
@@ -258,6 +292,9 @@ async def process_videos(
                 endpoint_idx = idx % len(caption_generator.urls)
                 tasks.append(process_pair(pair, endpoint_idx))
             await asyncio.gather(*tasks, return_exceptions=True)
+            progress_msg = retry_progress.update(len(batch))
+            if progress_msg:
+                logger.info(progress_msg)
 
     # Format results
     final_results = []
