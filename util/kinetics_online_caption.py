@@ -79,7 +79,7 @@ class RLBenchOnlineCaption(Dataset):
             # Convert to base64
             return base64.b64encode(buffer.getvalue()).decode('utf-8')
         except Exception as e:
-            logger.error(f"Failed to convert frame to base64: {e}")
+            logging.error(f"Failed to convert frame to base64: {e}")
             raise
 
     def get_caption(self, frame1, frame2, max_retries=3):
