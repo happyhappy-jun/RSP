@@ -328,8 +328,18 @@ async def main():
     # Create output directory
     os.makedirs(args.output_dir, exist_ok=True)
 
-    # Get list of all video files
+    # Get list of all video files, excluding specific tasks
+    excluded_tasks = [
+        "push_button",
+        "take_lid_off_saucepan",
+        "phone_on_base",
+        "take_umbrella_out_of_umbrella_stand",
+        "stack_wine",
+        "put_rubbish_in_bin"
+    ]
+    
     video_files = glob.glob(os.path.join(args.data_root, "*_front.mp4"))
+    video_files = [v for v in video_files if not any(task in v for task in excluded_tasks)]
 
     logger.info(f"Found {len(video_files)} video files")
     # Initialize caption generator
