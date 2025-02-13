@@ -151,7 +151,9 @@ class CaptionGenerator:
 
             # Send request
             url = self.urls[endpoint_idx]
-            logger.info(f"Sending request to endpoint {endpoint_idx} ({url})")
+            progress_msg = progress.update()
+            if progress_msg:
+                logger.info(f"Sending request to endpoint {endpoint_idx}. {progress_msg}")
             response = requests.post(url, json=payload, timeout=300)
             response.raise_for_status()
             self.endpoint_last_request[endpoint_idx] = time.time()
@@ -167,7 +169,9 @@ class CaptionGenerator:
                 "caption": task.caption
             })
 
-            logger.info(f"Successfully processed task from {task.video_path} using endpoint {endpoint_idx}")
+            progress_msg = progress.update()
+            if progress_msg:
+                logger.info(f"Successfully processed task. {progress_msg}")
             return True
 
         except Exception as e:
