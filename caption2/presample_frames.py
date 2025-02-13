@@ -11,10 +11,12 @@ import queue
 import threading
 import time
 from typing import List, Dict, Tuple, Optional
-import requests
+import aiohttp
+import asyncio
 import numpy as np
 from decord import VideoReader
 from tqdm import tqdm
+from asyncio import Semaphore
 from PIL import Image
 import io
 import base64
@@ -71,21 +73,24 @@ class CaptionTask:
 
 
 class CaptionGenerator:
-    def __init__(self, model: str, endpoints: List[Dict], rpm: int = 5):
+    def __init__(self, model: str, endpoints: List[Dict], rpm: int = 5, max_concurrent: int = 128):
         """
         Initialize with multiple endpoints
         endpoints: List of dicts with host and port for each endpoint
         rpm: Requests per minute per endpoint
+        max_concurrent: Maximum number of concurrent requests
         """
         self.model = model
         self.urls = [f"http://{ep['host']}:{ep['port']}/v1/chat/completions" for ep in endpoints]
         self.rpm = rpm
         self.min_interval = 60.0 / rpm  # Minimum time between requests
-        self.task_queue = queue.Queue()
         self.results_by_video = defaultdict(lambda: {"frame_pairs": [], "failed_pairs": []})
         self.endpoint_last_request = [0.0 for _ in self.urls]
         self.current_endpoint = 0  # Track current endpoint
+        self.semaphore = Semaphore(max_concurrent)
+        self.session = None
         logger.info(f"Initialized {len(endpoints)} endpoints with {rpm} RPM limit")
+        logger.info(f"Maximum concurrent requests: {max_concurrent}")
         for i, url in enumerate(self.urls):
             logger.info(f"Endpoint {i}: {url}")
 
@@ -113,7 +118,7 @@ class CaptionGenerator:
 
         return self.current_endpoint
 
-    def process_task(self, task: CaptionTask, progress: Optional[ProgressTracker] = None) -> bool:
+    async def process_task(self, task: CaptionTask, progress: Optional[ProgressTracker] = None) -> bool:
         """Process a single caption task. Returns True if successful."""
         if task.frames is None:
             try:
@@ -154,12 +159,13 @@ class CaptionGenerator:
             progress_msg = progress.update() if progress else None
             if progress_msg:
                 logger.info(f"Sending request to endpoint {endpoint_idx}. {progress_msg}")
-            response = requests.post(url, json=payload, timeout=300)
-            response.raise_for_status()
+            
+            async with self.semaphore:
+                async with self.session.post(url, json=payload, timeout=300) as response:
+                    response.raise_for_status()
+                    response_json = await response.json()
+                    
             self.endpoint_last_request[endpoint_idx] = time.time()
-
-            # Process response
-            response_json = response.json()
             task.caption = response_json['choices'][0]['message']['content']
 
             # Store result
@@ -223,7 +229,7 @@ def save_results(results: List[Dict], output_path: str):
             except:
                 pass
 
-def process_videos(
+async def process_videos(
         video_paths: List[str],
         data_root: str,
         caption_generator: CaptionGenerator,
@@ -319,7 +325,7 @@ def process_videos(
 
     return final_results
 
-def main():
+async def main():
     parser = argparse.ArgumentParser(description="Presample frames and generate captions")
     parser.add_argument("--data-root", required=True, help="Root directory containing videos")
     parser.add_argument("--output-dir", required=True, help="Output directory for caption files")
@@ -373,15 +379,17 @@ def main():
     )
 
     try:
-        # Process all videos
-        results = process_videos(
-            video_files,
-            args.data_root,
-            caption_generator,
-            args.output_dir,
-            args.num_pairs,
-            args.max_distance
-        )
+        async with aiohttp.ClientSession() as session:
+            caption_generator.session = session
+            # Process all videos
+            results = await process_videos(
+                video_files,
+                args.data_root,
+                caption_generator,
+                args.output_dir,
+                args.num_pairs,
+                args.max_distance
+            )
 
         # Save final results
         final_output = os.path.join(args.output_dir, "captions_final.json")
@@ -397,4 +405,4 @@ def main():
         raise
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
