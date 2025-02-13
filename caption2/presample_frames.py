@@ -44,12 +44,16 @@ def sample_frame_pairs(video_path: str, num_pairs: int = 64, max_distance: int =
     
     pairs = []
     for _ in range(num_pairs):
-        # Sample first frame index
-        first_idx = random.randint(0, video_length - max_distance - 1)
-        # Sample second frame within max_distance
-        second_idx = random.randint(first_idx + 1, min(first_idx + max_distance, video_length - 1))
-        pairs.append((first_idx, second_idx))
-    
+        least_frames_num = max_distance + 1
+        if video_length >= least_frames_num:
+            idx_cur = random.randint(0, video_length - least_frames_num)
+            interval = random.randint(4, max_distance)
+            idx_fut = idx_cur + interval
+        else:
+            indices = random.sample(range(video_length), 2)
+            indices.sort()
+            idx_cur, idx_fut = indices
+        pairs.append((idx_cur, idx_fut))
     return pairs
 
 
