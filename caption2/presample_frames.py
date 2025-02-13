@@ -48,11 +48,15 @@ class FramePair:
 
 
 class CaptionGenerator:
-    def __init__(self, model: str, host: str = "0.0.0.0", port: int = 23333, max_concurrent: int = 5):
+    def __init__(self, model: str, endpoints: List[Dict], max_concurrent: int = 5):
+        """
+        Initialize with multiple endpoints
+        endpoints: List of dicts with host and port for each endpoint
+        """
         self.model = model
-        self.url = f"http://{host}:{port}/v1/chat/completions"
-        self.max_concurrent = max_concurrent
-        self.semaphore = asyncio.Semaphore(max_concurrent)
+        self.urls = [f"http://{ep['host']}:{ep['port']}/v1/chat/completions" for ep in endpoints]
+        self.max_concurrent_per_endpoint = max_concurrent // len(self.urls)
+        self.semaphores = [asyncio.Semaphore(self.max_concurrent_per_endpoint) for _ in self.urls]
 
     def frame_to_base64(self, frame: np.ndarray) -> str:
         """Convert numpy array frame to base64 string."""
@@ -74,7 +78,7 @@ class CaptionGenerator:
             logger.error(f"Failed to convert frame to base64: {e}", exc_info=True)
             raise
 
-    async def get_caption(self, frame1: np.ndarray, frame2: np.ndarray, max_retries: int = 3) -> str:
+    async def get_caption(self, frame1: np.ndarray, frame2: np.ndarray, endpoint_idx: int, max_retries: int = 3) -> str:
         """Generate caption comparing two frames using LLM"""
         # Convert frames to base64
         img1_b64 = self.frame_to_base64(frame1)
@@ -95,17 +99,20 @@ class CaptionGenerator:
             "temperature": 1.0,
         }
         retry_count = 0
-        async with self.semaphore:  # Limit concurrent requests
+        url = self.urls[endpoint_idx]
+        semaphore = self.semaphores[endpoint_idx]
+        
+        async with semaphore:  # Limit concurrent requests per endpoint
             async with aiohttp.ClientSession() as session:
                 while retry_count < max_retries:
                     try:
-                        # Send request to local server and measure time
+                        # Send request to server and measure time
                         start_time = time.time()
-                        async with session.post(self.url, json=payload) as response:
+                        async with session.post(url, json=payload) as response:
                             response.raise_for_status()
                             response_json = await response.json()
                             caption = response_json['choices'][0]['message']['content']
-                            logger.info(caption)
+                            logger.info(f"[Endpoint {endpoint_idx}] {caption}")
                             request_time = time.time() - start_time
                             return caption
                     except Exception as e:
@@ -118,12 +125,12 @@ class CaptionGenerator:
                         logger.info(f"Waiting {wait_time:.1f} seconds before retry {retry_count + 1}")
                         await asyncio.sleep(wait_time)
 
-    async def process_frame_pair(self, pair: FramePair) -> None:
-        """Process a single frame pair"""
+    async def process_frame_pair(self, pair: FramePair, endpoint_idx: int) -> None:
+        """Process a single frame pair using specified endpoint"""
         try:
             if pair.frames is None:
                 pair.frames = load_frames(pair.video_path, [pair.first_idx, pair.second_idx])
-            pair.caption = await self.get_caption(pair.frames[0], pair.frames[1])
+            pair.caption = await self.get_caption(pair.frames[0], pair.frames[1], endpoint_idx)
         except Exception as e:
             pair.retries += 1
             raise e
@@ -186,10 +193,10 @@ async def process_videos(
     total_pairs = len(all_pairs)
     processed_pairs = 0
 
-    async def process_pair(pair: FramePair):
+    async def process_pair(pair: FramePair, endpoint_idx: int):
         nonlocal processed_pairs
         try:
-            await caption_generator.process_frame_pair(pair)
+            await caption_generator.process_frame_pair(pair, endpoint_idx)
             video_result = results_by_video[pair.video_path]
             video_result["frame_pairs"].append({
                 "frame_indices": [pair.first_idx, pair.second_idx],
@@ -210,7 +217,11 @@ async def process_videos(
     logger.info(f"Processing {total_pairs} pairs in batches of {batch_size}...")
     for i in range(0, len(all_pairs), batch_size):
         batch = all_pairs[i:i + batch_size]
-        tasks = [process_pair(pair) for pair in batch]
+        # Distribute pairs evenly between endpoints
+        tasks = []
+        for idx, pair in enumerate(batch):
+            endpoint_idx = idx % len(caption_generator.urls)
+            tasks.append(process_pair(pair, endpoint_idx))
         await asyncio.gather(*tasks, return_exceptions=True)
         
         # Save intermediate results every 1000 pairs
@@ -246,7 +257,10 @@ async def process_videos(
 
         for i in range(0, len(current_queue), batch_size):
             batch = current_queue[i:i + batch_size]
-            tasks = [process_pair(pair) for pair in batch]
+            tasks = []
+            for idx, pair in enumerate(batch):
+                endpoint_idx = idx % len(caption_generator.urls)
+                tasks.append(process_pair(pair, endpoint_idx))
             await asyncio.gather(*tasks, return_exceptions=True)
 
     # Format results
@@ -270,8 +284,8 @@ async def main():
     parser.add_argument("--data-root", required=True, help="Root directory containing videos")
     parser.add_argument("--output-dir", required=True, help="Output directory for caption files")
     parser.add_argument("--llm-model", required=True, help="LLM model name")
-    parser.add_argument("--llm-host", default="0.0.0.0", help="LLM API host")
-    parser.add_argument("--llm-port", type=int, default=23333, help="LLM API port")
+    parser.add_argument("--llm-hosts", nargs="+", default=["0.0.0.0", "0.0.0.0"], help="LLM API hosts")
+    parser.add_argument("--llm-ports", nargs="+", type=int, default=[23333, 23334], help="LLM API ports")
     parser.add_argument("--num-pairs", type=int, default=64, help="Number of frame pairs to sample per video")
     parser.add_argument("--max-distance", type=int, default=48, help="Maximum frame distance in pairs")
     parser.add_argument("--max-concurrent", type=int, default=5, help="Maximum concurrent requests")
@@ -287,10 +301,15 @@ async def main():
 
     logger.info(f"Found {len(video_files)} video files")
     # Initialize caption generator
+    # Create list of endpoints from hosts and ports
+    endpoints = [
+        {"host": host, "port": port} 
+        for host, port in zip(args.llm_hosts, args.llm_ports)
+    ]
+    
     caption_generator = CaptionGenerator(
         model=args.llm_model,
-        host=args.llm_host,
-        port=args.llm_port,
+        endpoints=endpoints,
         max_concurrent=args.max_concurrent
     )
 
