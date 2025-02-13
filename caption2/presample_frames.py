@@ -124,7 +124,7 @@ def process_video(
     caption_generator: CaptionGenerator,
     num_pairs: int = 64,
     max_distance: int = 48,
-    max_retries: int = 3
+    max_retries: int = 20
 ) -> Dict:
     """Process a single video, sampling frames and getting captions."""
     # Get relative path by removing data_root
