@@ -89,6 +89,19 @@ class CaptionGenerator:
         for i, url in enumerate(self.urls):
             logger.info(f"Endpoint {i}: {url}")
 
+    def frame_to_base64(self, frame: np.ndarray) -> str:
+        """Convert numpy array frame to base64 string."""
+        try:
+            if frame.dtype != np.uint8:
+                frame = (frame * 255).astype(np.uint8)
+            img = Image.fromarray(frame)
+            buffer = io.BytesIO()
+            img.save(buffer, format='JPEG')
+            return base64.b64encode(buffer.getvalue()).decode('utf-8')
+        except Exception as e:
+            logger.error(f"Failed to convert frame to base64: {e}", exc_info=True)
+            raise
+
     def get_next_endpoint(self) -> int:
         """Use endpoints in round-robin fashion"""
         current_time = time.time()
