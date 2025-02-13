@@ -321,7 +321,7 @@ async def main():
 
         # Save results periodically (every 100 processed pairs)
         processed_pairs = sum(len(r["frame_pairs"]) for r in results)
-        if processed_pairs % 100 == 0:
+        if processed_pairs % 100000 == 0:
             output_path = os.path.join(args.output_dir, f"captions_batch_{processed_pairs}.json")
             with open(output_path, 'w') as f:
                 json.dump(results, f, indent=2)
