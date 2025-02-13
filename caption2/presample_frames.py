@@ -223,53 +223,35 @@ async def process_videos(
     """Process videos using queue-based approach"""
     # Create tasks for all videos
     logger.info("Creating tasks from videos...")
-    total_tasks = 0
+    tasks = []
     for video_path in tqdm(video_paths):
         try:
             pairs = sample_frame_pairs(video_path, num_pairs, max_distance)
             for first, second in pairs:
                 task = CaptionTask(video_path=video_path, first_idx=first, second_idx=second)
-                caption_generator.task_queue.put(task)
-                total_tasks += 1
+                tasks.append(task)
         except Exception as e:
             logger.error(f"Error sampling frames from {video_path}: {str(e)}")
             continue
 
     # Process tasks
+    total_tasks = len(tasks)
     logger.info(f"Processing {total_tasks} tasks...")
     progress = ProgressTracker(total_tasks, "Processing")
-    completed_tasks = 0
-    retry_tasks = []
+    
+    # Process tasks concurrently
+    async def process_task_with_retry(task):
+        while task.retries < max_retries:
+            if await caption_generator.process_task(task, progress):
+                return True
+            await asyncio.sleep(min(60 * (2 ** task.retries), 300))
+        logger.error(f"Task failed after {max_retries} retries")
+        video_result = caption_generator.results_by_video[task.video_path]
+        video_result["failed_pairs"].append([task.first_idx, task.second_idx])
+        return False
 
-    while completed_tasks < total_tasks:
-        # Process main queue
-        while not caption_generator.task_queue.empty():
-            task = caption_generator.task_queue.get()
-            current_time = time.time()
-
-            # Check if we need to wait before retrying
-            if task.last_attempt > current_time:
-                retry_tasks.append(task)
-                continue
-
-            if caption_generator.process_task(task, progress):
-                completed_tasks += 1
-                progress_msg = progress.update()
-                if progress_msg:
-                    logger.info(progress_msg)
-            elif task.retries < max_retries:
-                retry_tasks.append(task)
-            else:
-                logger.error(f"Task failed after {max_retries} retries")
-                video_result = caption_generator.results_by_video[task.video_path]
-                video_result["failed_pairs"].append([task.first_idx, task.second_idx])
-                completed_tasks += 1
-
-        # Move retry tasks back to main queue
-        for task in retry_tasks:
-            if time.time() >= task.last_attempt:
-                caption_generator.task_queue.put(task)
-        retry_tasks = []
+    # Process all tasks concurrently
+    await asyncio.gather(*(process_task_with_retry(task) for task in tasks))
 
         # Save intermediate results every 1000 tasks
         if completed_tasks % 1000 == 0:
