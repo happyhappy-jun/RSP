@@ -27,7 +27,68 @@ logging.basicConfig(
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
 
-from util.kinetics_online_caption import RLBenchOnlineCaption
+class CaptionGenerator:
+    def __init__(self, model: str, host: str = "0.0.0.0", port: int = 23333):
+        self.model = model
+        self.url = f"http://{host}:{port}/v1/chat/completions"
+
+    def frame_to_base64(self, frame: np.ndarray) -> str:
+        """Convert numpy array frame to base64 string."""
+        try:
+            # Ensure frame is uint8
+            if frame.dtype != np.uint8:
+                frame = (frame * 255).astype(np.uint8)
+
+            # Convert to PIL Image
+            img = Image.fromarray(frame)
+
+            # Save to bytes buffer
+            buffer = io.BytesIO()
+            img.save(buffer, format='JPEG')
+
+            # Convert to base64
+            return base64.b64encode(buffer.getvalue()).decode('utf-8')
+        except Exception as e:
+            logging.error(f"Failed to convert frame to base64: {e}")
+            raise
+
+    def get_caption(self, frame1: np.ndarray, frame2: np.ndarray, max_retries: int = 3) -> str:
+        """Generate caption comparing two frames using LLM"""
+        # Convert frames to base64
+        img1_b64 = self.frame_to_base64(frame1)
+        img2_b64 = self.frame_to_base64(frame2)
+        
+        # Prepare request
+        payload = {
+            "model": self.model,
+            "messages": [{
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": "Describe the main differences between these two frames from a video."},
+                    {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{img1_b64}"}},
+                    {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{img2_b64}"}}
+                ]
+            }],
+            "temperature": 1.0,
+        }
+        
+        retry_count = 0
+        while retry_count < max_retries:
+            try:
+                # Send request to local server and measure time
+                start_time = time.time()
+                response = requests.post(self.url, json=payload)
+                response.raise_for_status()
+                response_json = response.json()
+                caption = response_json['choices'][0]['message']['content']
+                request_time = time.time() - start_time
+                return caption
+            except Exception as e:
+                retry_count += 1
+                if retry_count == max_retries:
+                    raise Exception(f"Failed to get caption after {max_retries} retries: {str(e)}")
+                logging.warning(f"Request failed (attempt {retry_count}/{max_retries}): {str(e)}")
+                time.sleep(60)  # Wait 1 minute before retrying
 
 
 def load_frames(video_path: str, indices: List[int]) -> List[np.ndarray]:
@@ -60,7 +121,7 @@ def sample_frame_pairs(video_path: str, num_pairs: int = 64, max_distance: int =
 def process_video(
     video_path: str,
     data_root: str,
-    caption_dataset: RLBenchOnlineCaption,
+    caption_generator: CaptionGenerator,
     num_pairs: int = 64,
     max_distance: int = 48,
     max_retries: int = 3
@@ -152,16 +213,11 @@ def main():
     video_files = (glob.glob(os.path.join(args.data_root, "*_front.mp4")) +
                             glob.glob(os.path.join(args.data_root, "*_overhead.mp4")))
     
-    # Initialize caption dataset
-    caption_dataset = RLBenchOnlineCaption(
-        root=args.data_root,
-        max_distance=args.max_distance,
-        llm={
-            "model": args.llm_model,
-            "host": args.llm_host,
-            "port": args.llm_port,
-            "postfix": "/v1/chat/completions"
-        }
+    # Initialize caption generator
+    caption_generator = CaptionGenerator(
+        model=args.llm_model,
+        host=args.llm_host,
+        port=args.llm_port
     )
 
     # Process each video
@@ -171,7 +227,7 @@ def main():
             result = process_video(
                 str(video_path),
                 args.data_root,
-                caption_dataset,
+                caption_generator,
                 args.num_pairs,
                 args.max_distance
             )
