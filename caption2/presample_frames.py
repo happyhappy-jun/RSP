@@ -31,7 +31,7 @@ class ProgressTracker:
         self.start_time = time.time()
         self.name = name
         self.last_update_time = self.start_time
-        self.update_interval = 1  # Update ETA every second
+        self.update_interval = 300  # Update ETA every second
 
     def update(self, n: int = 1) -> Optional[str]:
         self.current += n
@@ -132,7 +132,7 @@ class CaptionGenerator:
         retry_count = 0
         url = self.urls[endpoint_idx]
         semaphore = self.semaphores[endpoint_idx]
-        
+
         async with semaphore:  # Limit concurrent requests per endpoint
             async with aiohttp.ClientSession() as session:
                 while retry_count < max_retries:
@@ -148,11 +148,14 @@ class CaptionGenerator:
                     except Exception as e:
                         retry_count += 1
                         if retry_count == max_retries:
-                            raise Exception(f"Failed to get caption after {max_retries} retries: {str(e)}")
-                        logger.warning(f"Request failed (attempt {retry_count}/{max_retries})", exc_info=True)
+                            raise Exception(
+                                f"Failed to get caption from endpoint {url} after {max_retries} retries: {str(e)}")
+                        logger.warning(f"Request failed for endpoint {url} (attempt {retry_count}/{max_retries})",
+                                       exc_info=True)
                         # Exponential backoff with jitter
                         wait_time = min(60 * (2 ** retry_count) + random.uniform(0, 10), 300)  # Cap at 5 minutes
-                        logger.info(f"Waiting {wait_time:.1f} seconds before retry {retry_count + 1}")
+                        logger.info(
+                            f"Waiting {wait_time:.1f} seconds before retry {retry_count + 1} for endpoint {url}")
                         await asyncio.sleep(wait_time)
 
     async def process_frame_pair(self, pair: FramePair, endpoint_idx: int) -> None:
@@ -163,8 +166,9 @@ class CaptionGenerator:
             pair.caption = await self.get_caption(pair.frames[0], pair.frames[1], endpoint_idx)
         except Exception as e:
             pair.retries += 1
+            logger.error(
+                f"Failed to process pair from video {pair.video_path} using endpoint {self.urls[endpoint_idx]}: {str(e)}")
             raise e
-
 
 def load_frames(video_path: str, indices: List[int]) -> List[np.ndarray]:
     """Load specific frames from a video file."""
@@ -254,7 +258,7 @@ async def process_videos(
         await asyncio.gather(*tasks, return_exceptions=True)
         
         # Save intermediate results every 1000 pairs
-        if i % 1000 == 0:
+        if i % 10000 == 0:
             intermediate_results = []
             for video_path in video_paths:
                 if video_path in results_by_video:
