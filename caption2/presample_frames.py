@@ -69,6 +69,7 @@ class CaptionTask:
     last_attempt: float = 0
     endpoint_idx: int = 0
 
+
 class CaptionGenerator:
     def __init__(self, model: str, endpoints: List[Dict], rpm: int = 5):
         """
@@ -83,28 +84,21 @@ class CaptionGenerator:
         self.task_queue = queue.Queue()
         self.results_by_video = defaultdict(lambda: {"frame_pairs": [], "failed_pairs": []})
         self.endpoint_last_request = [0.0 for _ in self.urls]
+        self.current_endpoint = 0  # Track current endpoint
         logger.info(f"Initialized {len(endpoints)} endpoints with {rpm} RPM limit")
         for i, url in enumerate(self.urls):
             logger.info(f"Endpoint {i}: {url}")
 
-    def frame_to_base64(self, frame: np.ndarray) -> str:
-        """Convert numpy array frame to base64 string."""
-        try:
-            if frame.dtype != np.uint8:
-                frame = (frame * 255).astype(np.uint8)
-            img = Image.fromarray(frame)
-            buffer = io.BytesIO()
-            img.save(buffer, format='JPEG')
-            return base64.b64encode(buffer.getvalue()).decode('utf-8')
-        except Exception as e:
-            logger.error(f"Failed to convert frame to base64: {e}", exc_info=True)
-            raise
-
     def get_next_endpoint(self) -> int:
-        """Get the endpoint with the longest idle time"""
+        """Use endpoints in round-robin fashion"""
         current_time = time.time()
-        idle_times = [current_time - last_req for last_req in self.endpoint_last_request]
-        return idle_times.index(max(idle_times))
+        time_since_last = current_time - self.endpoint_last_request[self.current_endpoint]
+
+        # If not enough time has passed for current endpoint, try the other one
+        if time_since_last < self.min_interval:
+            self.current_endpoint = (self.current_endpoint + 1) % len(self.urls)
+
+        return self.current_endpoint
 
     def process_task(self, task: CaptionTask) -> bool:
         """Process a single caption task. Returns True if successful."""
@@ -136,7 +130,7 @@ class CaptionGenerator:
             }
 
             # Select endpoint and enforce rate limit
-            endpoint_idx = task.endpoint_idx
+            endpoint_idx = self.get_next_endpoint()
             current_time = time.time()
             time_since_last = current_time - self.endpoint_last_request[endpoint_idx]
             if time_since_last < self.min_interval:
@@ -144,6 +138,7 @@ class CaptionGenerator:
 
             # Send request
             url = self.urls[endpoint_idx]
+            logger.info(f"Sending request to endpoint {endpoint_idx} ({url})")
             response = requests.post(url, json=payload, timeout=300)
             response.raise_for_status()
             self.endpoint_last_request[endpoint_idx] = time.time()
@@ -165,10 +160,9 @@ class CaptionGenerator:
         except Exception as e:
             task.retries += 1
             wait_time = min(60 * (2 ** task.retries) + random.uniform(0, 10), 300)
-            logger.warning(f"Failed to process task (attempt {task.retries}): {str(e)}")
+            logger.warning(f"Failed to process task using endpoint {endpoint_idx} (attempt {task.retries}): {str(e)}")
             logger.info(f"Will retry in {wait_time:.1f} seconds")
             task.last_attempt = time.time() + wait_time
-            task.endpoint_idx = (task.endpoint_idx + 1) % len(self.urls)  # Try next endpoint
             return False
 
 def load_frames(video_path: str, indices: List[int]) -> List[np.ndarray]:
