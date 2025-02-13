@@ -7,11 +7,8 @@ import json
 import random
 import argparse
 import logging
-from pathlib import Path
 from typing import List, Dict, Tuple
 
-import cv2
-import torch
 import numpy as np
 from decord import VideoReader
 from tqdm import tqdm
