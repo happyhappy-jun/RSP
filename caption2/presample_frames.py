@@ -109,7 +109,6 @@ class CaptionGenerator:
                             response.raise_for_status()
                             response_json = await response.json()
                             caption = response_json['choices'][0]['message']['content']
-                            logger.info(f"[Endpoint {endpoint_idx}] {caption}")
                             request_time = time.time() - start_time
                             return caption
                     except Exception as e:
@@ -293,8 +292,7 @@ async def main():
     os.makedirs(args.output_dir, exist_ok=True)
 
     # Get list of all video files
-    video_files = (glob.glob(os.path.join(args.data_root, "*_front.mp4")) +
-                   glob.glob(os.path.join(args.data_root, "*_overhead.mp4")))
+    video_files = glob.glob(os.path.join(args.data_root, "*_front.mp4"))
 
     logger.info(f"Found {len(video_files)} video files")
     # Initialize caption generator
@@ -323,11 +321,10 @@ async def main():
 
         # Save results periodically (every 100 processed pairs)
         processed_pairs = sum(len(r["frame_pairs"]) for r in results)
-        if processed_pairs % 100000 == 0:
+        if processed_pairs % 100 == 0:
             output_path = os.path.join(args.output_dir, f"captions_batch_{processed_pairs}.json")
             with open(output_path, 'w') as f:
                 json.dump(results, f, indent=2)
-
         # Save final results
         final_output = os.path.join(args.output_dir, "captions_final.json")
         with open(final_output, 'w') as f:
