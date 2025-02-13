@@ -113,7 +113,7 @@ class CaptionGenerator:
 
         return self.current_endpoint
 
-    def process_task(self, task: CaptionTask) -> bool:
+    def process_task(self, task: CaptionTask, progress: Optional[ProgressTracker] = None) -> bool:
         """Process a single caption task. Returns True if successful."""
         if task.frames is None:
             try:
@@ -151,7 +151,7 @@ class CaptionGenerator:
 
             # Send request
             url = self.urls[endpoint_idx]
-            progress_msg = progress.update()
+            progress_msg = progress.update() if progress else None
             if progress_msg:
                 logger.info(f"Sending request to endpoint {endpoint_idx}. {progress_msg}")
             response = requests.post(url, json=payload, timeout=300)
@@ -169,7 +169,7 @@ class CaptionGenerator:
                 "caption": task.caption
             })
 
-            progress_msg = progress.update()
+            progress_msg = progress.update() if progress else None
             if progress_msg:
                 logger.info(f"Successfully processed task. {progress_msg}")
             return True
@@ -264,7 +264,7 @@ def process_videos(
                 retry_tasks.append(task)
                 continue
 
-            if caption_generator.process_task(task):
+            if caption_generator.process_task(task, progress):
                 completed_tasks += 1
                 progress_msg = progress.update()
                 if progress_msg:
