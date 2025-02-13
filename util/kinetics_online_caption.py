@@ -118,7 +118,10 @@ class RLBenchOnlineCaption(Dataset):
                 if retry_count == max_retries:
                     raise Exception(f"Failed to get caption after {max_retries} retries: {str(e)}")
                 logging.warning(f"Request failed (attempt {retry_count}/{max_retries}): {str(e)}")
-                time.sleep(60)  # Wait 1 minute before retrying
+                # Exponential backoff with jitter
+                wait_time = min(60 * (2 ** retry_count) + random.uniform(0, 10), 300)  # Cap at 5 minutes
+                logging.info(f"Waiting {wait_time:.1f} seconds before retry {retry_count + 1}")
+                time.sleep(wait_time)
 
     def __len__(self):
         return len(self.video_paths)

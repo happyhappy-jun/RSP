@@ -88,7 +88,10 @@ class CaptionGenerator:
                 if retry_count == max_retries:
                     raise Exception(f"Failed to get caption after {max_retries} retries: {str(e)}")
                 logging.warning(f"Request failed (attempt {retry_count}/{max_retries}): {str(e)}")
-                time.sleep(60)  # Wait 1 minute before retrying
+                # Exponential backoff with jitter
+                wait_time = min(60 * (2 ** retry_count) + random.uniform(0, 10), 300)  # Cap at 5 minutes
+                logging.info(f"Waiting {wait_time:.1f} seconds before retry {retry_count + 1}")
+                time.sleep(wait_time)
 
 
 def load_frames(video_path: str, indices: List[int]) -> List[np.ndarray]:
@@ -155,7 +158,10 @@ def process_video(
         except Exception as e:
             logging.warning(f"Failed to process pair ({first_idx}, {second_idx}): {str(e)}")
             retry_queue.append((first_idx, second_idx))
-            time.sleep(60)  # Wait 1 minute before continuing
+            # Exponential backoff with jitter
+            wait_time = min(60 * (2 ** len(retry_queue)) + random.uniform(0, 10), 300)  # Cap at 5 minutes
+            logging.info(f"Waiting {wait_time:.1f} seconds before continuing")
+            time.sleep(wait_time)
     
     # Process retry queue
     retry_count = 0
@@ -182,7 +188,10 @@ def process_video(
             except Exception as e:
                 logging.warning(f"Retry {retry_count} failed for pair ({first_idx}, {second_idx}): {str(e)}")
                 retry_queue.append((first_idx, second_idx))
-                time.sleep(60)
+                # Exponential backoff with jitter
+                wait_time = min(60 * (2 ** retry_count) + random.uniform(0, 10), 300)  # Cap at 5 minutes
+                logging.info(f"Waiting {wait_time:.1f} seconds before retry {retry_count + 1}")
+                time.sleep(wait_time)
     
     if retry_queue:
         logging.error(f"Failed to process {len(retry_queue)} pairs after {max_retries} retries")
