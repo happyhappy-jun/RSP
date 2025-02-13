@@ -16,8 +16,13 @@ import logging
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
+    format='%(asctime)s - %(levelname)s - %(name)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(),
+        logging.FileHandler('kinetics_online_caption.log')
+    ]
 )
+logger = logging.getLogger(__name__)
 
 from util.transform import PairedRandomResizedCrop
 
@@ -79,7 +84,7 @@ class RLBenchOnlineCaption(Dataset):
             # Convert to base64
             return base64.b64encode(buffer.getvalue()).decode('utf-8')
         except Exception as e:
-            logging.error(f"Failed to convert frame to base64: {e}")
+            logger.error(f"Failed to convert frame to base64: {e}", exc_info=True)
             raise
 
     def get_caption(self, frame1, frame2, max_retries=3):
@@ -117,10 +122,10 @@ class RLBenchOnlineCaption(Dataset):
                 retry_count += 1
                 if retry_count == max_retries:
                     raise Exception(f"Failed to get caption after {max_retries} retries: {str(e)}")
-                logging.warning(f"Request failed (attempt {retry_count}/{max_retries}): {str(e)}")
+                logger.warning(f"Request failed (attempt {retry_count}/{max_retries})", exc_info=True)
                 # Exponential backoff with jitter
                 wait_time = min(60 * (2 ** retry_count) + random.uniform(0, 10), 300)  # Cap at 5 minutes
-                logging.info(f"Waiting {wait_time:.1f} seconds before retry {retry_count + 1}")
+                logger.info(f"Waiting {wait_time:.1f} seconds before retry {retry_count + 1}")
                 time.sleep(wait_time)
 
     def __len__(self):
