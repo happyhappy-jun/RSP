@@ -109,7 +109,7 @@ class CaptionGenerator:
 
     def get_next_endpoint(self) -> int:
         """Use endpoints in round-robin fashion"""
-        self.current_endpoint = (self.current_endpoint + 1) % len(self.urls)
+        self.current_endpoint = (self.current_endpoint + 1) % len(self.clients)
         return self.current_endpoint
 
     async def process_task(self, task: CaptionTask, progress: Optional[ProgressTracker] = None) -> bool:
@@ -143,7 +143,6 @@ class CaptionGenerator:
 
             # Select endpoint and send request
             endpoint_idx = self.get_next_endpoint()
-            url = self.urls[endpoint_idx]
             progress_msg = progress.update() if progress else None
             if progress_msg:
                 logger.info(f"Sending request to endpoint {endpoint_idx}. {progress_msg}")
