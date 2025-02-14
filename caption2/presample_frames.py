@@ -360,15 +360,15 @@ async def main():
     )
 
     try:
-            # Process all videos
-            results = await process_videos(
-                video_files,
-                args.data_root,
-                caption_generator,
-                args.output_dir,
-                args.num_pairs,
-                args.max_distance
-            )
+        # Process all videos
+        results = await process_videos(
+            video_files,
+            args.data_root,
+            caption_generator,
+            args.output_dir,
+            args.num_pairs,
+            args.max_distance
+        )
 
         # Save final results
         final_output = os.path.join(args.output_dir, "captions_final.json")
