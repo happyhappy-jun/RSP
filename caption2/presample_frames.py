@@ -11,8 +11,8 @@ import queue
 import threading
 import time
 from typing import List, Dict, Tuple, Optional
-import aiohttp
 import asyncio
+from openai import AsyncOpenAI
 import numpy as np
 from decord import VideoReader
 from tqdm import tqdm
@@ -80,15 +80,19 @@ class CaptionGenerator:
         max_concurrent: Maximum number of concurrent requests
         """
         self.model = model
-        self.urls = [f"http://{ep['host']}:{ep['port']}/v1/chat/completions" for ep in endpoints]
+        self.clients = [
+            AsyncOpenAI(
+                api_key="EMPTY",
+                base_url=f"http://{ep['host']}:{ep['port']}/v1"
+            ) for ep in endpoints
+        ]
         self.results_by_video = defaultdict(lambda: {"frame_pairs": [], "failed_pairs": []})
         self.current_endpoint = 0  # Track current endpoint
         self.semaphore = Semaphore(max_concurrent)
-        self.session = None
         logger.info(f"Initialized {len(endpoints)} endpoints")
         logger.info(f"Maximum concurrent requests: {max_concurrent}")
-        for i, url in enumerate(self.urls):
-            logger.info(f"Endpoint {i}: {url}")
+        for i, ep in enumerate(endpoints):
+            logger.info(f"Endpoint {i}: http://{ep['host']}:{ep['port']}")
 
     def frame_to_base64(self, frame: np.ndarray) -> str:
         """Convert numpy array frame to base64 string."""
@@ -145,10 +149,22 @@ class CaptionGenerator:
                 logger.info(f"Sending request to endpoint {endpoint_idx}. {progress_msg}")
             
             async with self.semaphore:
-                async with self.session.post(url, json=payload, timeout=300) as response:
-                    response.raise_for_status()
-                    response_json = await response.json()
-            task.caption = response_json['choices'][0]['message']['content']
+                client = self.clients[endpoint_idx]
+                response = await client.chat.completions.create(
+                    model=self.model,
+                    messages=[{
+                        "role": "user",
+                        "content": [
+                            {"type": "text", 
+                             "text": "Describe followings. Keep the answer concise. 1. differences between these two frames from a video\n2. temporal change\n3. motion and dynamics\n4. Task of robot\n5. Environment of robot"},
+                            {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{img1_b64}"}},
+                            {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{img2_b64}"}}
+                        ]
+                    }],
+                    temperature=1.0,
+                    timeout=300
+                )
+            task.caption = response.choices[0].message.content
 
             # Store result
             video_result = self.results_by_video[task.video_path]
@@ -344,8 +360,6 @@ async def main():
     )
 
     try:
-        async with aiohttp.ClientSession() as session:
-            caption_generator.session = session
             # Process all videos
             results = await process_videos(
                 video_files,
