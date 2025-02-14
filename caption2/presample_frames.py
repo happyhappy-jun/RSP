@@ -166,6 +166,7 @@ class CaptionGenerator:
                     timeout=300
                 )
             task.caption = response.choices[0].message.content
+            logger.info(task.caption)
 
             # Store result
             video_result = self.results_by_video[task.video_path]
