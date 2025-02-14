@@ -58,6 +58,8 @@ logging.basicConfig(
         logging.FileHandler('presample_frames.log')
     ]
 )
+# Disable httpx logging
+logging.getLogger("httpx").setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
 
 @dataclass
