@@ -9,7 +9,7 @@ from modeling import (
     models_joint_emb_cut,
     models_mse_implicit,
     models_joint_text_q,
-    models_joint_m3ae, models_joint_m3ae_implicit, models_joint_implicit
+    models_joint_m3ae, models_joint_m3ae_implicit, models_joint_implicit, models_joint_implicit_scale
 )
 
 # Original RSP models
@@ -61,3 +61,5 @@ rsp_joint_m3ae_vit_small_patch16 = models_joint_m3ae.rsp_joint_m3ae_vit_small_pa
 rsp_joint_m3ae_implicit_vit_small_patch16 = models_joint_m3ae_implicit.rsp_joint_m3ae_implicit_vit_small_patch16_dec512d8b
 
 rsp_joint_implicit_vit_small_patch16 = models_joint_implicit.rsp_joint_implicit_vit_small_patch16_dec512d8b
+
+rsp_joint_implicit_scale_vit_small_patch16 = models_joint_implicit_scale.rsp_joint_implicit_scale_vit_small_patch16_dec512d8b

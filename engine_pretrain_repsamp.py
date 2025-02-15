@@ -263,7 +263,6 @@ def train_one_epoch_online(
     device: torch.device,
     epoch: int,
     loss_scaler,
-    embedding_model=None,
     log_writer=None,
     args=None,
 ):
@@ -296,17 +295,13 @@ def train_one_epoch_online(
         with torch.cuda.amp.autocast(enabled=args.amp):
             with torch.no_grad():
                 # Reshape inputs if needed and move to device
-                inputs = {k: v.reshape(-1, v.size(-1)) if k == 'input_ids' else v.reshape(-1, v.size(-1))
+                caption_inputs = {k: v.reshape(-1, v.size(-1)) if k == 'input_ids' else v.reshape(-1, v.size(-1))
                          for k, v in captions.items()}
-                inputs = {k: v.to(device) for k, v in inputs.items()}
+                caption_inputs = {k: v.to(device) for k, v in caption_inputs.items()}
                 
-                outputs = embedding_model(**inputs)
-                embeddings = outputs.last_hidden_state[:, 0]  # Take CLS token
-                embeddings = F.normalize(embeddings, dim=1)
-
             # Forward pass through RSP model
             loss, _, detailed_loss = model(
-                src_samples, tgt_samples, embeddings,
+                src_samples, tgt_samples, caption_inputs,
                 data_iter_step / len(data_loader) + epoch
             )
 
