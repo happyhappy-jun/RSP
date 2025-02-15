@@ -36,7 +36,7 @@ class RspCaptionJointImplicitScale(RspCaption):
         self.language_type_embed = None
         self.image_type_embed = None
         from transformers import AutoModel
-        self.text_model = AutoModel.from_pretrained("thenlper/gte-base")
+        self.text_model = AutoModel.from_pretrained("thenlper/gte-base").eval()
 
     def get_feat(self, h, z):
         # Process deterministic path
