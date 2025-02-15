@@ -31,8 +31,7 @@ from util.transform import PairedRandomResizedCrop
 
 
 class PrecomputedCaptionDataset(Dataset):
-    def __init__(self, dataset_file: str, data_root: str, repeated_sampling: int = 2, 
-                 paired_transform=None, basic_transform=None, max_pair_pool: int = 64):
+    def __init__(self, dataset_file: str, data_root: str, repeated_sampling: int = 2, max_pair_pool: int = 64, seed=42):
         """
         Args:
             dataset_file (str): Path to the JSON file containing precomputed caption annotations.
@@ -44,6 +43,7 @@ class PrecomputedCaptionDataset(Dataset):
                                                    Defaults to standard normalization.
             max_pair_pool (int): Maximum number of frame pairs to consider per video. Defaults to 64.
         """
+        random.seed(seed)
         with open(dataset_file, 'r') as f:
             data = json.load(f)
         
@@ -52,11 +52,11 @@ class PrecomputedCaptionDataset(Dataset):
         self.max_pair_pool = max_pair_pool
         self.samples = []
         
-        self.paired_transform = paired_transform if paired_transform is not None else PairedRandomResizedCrop()
-        self.basic_transform = basic_transform if basic_transform is not None else transforms.Compose([
-            transforms.ToTensor(),
-            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-        ])
+        self.transforms = PairedRandomResizedCrop()
+        self.basic_transform = transforms.Compose(
+            [transforms.ToTensor(),
+             transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])]
+        )
         
         for entry in data:
             video_rel_path = entry.get("video_path")
