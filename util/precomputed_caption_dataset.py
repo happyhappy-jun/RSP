@@ -29,6 +29,9 @@ from torchvision import transforms
 # Import a paired random resized crop transform if available
 from util.transform import PairedRandomResizedCrop
 
+import logging
+logger = logging.getLogger(__name__)
+
 
 class PrecomputedCaptionDataset(Dataset):
     def __init__(self, dataset_file: str, data_root: str, repeated_sampling: int = 2, max_pair_pool: int = 64, seed=42):
@@ -71,15 +74,18 @@ class PrecomputedCaptionDataset(Dataset):
                 "video_path": video_path,
                 "frame_pairs": frame_pairs
             })
+        logger.info(f"PrecomputedCaptionDataset initialized with {len(self.samples)} video entries.")
     
     def __len__(self):
         return len(self.samples)
     
     def read_frame(self, vr: VideoReader, index: int) -> np.ndarray:
+        logger.debug(f"Reading frame index {index}")
         frame = vr[index].asnumpy()
         return frame
 
     def transform(self, src_image, tgt_image):
+        logger.debug("Applying paired and basic transforms to images")
         src_image, tgt_image = self.transforms(src_image, tgt_image)
         src_image = self.basic_transform(src_image)
         tgt_image = self.basic_transform(tgt_image)
@@ -95,6 +101,7 @@ class PrecomputedCaptionDataset(Dataset):
             selected_pairs = random.sample(pool, self.repeated_sampling)
         else:
             selected_pairs = pool
+        logger.info(f"Loading video {video_path} with {len(pool)} pairs, selected {len(selected_pairs)} pairs for processing.")
         src_images = []
         tgt_images = []
         captions = []
@@ -113,6 +120,7 @@ class PrecomputedCaptionDataset(Dataset):
             captions.append(caption)
         src_images = torch.stack(src_images, dim=0)
         tgt_images = torch.stack(tgt_images, dim=0)
+        logger.info(f"Returning item {idx} with {len(captions)} captions.")
         return {
             "src_images": src_images,
             "tgt_images": tgt_images,
