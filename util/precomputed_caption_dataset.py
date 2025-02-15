@@ -118,7 +118,7 @@ class PrecomputedCaptionDataset(Dataset):
         captions = []
         for pair in selected_pairs:
             indices = pair.get("frame_indices")
-            caption = pair.get("caption", "")
+            caption = pair.get("caption", "")print(indices, caption[:100])
             if caption == "":
                 print("Warning: Empty caption found.")
             if not indices or len(indices) < 2:
@@ -138,7 +138,6 @@ class PrecomputedCaptionDataset(Dataset):
             tokenized_batch = None
         for i, tokenized_bat in enumerate(tokenized_batch["input_ids"]): print(i, tokenized_bat.size())
 
-        logger.info(f"Returning item {idx} with {len(captions)} caption tokenized.")
         return {
             "src_images": src_images,
             "tgt_images": tgt_images,
