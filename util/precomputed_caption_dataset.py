@@ -32,6 +32,14 @@ from util.transform import PairedRandomResizedCrop
 import logging
 logger = logging.getLogger(__name__)
 
+import torch.nn.functional as F
+from torch import Tensor
+from transformers import AutoTokenizer, AutoModel
+
+
+def average_pool(last_hidden_states: Tensor, attention_mask: Tensor) -> Tensor:
+    last_hidden = last_hidden_states.masked_fill(~attention_mask[..., None].bool(), 0.0)
+    return last_hidden.sum(dim=1) / attention_mask.sum(dim=1)[..., None]
 
 class PrecomputedCaptionDataset(Dataset):
     def __init__(self, dataset_file: str, data_root: str, repeated_sampling: int = 2, max_pair_pool: int = 64, seed=42):
@@ -74,6 +82,8 @@ class PrecomputedCaptionDataset(Dataset):
                 "video_path": video_path,
                 "frame_pairs": frame_pairs
             })
+        self.caption_tokenizer = AutoTokenizer.from_pretrained("thenlper/gte-base")
+        self.caption_model = AutoModel.from_pretrained("thenlper/gte-base").eval()
         logger.info(f"PrecomputedCaptionDataset initialized with {len(self.samples)} video entries.")
     
     def __len__(self):
@@ -120,9 +130,16 @@ class PrecomputedCaptionDataset(Dataset):
             captions.append(caption)
         src_images = torch.stack(src_images, dim=0)
         tgt_images = torch.stack(tgt_images, dim=0)
-        logger.info(f"Returning item {idx} with {len(captions)} captions.")
+        if captions:
+            batch_dict = self.caption_tokenizer(captions, max_length=512, padding=True, truncation=True, return_tensors='pt')
+            outputs = self.caption_model(**batch_dict)
+            embeddings = average_pool(outputs.last_hidden_state, batch_dict['attention_mask'])
+            embeddings = F.normalize(embeddings, p=2, dim=1)
+        else:
+            embeddings = None
+        logger.info(f"Returning item {idx} with {len(captions)} captions processed into embeddings.")
         return {
             "src_images": src_images,
             "tgt_images": tgt_images,
-            "captions": captions
+            "caption_embeddings": embeddings
         }
