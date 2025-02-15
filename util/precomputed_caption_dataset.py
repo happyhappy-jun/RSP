@@ -136,6 +136,7 @@ class PrecomputedCaptionDataset(Dataset):
                                                      max_length=512, padding=True, truncation=False, return_tensors='pt')
         else:
             tokenized_batch = None
+        for i, tokenized_bat in enumerate(tokenized_batch["input_ids"]): print(i, tokenized_bat.size())
 
         logger.info(f"Returning item {idx} with {len(captions)} caption tokenized.")
         return {
