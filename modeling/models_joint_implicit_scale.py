@@ -32,7 +32,7 @@ class RspCaptionJointImplicitScale(RspCaption):
         self.image_type_embed = None
 
         # Load the text model but don't track its parameters
-        self.text_model = AutoModel.from_pretrained("Alibaba-NLP/gte-base-en-v1.5")
+        self.text_model = AutoModel.from_pretrained("Alibaba-NLP/gte-base-en-v1.5", trust_remote_code=True)
         self.text_model.eval()
         for param in self.text_model.parameters():
             param.requires_grad = False
