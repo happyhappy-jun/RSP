@@ -66,21 +66,10 @@ class PrecomputedCaptionDataset(Dataset):
                 continue
             if len(frame_pairs) > self.max_pair_pool:
                 frame_pairs = random.sample(frame_pairs, self.max_pair_pool)
-            # Sample 'repeated_sampling' pairs if available, else use all
-            if len(frame_pairs) > repeated_sampling:
-                sampled_pairs = random.sample(frame_pairs, repeated_sampling)
-            else:
-                sampled_pairs = frame_pairs
-            for pair in sampled_pairs:
-                indices = pair.get("frame_indices")
-                caption = pair.get("caption", "")
-                if not indices or len(indices) < 2:
-                    continue
-                self.samples.append({
-                    "video_path": video_path,
-                    "frame_indices": indices,
-                    "caption": caption
-                })
+            self.samples.append({
+                "video_path": video_path,
+                "frame_pairs": frame_pairs
+            })
     
     def __len__(self):
         return len(self.samples)
@@ -94,27 +83,35 @@ class PrecomputedCaptionDataset(Dataset):
     def __getitem__(self, idx: int):
         sample = self.samples[idx]
         video_path = sample["video_path"]
-        indices = sample["frame_indices"]
-        
-        # Read source and target frames
-        frame1_np = self.read_frame(video_path, indices[0])
-        frame2_np = self.read_frame(video_path, indices[1])
-        
-        # Convert numpy arrays to PIL Images
-        img1 = Image.fromarray(frame1_np)
-        img2 = Image.fromarray(frame2_np)
-        
-        # Apply paired transformation if available
-        if self.paired_transform:
-            img1, img2 = self.paired_transform(img1, img2)
-        
-        # Apply basic transform (conversion to tensor and normalization)
-        if self.basic_transform:
-            img1 = self.basic_transform(img1)
-            img2 = self.basic_transform(img2)
-        
+        pool = sample["frame_pairs"]
+        if len(pool) > self.repeated_sampling:
+            selected_pairs = random.sample(pool, self.repeated_sampling)
+        else:
+            selected_pairs = pool
+        src_images = []
+        tgt_images = []
+        captions = []
+        for pair in selected_pairs:
+            indices = pair.get("frame_indices")
+            caption = pair.get("caption", "")
+            if not indices or len(indices) < 2:
+                continue
+            frame1_np = self.read_frame(video_path, indices[0])
+            frame2_np = self.read_frame(video_path, indices[1])
+            img1 = Image.fromarray(frame1_np)
+            img2 = Image.fromarray(frame2_np)
+            if self.transforms:
+                img1, img2 = self.transforms(img1, img2)
+            if self.basic_transform:
+                img1 = self.basic_transform(img1)
+                img2 = self.basic_transform(img2)
+            src_images.append(img1)
+            tgt_images.append(img2)
+            captions.append(caption)
+        src_images = torch.stack(src_images, dim=0)
+        tgt_images = torch.stack(tgt_images, dim=0)
         return {
-            "src_image": img1,
-            "tgt_image": img2,
-            "caption": sample["caption"]
+            "src_images": src_images,
+            "tgt_images": tgt_images,
+            "captions": captions
         }
