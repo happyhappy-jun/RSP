@@ -85,7 +85,7 @@ class PrecomputedCaptionDataset(Dataset):
                 "video_path": video_path,
                 "frame_pairs": frame_pairs
             })
-        self.caption_tokenizer = AutoTokenizer.from_pretrained("thenlper/gte-base")
+        self.caption_tokenizer = AutoTokenizer.from_pretrained("Alibaba-NLP/gte-base-en-v1.5")
         print(f"PrecomputedCaptionDataset initialized with {len(self.samples)} video entries.")
 
     def __len__(self):
