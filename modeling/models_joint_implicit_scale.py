@@ -5,6 +5,12 @@ import torch.nn as nn
 from modeling.layers import CrossAttentionBlock
 from modeling.models_rsp_caption import RspCaption
 import torch.nn.functional as F
+from transformers import AutoModel
+from torch import Tensor
+
+def average_pool(last_hidden_states: Tensor, attention_mask: Tensor) -> Tensor:
+    last_hidden = last_hidden_states.masked_fill(~attention_mask[..., None].bool(), 0.0)
+    return last_hidden.sum(dim=1) / attention_mask.sum(dim=1)[..., None]
 
 
 class RspCaptionJointImplicitScale(RspCaption):
@@ -29,6 +35,8 @@ class RspCaptionJointImplicitScale(RspCaption):
         self.to_language_prior = None
         self.language_type_embed = None
         self.image_type_embed = None
+        from transformers import AutoModel
+        self.text_model = AutoModel.from_pretrained("thenlper/gte-base")
 
     def get_feat(self, h, z):
         # Process deterministic path
@@ -98,12 +106,15 @@ class RspCaptionJointImplicitScale(RspCaption):
         return embedding_patch
 
     def forward(self, src_imgs, tgt_imgs, embedding, epoch):
-        # Extract embeddings
+        # Extract embeddings for text captions using the text model
         src_imgs = src_imgs.reshape(-1, *src_imgs.shape[2:])
         tgt_imgs = tgt_imgs.reshape(-1, *tgt_imgs.shape[2:])
-        embedding = embedding.reshape(-1, embedding.size(-1))
-        embedding = embedding.unsqueeze(1)
-        h_context_embed_dim = self.patchify_embedding(embedding)
+        with torch.no_grad():
+            outputs = self.text_model(**embedding)
+            text_embeddings = average_pool(outputs.last_hidden_state, embedding['attention_mask'])
+            text_embeddings = F.normalize(text_embeddings, p=2, dim=1)
+        text_embeddings = text_embeddings.unsqueeze(1)
+        h_context_embed_dim = self.patchify_embedding(text_embeddings)
         src_h, _, _ = self.forward_encoder(src_imgs, mask_ratio=0)
         tgt_h, _, _ = self.forward_encoder(self.perturb(tgt_imgs), mask_ratio=0)
 
