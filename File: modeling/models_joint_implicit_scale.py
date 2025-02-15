@@ -26,6 +26,9 @@ class RspCaptionJointImplicitScale(RspCaption):
         self.to_language_prior = None
         self.language_type_embed = None
         self.image_type_embed = None
+        from transformers import AutoModel
+        self.text_model = AutoModel.from_pretrained("Alibaba-NLP/gte-base-en-v1.5")
+        self.text_model.eval()
 
     def get_feat(self, h, z):
         # Process deterministic path
@@ -75,12 +78,15 @@ class RspCaptionJointImplicitScale(RspCaption):
         embedding_patch = embedding.reshape(embedding.shape[0], -1, self.embed_dim)
         return embedding_patch
 
-    def forward(self, src_imgs, tgt_imgs, embedding, epoch):
+    def forward(self, src_imgs, tgt_imgs, captions, epoch):
         src_imgs = src_imgs.reshape(-1, *src_imgs.shape[2:])
         tgt_imgs = tgt_imgs.reshape(-1, *tgt_imgs.shape[2:])
-        embedding = embedding.reshape(-1, embedding.size(-1))
-        embedding = embedding.unsqueeze(1)
-        h_context_embed_dim = self.patchify_embedding(embedding)
+        with torch.no_grad():
+            outputs = self.text_model(**captions)
+            text_embeddings = outputs.last_hidden_state[:, 0]  # Use CLS token
+            text_embeddings = F.normalize(text_embeddings, p=2, dim=1)
+        text_embeddings = text_embeddings.unsqueeze(1)
+        h_context_embed_dim = self.patchify_embedding(text_embeddings)
         src_h, _, _ = self.forward_encoder(src_imgs, mask_ratio=0)
         tgt_h, _, _ = self.forward_encoder(self.perturb(tgt_imgs), mask_ratio=0)
         post_h = self.forward_joint_emb(src_h[:, 0], tgt_h[:, 0], h_context_embed_dim)
@@ -101,7 +107,6 @@ class RspCaptionJointImplicitScale(RspCaption):
             tgt_pred_prior = self.forward_decoder_fut(src_h, prior_z)
             loss_prior = self.forward_loss(tgt_imgs, tgt_pred_prior)
         loss = loss_post + self.kl_scale * kl_loss + mae_loss
-        # Scale the loss with cos_scale
         loss = loss * self.cos_scale
         detailed_loss = {
             "loss_post": loss_post,

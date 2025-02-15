@@ -131,15 +131,12 @@ class PrecomputedCaptionDataset(Dataset):
         src_images = torch.stack(src_images, dim=0)
         tgt_images = torch.stack(tgt_images, dim=0)
         if captions:
-            batch_dict = self.caption_tokenizer(captions, max_length=512, padding=True, truncation=True, return_tensors='pt')
-            outputs = self.caption_model(**batch_dict)
-            embeddings = average_pool(outputs.last_hidden_state, batch_dict['attention_mask'])
-            embeddings = F.normalize(embeddings, p=2, dim=1)
+            tokenized_batch = self.caption_tokenizer(captions, max_length=512, padding=True, truncation=True, return_tensors='pt')
         else:
-            embeddings = None
-        logger.info(f"Returning item {idx} with {len(captions)} captions processed into embeddings.")
+            tokenized_batch = None
+        logger.info(f"Returning item {idx} with {len(captions)} captions tokenized.")
         return {
             "src_images": src_images,
             "tgt_images": tgt_images,
-            "caption_embeddings": embeddings
+            "captions": tokenized_batch
         }
