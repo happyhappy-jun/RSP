@@ -32,7 +32,7 @@ from util.transform import PairedRandomResizedCrop
 
 class PrecomputedCaptionDataset(Dataset):
     def __init__(self, dataset_file: str, data_root: str, repeated_sampling: int = 2, 
-                 paired_transform=None, basic_transform=None):
+                 paired_transform=None, basic_transform=None, max_pair_pool: int = 64):
         """
         Args:
             dataset_file (str): Path to the JSON file containing precomputed caption annotations.
@@ -42,12 +42,14 @@ class PrecomputedCaptionDataset(Dataset):
                                                    Defaults to PairedRandomResizedCrop().
             basic_transform (callable, optional): Callable to convert a PIL image to tensor and normalize.
                                                    Defaults to standard normalization.
+            max_pair_pool (int): Maximum number of frame pairs to consider per video. Defaults to 64.
         """
         with open(dataset_file, 'r') as f:
             data = json.load(f)
         
         self.data_root = data_root
         self.repeated_sampling = repeated_sampling
+        self.max_pair_pool = max_pair_pool
         self.samples = []
         
         self.paired_transform = paired_transform if paired_transform is not None else PairedRandomResizedCrop()
@@ -62,6 +64,8 @@ class PrecomputedCaptionDataset(Dataset):
             frame_pairs = entry.get("frame_pairs", [])
             if len(frame_pairs) == 0:
                 continue
+            if len(frame_pairs) > self.max_pair_pool:
+                frame_pairs = random.sample(frame_pairs, self.max_pair_pool)
             # Sample 'repeated_sampling' pairs if available, else use all
             if len(frame_pairs) > repeated_sampling:
                 sampled_pairs = random.sample(frame_pairs, repeated_sampling)
