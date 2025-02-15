@@ -133,7 +133,7 @@ class PrecomputedCaptionDataset(Dataset):
         tgt_images = torch.stack(tgt_images, dim=0)
         if captions:
             tokenized_batch = self.caption_tokenizer(captions,
-                                                     max_length=512, padding=True, truncation=False, return_tensors='pt')
+                                                     max_length=512, padding="max_length", truncation=False, return_tensors='pt')
         else:
             tokenized_batch = None
         for i, tokenized_bat in enumerate(tokenized_batch["input_ids"]): print(i, tokenized_bat.size())
