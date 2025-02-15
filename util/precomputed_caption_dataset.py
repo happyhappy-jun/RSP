@@ -51,6 +51,7 @@ class PrecomputedCaptionDataset(Dataset):
         self.repeated_sampling = repeated_sampling
         self.max_pair_pool = max_pair_pool
         self.samples = []
+        self._video_reader_cache = {}
         
         self.transforms = PairedRandomResizedCrop()
         self.basic_transform = transforms.Compose(
@@ -76,7 +77,9 @@ class PrecomputedCaptionDataset(Dataset):
     
     def read_frame(self, video_path: str, index: int) -> np.ndarray:
         """Read a single frame from a video file using decord."""
-        vr = VideoReader(video_path, num_threads=1, ctx=cpu(0))
+        if video_path not in self._video_reader_cache:
+            self._video_reader_cache[video_path] = VideoReader(video_path, num_threads=1, ctx=cpu(0))
+        vr = self._video_reader_cache[video_path]
         frame = vr[index].asnumpy()
         return frame
     
