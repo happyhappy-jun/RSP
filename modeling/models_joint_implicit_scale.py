@@ -16,13 +16,8 @@ def average_pool(last_hidden_states: Tensor, attention_mask: Tensor) -> Tensor:
 class RspCaptionJointImplicitScale(RspCaption):
     """RSP model variant that uses MSE loss instead of KL divergence"""
 
-    def __init__(self,
-                 *args,
-                 context_emb_dim=3072,
-                 cos_scale=1.0,
-                 embed_decoder_num_heads=8,
-                 embed_decoder_depth=4,
-                 **kwargs):
+    def __init__(self, *args, context_emb_dim=3072, cos_scale=1.0,
+                 embed_decoder_num_heads=8, embed_decoder_depth=4, **kwargs):
         super().__init__(*args, **kwargs)
         self.cos_scale = cos_scale
         self.decoder_embed_deter = nn.Linear(self.embed_dim, self.decoder_embed_dim)
@@ -31,12 +26,16 @@ class RspCaptionJointImplicitScale(RspCaption):
             CrossAttentionBlock(self.embed_dim, self.embed_dim, embed_decoder_num_heads)
             for _ in range(embed_decoder_depth)
         ])
-        self.joint_emb_norm = nn.LayerNorm(self.embed_dim *2)
+        self.joint_emb_norm = nn.LayerNorm(self.embed_dim * 2)
         self.to_language_prior = None
         self.language_type_embed = None
         self.image_type_embed = None
-        from transformers import AutoModel
-        self.text_model = AutoModel.from_pretrained("thenlper/gte-base").eval()
+
+        # Load the text model but don't track its parameters
+        self.text_model = AutoModel.from_pretrained("thenlper/gte-base")
+        self.text_model.eval()
+        for param in self.text_model.parameters():
+            param.requires_grad = False
 
     def get_feat(self, h, z):
         # Process deterministic path
@@ -105,27 +104,37 @@ class RspCaptionJointImplicitScale(RspCaption):
         embedding_patch = embedding.reshape(embedding.shape[0], -1, self.embed_dim)
         return embedding_patch
 
-    def forward(self, src_imgs, tgt_imgs, embedding, epoch):
-        # Extract embeddings for text captions using the text model
-        src_imgs = src_imgs.reshape(-1, *src_imgs.shape[2:])
-        tgt_imgs = tgt_imgs.reshape(-1, *tgt_imgs.shape[2:])
+    def get_text_embeddings(self, embedding):
+        # Move the input to the same device as the model
+        embedding = {k: v.to(self.text_model.device) for k, v in embedding.items()}
+
         with torch.no_grad():
             outputs = self.text_model(**embedding)
             text_embeddings = average_pool(outputs.last_hidden_state, embedding['attention_mask'])
             text_embeddings = F.normalize(text_embeddings, p=2, dim=1)
+
+        # Return embeddings on the same device as the input
+        return text_embeddings.to(embedding['input_ids'].device)
+
+    def forward(self, src_imgs, tgt_imgs, embedding, epoch):
+        # Reshape input images
+        src_imgs = src_imgs.reshape(-1, *src_imgs.shape[2:])
+        tgt_imgs = tgt_imgs.reshape(-1, *tgt_imgs.shape[2:])
+
+        # Get text embeddings (handled separately from DDP)
+        text_embeddings = self.get_text_embeddings(embedding)
         text_embeddings = text_embeddings.unsqueeze(1)
         h_context_embed_dim = self.patchify_embedding(text_embeddings)
+
+        # Rest of the forward pass remains the same
         src_h, _, _ = self.forward_encoder(src_imgs, mask_ratio=0)
         tgt_h, _, _ = self.forward_encoder(self.perturb(tgt_imgs), mask_ratio=0)
 
-        # Posterior distribution from both images
-        # post_h = torch.cat([src_h[:, 0], tgt_h[:, 0]], -1)
         post_h = self.forward_joint_emb(src_h[:, 0], tgt_h[:, 0], h_context_embed_dim)
         post_logits = self.to_posterior(post_h)
         post_dist = self.make_dist(post_logits)
         post_z = post_dist.rsample()
 
-        # Prior distribution only from current images
         prior_h = src_h[:, 0]
         prior_logits = self.to_prior(prior_h)
         prior_dist = self.make_dist(prior_logits)
@@ -135,7 +144,6 @@ class RspCaptionJointImplicitScale(RspCaption):
         loss_post = self.forward_loss(tgt_imgs, tgt_pred)
         kl_loss, kl_value = self.compute_kl_loss(post_logits, prior_logits)
 
-        # MAE
         img_h, mask, ids_restore = self.forward_encoder(tgt_imgs, mask_ratio=self.mask_ratio)
         pred_masked = self.forward_decoder_mae(img_h, ids_restore)
         mae_loss = self.forward_loss(tgt_imgs, pred_masked, mask)
