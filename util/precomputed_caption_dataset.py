@@ -16,16 +16,14 @@ and frames at the specified indices are extracted. Then, optional paired transfo
 and basic transforms (to tensor and normalize) are applied.
 """
 
-import os
 import json
+import os
 import random
 
-from pptx.media import Video
-from torch.utils.data import Dataset
 import numpy as np
-from decord import VideoReader, cpu
-from PIL import Image
 import torch
+from decord import VideoReader, cpu
+from torch.utils.data import Dataset
 from torchvision import transforms
 
 # Import a paired random resized crop transform if available
