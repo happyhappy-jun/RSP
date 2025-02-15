@@ -37,7 +37,7 @@ class PairedRLBench(Dataset):
         self.samples = []
         for dirpath, _, filenames in os.walk(root):
             for filename in filenames:
-                if filename.endswith('.mp4'):
+                if filename.endswith('_front.mp4'):
                     self.samples.append(os.path.join(dirpath, filename))
 
         # Initialize transforms
