@@ -108,7 +108,6 @@ class PrecomputedCaptionDataset(Dataset):
         video_path = sample["video_path"]
         vr = VideoReader(video_path, ctx=cpu(0), num_threads=16)
         pool = sample["frame_pairs"]
-        print(f"Pool size for video {video_path}: {len(pool)}. Pool content: {pool}")
         if len(pool) > self.repeated_sampling:
             selected_pairs = random.sample(pool, self.repeated_sampling)
         else:
