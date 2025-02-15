@@ -20,7 +20,7 @@ import util.misc as misc
 import hydra
 from omegaconf import DictConfig, OmegaConf
 from hydra.utils import instantiate
-from util.misc import NativeScalerWithGradNormCount as NativeScaler
+from util.misc import NativeScalerWithGradNormCount as NativeScaler, seed_everything
 
 import modeling
 
@@ -66,9 +66,7 @@ def main(cfg: DictConfig):
 
     # fix the seed for reproducibility
     seed = cfg.seed + misc.get_rank()
-    torch.manual_seed(seed)
-    np.random.seed(seed)
-
+    seed_everything(seed)
     cudnn.benchmark = True
 
     eff_batch_size = cfg.batch_size * cfg.accum_iter * misc.get_world_size()
@@ -96,6 +94,8 @@ def main(cfg: DictConfig):
     else:
         sampler_train = torch.utils.data.RandomSampler(dataset_train)
 
+    g = torch.Generator()
+    g.manual_seed(0)
 
     data_loader_train = torch.utils.data.DataLoader(
         dataset_train,
@@ -107,6 +107,8 @@ def main(cfg: DictConfig):
         drop_last=True,
         persistent_workers=True,
         multiprocessing_context=torch.multiprocessing.get_context("spawn"),
+        worker_init_fn=misc.seed_worker,
+        generator=g,
     )
 
     # define the model
