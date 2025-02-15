@@ -118,7 +118,8 @@ class PrecomputedCaptionDataset(Dataset):
         captions = []
         for pair in selected_pairs:
             indices = pair.get("frame_indices")
-            caption = pair.get("caption", "")print(indices, caption[:100])
+            caption = pair.get("caption", "")
+            print(indices, caption[:100])
             if caption == "":
                 print("Warning: Empty caption found.")
             if not indices or len(indices) < 2:
