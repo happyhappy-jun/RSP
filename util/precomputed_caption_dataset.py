@@ -130,10 +130,13 @@ class PrecomputedCaptionDataset(Dataset):
         src_images = torch.stack(src_images, dim=0)
         tgt_images = torch.stack(tgt_images, dim=0)
         if captions:
-            tokenized_batch = self.caption_tokenizer(captions, max_length=512, padding=True, truncation=True, return_tensors='pt')
+            tokenized_batch = self.caption_tokenizer(captions,
+                                                     max_length=512, padding=True, truncation=True, return_tensors='pt')
+            tokenized_batch = {k: v.clone() for k, v in
+                               tokenized_batch.items()}
         else:
             tokenized_batch = None
-        logger.info(f"Returning item {idx} with {len(captions)} captions tokenized.")
+        logger.info(f"Returning item {idx} with {len(captions)} caption tokenized.")
         return {
             "src_images": src_images,
             "tgt_images": tgt_images,
