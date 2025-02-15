@@ -19,6 +19,8 @@ and basic transforms (to tensor and normalize) are applied.
 import os
 import json
 import random
+
+from pptx.media import Video
 from torch.utils.data import Dataset
 import numpy as np
 from decord import VideoReader, cpu
@@ -75,17 +77,21 @@ class PrecomputedCaptionDataset(Dataset):
     def __len__(self):
         return len(self.samples)
     
-    def read_frame(self, video_path: str, index: int) -> np.ndarray:
-        """Read a single frame from a video file using decord."""
-        if video_path not in self._video_reader_cache:
-            self._video_reader_cache[video_path] = VideoReader(video_path, num_threads=1, ctx=cpu(0))
-        vr = self._video_reader_cache[video_path]
+    def read_frame(self, vr: VideoReader, index: int) -> np.ndarray:
         frame = vr[index].asnumpy()
         return frame
+
+    def transform(self, src_image, tgt_image):
+        src_image, tgt_image = self.transforms(src_image, tgt_image)
+        src_image = self.basic_transform(src_image)
+        tgt_image = self.basic_transform(tgt_image)
+        return src_image, tgt_image
+
     
     def __getitem__(self, idx: int):
         sample = self.samples[idx]
         video_path = sample["video_path"]
+        vr = VideoReader(video_path, ctx=cpu(0), num_threads=16)
         pool = sample["frame_pairs"]
         if len(pool) > self.repeated_sampling:
             selected_pairs = random.sample(pool, self.repeated_sampling)
@@ -97,19 +103,15 @@ class PrecomputedCaptionDataset(Dataset):
         for pair in selected_pairs:
             indices = pair.get("frame_indices")
             caption = pair.get("caption", "")
+            if caption is "":
+                print("Warning: Empty caption found.")
             if not indices or len(indices) < 2:
                 continue
-            frame1_np = self.read_frame(video_path, indices[0])
-            frame2_np = self.read_frame(video_path, indices[1])
-            img1 = Image.fromarray(frame1_np)
-            img2 = Image.fromarray(frame2_np)
-            if self.transforms:
-                img1, img2 = self.transforms(img1, img2)
-            if self.basic_transform:
-                img1 = self.basic_transform(img1)
-                img2 = self.basic_transform(img2)
-            src_images.append(img1)
-            tgt_images.append(img2)
+            frame1_np = self.read_frame(vr, indices[0])
+            frame2_np = self.read_frame(vr, indices[1])
+            src_image, tgt_image = self.transform(frame1_np, frame2_np)
+            src_images.append(src_image)
+            tgt_images.append(tgt_image)
             captions.append(caption)
         src_images = torch.stack(src_images, dim=0)
         tgt_images = torch.stack(tgt_images, dim=0)
