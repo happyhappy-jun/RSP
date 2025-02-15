@@ -31,6 +31,7 @@ from util.transform import PairedRandomResizedCrop
 
 import logging
 
+logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 import torch.nn.functional as F
@@ -121,7 +122,6 @@ class PrecomputedCaptionDataset(Dataset):
         for pair in selected_pairs:
             indices = pair.get("frame_indices")
             caption = pair.get("caption", "")
-            print(indices, caption[:100])
             if caption == "":
                 print("Warning: Empty caption found.")
             if not indices or len(indices) < 2:
@@ -139,7 +139,6 @@ class PrecomputedCaptionDataset(Dataset):
                                                      max_length=512, padding="max_length", truncation=True, return_tensors='pt')
         else:
             tokenized_batch = None
-        for i, tokenized_bat in enumerate(tokenized_batch["input_ids"]): print(i, tokenized_bat.size())
 
         return {
             "src_images": src_images,
