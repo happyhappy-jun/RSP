@@ -86,7 +86,7 @@ class PrecomputedCaptionDataset(Dataset):
                 "frame_pairs": frame_pairs
             })
         self.caption_tokenizer = AutoTokenizer.from_pretrained("thenlper/gte-base")
-        logger.info(f"PrecomputedCaptionDataset initialized with {len(self.samples)} video entries.")
+        print(f"PrecomputedCaptionDataset initialized with {len(self.samples)} video entries.")
 
     def __len__(self):
         return len(self.samples)
@@ -108,13 +108,13 @@ class PrecomputedCaptionDataset(Dataset):
         video_path = sample["video_path"]
         vr = VideoReader(video_path, ctx=cpu(0), num_threads=16)
         pool = sample["frame_pairs"]
-        logger.info(f"Pool size for video {video_path}: {len(pool)}. Pool content: {pool}")
+        print(f"Pool size for video {video_path}: {len(pool)}. Pool content: {pool}")
         if len(pool) > self.repeated_sampling:
             selected_pairs = random.sample(pool, self.repeated_sampling)
         else:
             selected_pairs = pool
-        logger.info(f"Selected pairs for video {video_path}: {selected_pairs}")
-        logger.info(
+        print(f"Selected pairs for video {video_path}: {selected_pairs}")
+        print(
             f"Loading video {video_path} with {len(pool)} pairs, selected {len(selected_pairs)} pairs for processing.")
         src_images = []
         tgt_images = []
