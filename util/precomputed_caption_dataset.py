@@ -30,6 +30,7 @@ from torchvision import transforms
 from util.transform import PairedRandomResizedCrop
 
 import logging
+
 logger = logging.getLogger(__name__)
 
 import torch.nn.functional as F
@@ -40,6 +41,7 @@ from transformers import AutoTokenizer, AutoModel
 def average_pool(last_hidden_states: Tensor, attention_mask: Tensor) -> Tensor:
     last_hidden = last_hidden_states.masked_fill(~attention_mask[..., None].bool(), 0.0)
     return last_hidden.sum(dim=1) / attention_mask.sum(dim=1)[..., None]
+
 
 class PrecomputedCaptionDataset(Dataset):
     def __init__(self, dataset_file: str, data_root: str, repeated_sampling: int = 2, max_pair_pool: int = 64, seed=42):
@@ -57,19 +59,19 @@ class PrecomputedCaptionDataset(Dataset):
         random.seed(seed)
         with open(dataset_file, 'r') as f:
             data = json.load(f)
-        
+
         self.data_root = data_root
         self.repeated_sampling = repeated_sampling
         self.max_pair_pool = max_pair_pool
         self.samples = []
         self._video_reader_cache = {}
-        
+
         self.transforms = PairedRandomResizedCrop()
         self.basic_transform = transforms.Compose(
             [transforms.ToTensor(),
              transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])]
         )
-        
+
         for entry in data:
             video_rel_path = entry.get("video_path")
             video_path = os.path.join(data_root, video_rel_path)
@@ -84,10 +86,10 @@ class PrecomputedCaptionDataset(Dataset):
             })
         self.caption_tokenizer = AutoTokenizer.from_pretrained("thenlper/gte-base")
         logger.info(f"PrecomputedCaptionDataset initialized with {len(self.samples)} video entries.")
-    
+
     def __len__(self):
         return len(self.samples)
-    
+
     def read_frame(self, vr: VideoReader, index: int) -> np.ndarray:
         logger.debug(f"Reading frame index {index}")
         frame = vr[index].asnumpy()
@@ -100,7 +102,6 @@ class PrecomputedCaptionDataset(Dataset):
         tgt_image = self.basic_transform(tgt_image)
         return src_image, tgt_image
 
-    
     def __getitem__(self, idx: int):
         sample = self.samples[idx]
         video_path = sample["video_path"]
@@ -110,7 +111,8 @@ class PrecomputedCaptionDataset(Dataset):
             selected_pairs = random.sample(pool, self.repeated_sampling)
         else:
             selected_pairs = pool
-        logger.info(f"Loading video {video_path} with {len(pool)} pairs, selected {len(selected_pairs)} pairs for processing.")
+        logger.info(
+            f"Loading video {video_path} with {len(pool)} pairs, selected {len(selected_pairs)} pairs for processing.")
         src_images = []
         tgt_images = []
         captions = []
@@ -132,12 +134,9 @@ class PrecomputedCaptionDataset(Dataset):
         if captions:
             tokenized_batch = self.caption_tokenizer(captions,
                                                      max_length=512, padding=True, return_tensors='pt')
-            tokenized_batch = {k: v.clone() for k, v in
-                               tokenized_batch.items()}
         else:
             tokenized_batch = None
 
-        print("BATCH", tokenized_batch)
         logger.info(f"Returning item {idx} with {len(captions)} caption tokenized.")
         return {
             "src_images": src_images,
