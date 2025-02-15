@@ -112,10 +112,6 @@ class PrecomputedCaptionDataset(Dataset):
             selected_pairs = random.sample(pool, self.repeated_sampling)
         else:
             selected_pairs = pool
-        print(f"Selected pairs for video {video_path}: {[pair['frame_indices'] for pair in selected_pairs]}")
-        print(
-            f"Loading video {video_path} with {len(pool)} pairs, selected {len(selected_pairs)} pairs for processing.")
-        exit()
         src_images = []
         tgt_images = []
         captions = []
