@@ -136,6 +136,8 @@ class PrecomputedCaptionDataset(Dataset):
                                tokenized_batch.items()}
         else:
             tokenized_batch = None
+
+        print("BATCH", tokenized_batch)
         logger.info(f"Returning item {idx} with {len(captions)} caption tokenized.")
         return {
             "src_images": src_images,
