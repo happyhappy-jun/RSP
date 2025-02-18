@@ -5,96 +5,71 @@ import torch
 from torch.utils.data import Dataset
 from torchvision import transforms
 from util.transform import PairedRandomResizedCrop
-
+import pickle
+from decord import VideoReader, cpu
+import random
 
 class PairedKinetics(Dataset):
-    def __del__(self):
-        # Cleanup any remaining resources
-        torch.cuda.empty_cache()
-        
     def __init__(
         self,
-        frame_root,
-        frame_info_path,
-        repeated_sampling=2,
-        seed=42
+        root,
+        max_distance=48,
+        repeated_sampling=2
     ):
         super().__init__()
-        self.frame_root = frame_root
-        
-        # Load frame info data
-        with open(frame_info_path, 'r') as f:
-            frame_info = json.load(f)
-            self.frames = frame_info['videos']
+        self.root = root
+        with open(
+            os.path.join(self.root, "labels", f"label_full_1.0.pickle"), "rb"
+        ) as f:
+            self.samples = pickle.load(f)
 
-        self.transforms = PairedRandomResizedCrop(seed=seed)
-        self.basic_transform = transforms.Compose([
-            transforms.ToTensor(),
-            transforms.Normalize(mean=[0.485, 0.456, 0.406], 
-                              std=[0.229, 0.224, 0.225])
-        ])
-        
+        self.transforms = PairedRandomResizedCrop(hflip_p=0)
+        self.basic_transform = transforms.Compose(
+            [transforms.ToTensor(),
+             transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])]
+        )
+
+        self.max_distance = max_distance
         self.repeated_sampling = repeated_sampling
 
     def __len__(self):
-        return len(self.frames)
-
-    def _process_path(self, frame_path):
-        """add frame_root to frame_path"""
-        return f"{self.frame_root}/{frame_path}"
-
-    def load_frame(self, frame_path):
-        """Load and convert frame to RGB"""
-        frame = cv2.imread(frame_path)
-        if frame is None:
-            raise ValueError(f"Failed to load frame from path: {frame_path}")
-        return cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        return len(self.samples)
 
     def __getitem__(self, index):
-        frame_data = self.frames[index]
-        frame_paths = frame_data['frame_paths']
-        
+        sample = os.path.join(self.root, self.samples[index][1])
+        vr = VideoReader(sample, num_threads=1, ctx=cpu(0))
         src_images = []
         tgt_images = []
-        
-        for _ in range(self.repeated_sampling):
-            frame_cur = self.load_frame(self._process_path(frame_paths[0]))
-            frame_fut = self.load_frame(self._process_path(frame_paths[1]))
-            
-            src_image, tgt_image = self.transforms(frame_cur, frame_fut)
-            src_image = self.basic_transform(src_image)
-            tgt_image = self.basic_transform(tgt_image)
-            
+        for i in range(self.repeated_sampling):
+            src_image, tgt_image = self.load_frames(vr)
+            src_image, tgt_image = self.transform(src_image, tgt_image)
             src_images.append(src_image)
             tgt_images.append(tgt_image)
+        src_images = torch.stack(src_images, dim=0)
+        tgt_images = torch.stack(tgt_images, dim=0)
+        return src_images, tgt_images, 0
 
-        return torch.stack(src_images, dim=0), torch.stack(tgt_images, dim=0), 0
+    def load_frames(self, vr):
+        # handle temporal segments
+        seg_len = len(vr)
+        least_frames_num = self.max_distance + 1
+        if seg_len >= least_frames_num:
+            idx_cur = random.randint(0, seg_len - least_frames_num)
+            interval = random.randint(4, self.max_distance)
+            idx_fut = idx_cur + interval
+        else:
+            indices = random.sample(range(seg_len), 2)
+            indices.sort()
+            idx_cur, idx_fut = indices
+        frame_cur = vr[idx_cur].asnumpy()
+        frame_fut = vr[idx_fut].asnumpy()
+
+        return frame_cur, frame_fut
+
+    def transform(self, src_image, tgt_image):
+        src_image, tgt_image = self.transforms(src_image, tgt_image)
+        src_image = self.basic_transform(src_image)
+        tgt_image = self.basic_transform(tgt_image)
+        return src_image, tgt_image
 
 
-
-if __name__ == "__main__":
-    # Test to verify PairedKineticsFixed uses fixed frame numbers
-    root = "/data/kinetics400"  # Replace with actual path
-    
-    # Create two instances of PairedKineticsFixed
-    dataset1 = PairedKineticsFixed(root, seed=42)
-    dataset2 = PairedKineticsFixed(root, seed=42)
-    
-    # Check if presampled indices are the same for both instances
-    print("Testing if frame indices are fixed across dataset instances...")
-    
-    # Compare presampled indices for first 5 videos
-    for idx in range(min(5, len(dataset1))):
-        indices1 = dataset1.presampled_indices[idx]
-        indices1_2 = dataset1.presampled_indices[idx]
-        indices2 = dataset2.presampled_indices[idx]
-        indices2_2 = dataset2.presampled_indices[idx]
-        
-        print(f"Video {idx}:")
-        print(f"Dataset1 indices: {indices1}")
-        print(f"Dataset2 indices: {indices2}")
-        print(f"Dataset1 indices (2nd time): {indices1_2}")
-        print(f"Dataset2 indices (2nd time): {indices2_2}")
-
-    
-    print("Test passed! Frame indices are fixed across dataset instances.")

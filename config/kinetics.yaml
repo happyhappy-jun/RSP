@@ -2,16 +2,16 @@ defaults:
   - main
   - _self_
 
-exp_name: rsp_fixed
+exp_name: rsp_baseline
 
 model_name: rsp_vit_small_patch16
 
 dataset:
   _target_: util.kinetics.PairedKinetics
-  root: /data/kinetics400
+  root: /data/rlwrld-common/junyoon/kinetics400
 
 train_loop:
   _target_: engine_pretrain_repsamp.train_one_epoch
   _partial_: true
 
-kl_scale: 0.001
+kl_scale: 0.01
