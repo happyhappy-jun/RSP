@@ -68,13 +68,42 @@ class PairedKineticsWithCaption8Pair(Dataset):
 
         print(f"\nFinished loading {len(self.embeddings):,} embeddings")
 
+
+    def shuffle_embeddings_dict(self, embeddings_dict, seed=42):
+        """
+        Shuffle the values in the embeddings dictionary while keeping the keys intact.
+        
+        Args:
+            embeddings_dict (dict): Dictionary with (video_idx, pair_idx) as keys and embeddings as values
+            seed (int): Random seed for reproducibility
+        
+        Returns:
+            dict: New dictionary with shuffled embeddings
+        """
+        # Set random seed for reproducibility
+        random.seed(seed)
+        
+        # Get all keys and values
+        keys = list(embeddings_dict.keys())
+        values = list(embeddings_dict.values())
+        
+        # Shuffle the values
+        random.shuffle(values)
+        
+        # Create new dictionary with original keys but shuffled values
+        shuffled_dict = {key: value for key, value in zip(keys, values)}
+        
+        return shuffled_dict
+
+
     def __init__(
         self,
         frame_root,
         frame_info_path,  # Path to frame_info.json
         embeddings_path,  # Path to combined_output.jsonl
         frame_info_additional_path=None,  # Optional path to additional frame info
-        embeddings_additional_path=None,  # Optional path to additional embeddings
+        embeddings_additional_path=None,  # Optional path to additional embeddings,
+        shuffle=False,
         repeated_sampling=2,  # Number of augmented samples per pair
     ):
         super().__init__()
@@ -106,6 +135,10 @@ class PairedKineticsWithCaption8Pair(Dataset):
         # Filter and group valid pairs by video_idx
         self.video_pairs = defaultdict(list)
         missing_embeddings = defaultdict(list)
+
+        if shuffle:
+            print("Shuffling embedding for random embedding")
+            self.embeddings = self.shuffle_embeddings_dict(self.embeddings)
 
         for video_idx, frame_data in self.results.items():
             for pair in frame_data:
@@ -248,79 +281,10 @@ if __name__ == "__main__":
 
     print("\nInitializing dataset...")
     dataset = PairedKineticsWithCaption8Pair(
-        frame_root="/data/kinetics400caption",
-        frame_info_path="/data/kinetics400caption/frame_info.json",
-        embeddings_path="/data/kinetics400caption/embedding_large_512.jsonl",
-        frame_info_additional_path="/data/kinetics400caption/frame_info_additional.json",
-        embeddings_additional_path="/data/kinetics400caption/embedding_6_pair_512.jsonl",
+        frame_root="/data/rlwrld-common/junyoon/kinetics400caption",
+        frame_info_path="/data/rlwrld-common/junyoon/kinetics400caption/frame_info.json",
+        embeddings_path="/data/rlwrld-common/junyoon/kinetics400caption/embedding_large_512.jsonl",
+        frame_info_additional_path="/data/rlwrld-common/junyoon/kinetics400caption/frame_info_additional.json",
+        embeddings_additional_path="/data/rlwrld-common/junyoon/kinetics400caption/embedding_6_pair_512.jsonl",
     )
-
-    print(f"\nTotal number of valid pairs: {len(dataset)}")
-
-    # Print some random samples from results
-    print("\nRandom samples from dataset:")
-    if dataset.results:
-        video_indices = list(dataset.results.keys())
-        sample_videos = random.sample(video_indices, min(5, len(video_indices)))
-        for video_idx in sample_videos:
-            pairs = dataset.results[video_idx]
-            if pairs:  # Check if there are any pairs for this video
-                sample_pair = random.choice(pairs)
-                print(f"\nVideo {video_idx}:")
-                print(f"Frame current path: {sample_pair['frame_cur_path']}")
-                print(f"Frame future path: {sample_pair['frame_fut_path']}")
-                print(f"Pair idx: {sample_pair['pair_idx']}")
-
-    # Create dataloader with small batch size for validation
-    dataloader = DataLoader(
-        dataset, batch_size=4, shuffle=False, num_workers=2, collate_fn=collate_fn
-    )
-
-    print("\nValidating dataset by attempting to load all samples...")
-    total_samples = len(dataloader)
-    failed_indices = []
-
-    try:
-        for idx, batch in tqdm.tqdm(enumerate(dataloader), total=total_samples):
-            # Verify batch contents
-            assert (
-                batch["src_images"].shape[0] == batch["tgt_images"].shape[0]
-            ), f"Batch {idx}: Mismatched batch sizes between source and target images"
-            assert (
-                batch["embeddings"].shape[0] == batch["src_images"].shape[0]
-            ), f"Batch {idx}: Mismatched batch sizes between images and embeddings"
-
-            # Check for NaN values
-            if torch.isnan(batch["src_images"]).any():
-                failed_indices.append((idx, "NaN in source images"))
-            if torch.isnan(batch["tgt_images"]).any():
-                failed_indices.append((idx, "NaN in target images"))
-            if torch.isnan(batch["embeddings"]).any():
-                failed_indices.append((idx, "NaN in embeddings"))
-
-    except Exception as e:
-        print(f"\nError during validation: {str(e)}")
-        sys.exit(1)
-
-    print("\nDataset validation complete!")
-    print(f"Successfully processed {total_samples} batches")
-
-    if failed_indices:
-        print("\nWarning: Found issues in the following batches:")
-        for idx, issue in failed_indices:
-            print(f"Batch {idx}: {issue}")
-    else:
-        print("No issues found. All samples are valid and accessible.")
-
-    # Print sample batch shapes
-    sample_batch = next(iter(dataloader))
-    print("\nSample batch shapes:")
-    print(f"Source images: {sample_batch['src_images'].shape}")
-    print(f"Target images: {sample_batch['tgt_images'].shape}")
-    print(f"Embeddings: {sample_batch['embeddings'].shape}")
-
-    # Print shapes of individual samples within the batch
-    print("\nIndividual sample shapes in batch:")
-    print(f"Source image shape (per sample): {sample_batch['src_images'][0].shape}")
-    print(f"Target image shape (per sample): {sample_batch['tgt_images'][0].shape}")
-    print(f"Embedding shape (per sample): {sample_batch['embeddings'][0].shape}")
+    
