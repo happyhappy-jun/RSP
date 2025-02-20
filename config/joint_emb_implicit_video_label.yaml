@@ -12,7 +12,7 @@ dataset:
   _target_: util.kinetics_caption_video_label.PairedKineticsCaptionVideoLabel
   frame_root: ${..data_root}/kinetics400caption
   frame_info_path: ${..data_root}/kinetics400caption/frame_info.json
-  class_embeddings_path: ${..data_root}/kinetics400caption/class_embeddings.jsonl
+  class_embeddings_path: ${..data_root}/kinetics400caption/class_embeddings.json
   frame_info_additional_path: ${..data_root}/kinetics400caption/frame_info_additional.json
 
 

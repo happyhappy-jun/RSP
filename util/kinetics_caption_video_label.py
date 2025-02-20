@@ -60,8 +60,8 @@ class PairedKineticsCaptionVideoLabel(Dataset):
 
         for video_idx, frame_data in self.results.items():
             for pair in frame_data:
-                if pair["class_name"] in self.class_embeddings:
-                    pair["embedding"] = np.array(self.class_embeddings[pair["class_name"]], dtype=np.float32)[:512]
+                if pair["class_label"] in self.class_embeddings:
+                    pair["embedding"] = np.array(self.class_embeddings[pair["class_label"]], dtype=np.float32)[:512]
                     self.video_pairs[video_idx].append(pair)
                 else:
                     missing_embeddings[video_idx].append(pair["pair_idx"])
@@ -81,7 +81,7 @@ class PairedKineticsCaptionVideoLabel(Dataset):
         print("\nExample video pair counts:")
         for video_idx, pairs in list(self.video_pairs.items())[:5]:
             print(
-                f"Video {video_idx}: {len(pairs)} pairs - Class: {pairs[0]['class_name']}"
+                f"Video {video_idx}: {len(pairs)} pairs - Class: {pairs[0]['class_label']}"
             )
 
         del self.video_pairs  # Keep only the flattened valid_videos list
@@ -105,7 +105,7 @@ class PairedKineticsCaptionVideoLabel(Dataset):
         for frame in frames:
             video_idx = frame["video_idx"]
             frame_paths = frame["frame_paths"]
-            class_name = frame["class_name"]  # New: get class name from frame info
+            class_label = frame["class_label"]  # New: get class name from frame info
             pair_idx = frame["pair_idx"] + pair_idx_offset
 
             # Add prefix to frame paths
@@ -125,7 +125,7 @@ class PairedKineticsCaptionVideoLabel(Dataset):
                         "pair_idx": pair_idx,
                         "frame_cur_path": processed_paths[0],
                         "frame_fut_path": processed_paths[1],
-                        "class_name": class_name,  # New: store class name
+                        "class_label": class_label,  # New: store class name
                     }
                 ]
             )
@@ -151,7 +151,7 @@ class PairedKineticsCaptionVideoLabel(Dataset):
         src_images = []
         tgt_images = []
         embeddings = []
-        class_names = []  # New: track class names for debugging
+        class_labels = []  # New: track class names for debugging
 
         # Randomly sample pairs for this video
         sampled_pairs = random.sample(
@@ -169,14 +169,14 @@ class PairedKineticsCaptionVideoLabel(Dataset):
             src_images.append(src_image)
             tgt_images.append(tgt_image)
             embeddings.append(torch.from_numpy(pair["embedding"]))
-            class_names.append(pair["class_name"])
+            class_labels.append(pair["class_label"])
 
         # If we need more samples, repeat the last pair
         while len(src_images) < self.repeated_sampling:
             src_images.append(src_images[-1])
             tgt_images.append(tgt_images[-1])
             embeddings.append(embeddings[-1])
-            class_names.append(class_names[-1])
+            class_labels.append(class_labels[-1])
 
         return {
             "video_idx": video_idx,
@@ -237,7 +237,7 @@ if __name__ == "__main__":
         print(f"Target images shape: {batch['tgt_images'].size()}")
         print(f"Embeddings shape: {batch['embeddings'].size()}")
         print(f"Video indices: {batch['video_idx']}")
-        print(f"Class names: {batch['class_names'][0]}")  # Print first item's classes
+        print(f"Class names: {batch['class_labels'][0]}")  # Print first item's classes
 
         # Check embedding values
         print(f"Embedding sample (first 5 values): {batch['embeddings'][0][0][:5]}")
