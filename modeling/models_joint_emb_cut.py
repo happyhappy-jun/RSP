@@ -147,10 +147,10 @@ class RspCaptionJointCut(RspCaption):
         mae_loss = self.forward_loss(tgt_imgs, pred_masked, mask)
 
         with torch.no_grad():
-            tgt_pred_prior = self.forward_decoder_fut(src_h, h_context_decoder, prior_z)
+            tgt_pred_prior = self.forward_decoder_fut(src_h, prior_z)
             loss_prior = self.forward_loss(tgt_imgs, tgt_pred_prior)
 
-        loss = loss_post + self.kl_scale * kl_loss + self.cos_scale * context_loss + mae_loss
+        loss = loss_post + self.kl_scale * kl_loss  + mae_loss
 
         detailed_loss = {
             "loss_post": loss_post,

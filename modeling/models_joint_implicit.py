@@ -16,6 +16,7 @@ class RspCaptionJointImplicit(RspCaption):
                  cos_scale=1.0,
                  embed_decoder_num_heads=8,
                  embed_decoder_depth=4,
+                 resize=False,
                  **kwargs):
         super().__init__(*args, **kwargs)
         self.cos_scale = cos_scale
@@ -29,6 +30,7 @@ class RspCaptionJointImplicit(RspCaption):
         self.to_language_prior = None
         self.language_type_embed = None
         self.image_type_embed = None
+        self.resize = resize
 
     def get_feat(self, h, z):
         # Process deterministic path
@@ -103,7 +105,10 @@ class RspCaptionJointImplicit(RspCaption):
         tgt_imgs = tgt_imgs.reshape(-1, *tgt_imgs.shape[2:])
         embedding = embedding.reshape(-1, embedding.size(-1))
         embedding = embedding.unsqueeze(1)
-        h_context_embed_dim = self.patchify_embedding(embedding)
+        if self.resize:
+            h_context_embed_dim = self.resize_embed(embedding, self.embed_dim)
+        else:
+            h_context_embed_dim = self.patchify_embedding(embedding)
         src_h, _, _ = self.forward_encoder(src_imgs, mask_ratio=0)
         tgt_h, _, _ = self.forward_encoder(self.perturb(tgt_imgs), mask_ratio=0)
 
