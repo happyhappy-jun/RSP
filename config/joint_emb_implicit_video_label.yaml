@@ -1,0 +1,32 @@
+defaults:
+  - main
+  - _self_
+
+exp_name: ours_joint_implicit_video_label
+
+model_name: rsp_joint_implicit_vit_small_patch16
+
+data_root: /data/
+
+dataset:
+  _target_: util.kinetics_caption_video_label.PairedKineticsCaptionVideoLabel
+  frame_root: ${..data_root}/kinetics400caption
+  frame_info_path: ${..data_root}/kinetics400caption/frame_info.json
+  class_embeddings_path: ${..data_root}/kinetics400caption/class_embeddings.jsonl
+  frame_info_additional_path: ${..data_root}/kinetics400caption/frame_info_additional.json
+
+
+train_loop:
+  _target_: engine_pretrain_repsamp.train_one_epoch_llm
+  _partial_: true
+
+num_workers: 4
+batch_size: 24
+accum_iter: 8
+
+model_params:
+  context_emb_dim: 768
+  embed_decoder_num_heads: 8
+  embed_decoder_depth: 4
+  kl_scale: 0.005
+  cos_scale: 0.1
