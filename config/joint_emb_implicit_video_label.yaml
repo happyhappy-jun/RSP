@@ -6,7 +6,7 @@ exp_name: ours_joint_implicit_video_label
 
 model_name: rsp_joint_implicit_vit_small_patch16
 
-data_root: /data/
+data_root: /data
 
 dataset:
   _target_: util.kinetics_caption_video_label.PairedKineticsCaptionVideoLabel

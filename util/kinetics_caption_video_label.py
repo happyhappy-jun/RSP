@@ -61,7 +61,7 @@ class PairedKineticsCaptionVideoLabel(Dataset):
         for video_idx, frame_data in self.results.items():
             for pair in frame_data:
                 if pair["class_name"] in self.class_embeddings:
-                    pair["embedding"] = np.array(self.class_embeddings[pair["class_name"]], dtype=np.float32)
+                    pair["embedding"] = np.array(self.class_embeddings[pair["class_name"]], dtype=np.float32)[:512]
                     self.video_pairs[video_idx].append(pair)
                 else:
                     missing_embeddings[video_idx].append(pair["pair_idx"])
