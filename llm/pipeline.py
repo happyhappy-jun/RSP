@@ -77,10 +77,29 @@ class GPT4OMiniStep1Sampler(Step1Sampler):
         )
 
 class DummyStep2Grounding(Step2Grounding):
+    def __init__(self):
+        self.model = load_model("groundingdino/config/GroundingDINO_SwinT_OGC.py", "weights/groundingdino_swint_ogc.pth")
+        self.box_threshold = 0.35
+        self.text_threshold = 0.25
+
     def detect_bounding_boxes(self, frame_path: Path, caption: str) -> Step2Output:
-        # Dummy implementation: Returns a fixed bounding box.
-        dummy_bbox = BoundingBox(x=50.0, y=50.0, width=200.0, height=200.0)
-        return Step2Output(bounding_boxes=[dummy_bbox])
+        image_source, image = load_image(str(frame_path))
+        boxes, logits, phrases = predict(
+            model=self.model,
+            image=image,
+            caption=caption,
+            box_threshold=self.box_threshold,
+            text_threshold=self.text_threshold
+        )
+        annotated_frame = annotate(image_source=image_source, boxes=boxes, logits=logits, phrases=phrases)
+        output_path = "annotated_" + frame_path.stem + ".jpg"
+        cv2.imwrite(output_path, annotated_frame)
+        bounding_boxes = []
+        for box in boxes:
+            x1, y1, x2, y2 = box
+            bbox = BoundingBox(x=float(x1), y=float(y1), width=float(x2 - x1), height=float(y2 - y1))
+            bounding_boxes.append(bbox)
+        return Step2Output(bounding_boxes=bounding_boxes)
 
 class DummyStep3FutureDetection(Step3FutureDetection):
     def detect_in_future_frame(self, video_path: Path, bounding_box: BoundingBox) -> Step3Output:
