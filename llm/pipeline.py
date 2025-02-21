@@ -12,7 +12,6 @@ from llm.base_pipeline import (
     BoundingBox,
     DatasetGenerationPipeline
 )
-import openai
 from groundingdino.util.inference import load_model, load_image, predict, annotate
 import cv2
 
@@ -79,8 +78,8 @@ class GPT4OMiniStep1Sampler(Step1Sampler):
 class DummyStep2Grounding(Step2Grounding):
     def __init__(self):
         self.model = load_model("groundingdino/config/GroundingDINO_SwinT_OGC.py", "weights/groundingdino_swint_ogc.pth")
-        self.box_threshold = 0.35
-        self.text_threshold = 0.25
+        self.box_threshold = 0.3
+        self.text_threshold = 0.2
 
     def detect_bounding_boxes(self, frame_path: Path, caption: str) -> Step2Output:
         image_source, image = load_image(str(frame_path))
