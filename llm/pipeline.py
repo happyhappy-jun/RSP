@@ -27,15 +27,11 @@ class GPT4OMiniStep1Sampler(Step1Sampler):
         random_index = random.randint(0, num_frames - 1)
         frame = vr[random_index].asnumpy()
 
-        # Save the extracted frame to a temporary file.
-        temp_frame_path = "/tmp/extracted_frame.jpg"
-        cv2.imwrite(temp_frame_path, frame)
-        frame_path = Path(temp_frame_path)
-
-        # Encode the image to Base64.
+        # Encode the image to Base64 from the in-memory frame.
         success, encoded_image = cv2.imencode('.jpg', frame)
         if not success:
             raise ValueError("Failed to encode the frame to JPEG format.")
+        frame_path = Path("in-memory")
         image_bytes = encoded_image.tobytes()
         base64_image = base64.b64encode(image_bytes).decode("utf-8")
         image_data = f"data:image/jpeg;base64,{base64_image}"
