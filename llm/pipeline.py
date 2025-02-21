@@ -2,7 +2,7 @@
 # This file provides dummy implementations for each pipeline step.
 
 from pathlib import Path
-from llm.base_pipeline import (
+from base_pipeline import (
     Step1Sampler,
     Step2Grounding,
     Step3FutureDetection,
