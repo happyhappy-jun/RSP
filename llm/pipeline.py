@@ -13,6 +13,8 @@ from llm.base_pipeline import (
     DatasetGenerationPipeline
 )
 import openai
+from groundingdino.util.inference import load_model, load_image, predict, annotate
+import cv2
 
 class GPT4OMiniStep1Sampler(Step1Sampler):
     def sample_frame_and_generate_caption(self, video_path: Path) -> Step1Output:
@@ -20,6 +22,9 @@ class GPT4OMiniStep1Sampler(Step1Sampler):
         import decord
         import cv2
         import base64
+        from openai import OpenAI
+
+        client = OpenAI()
 
         # Read the video and select a random frame using decord.
         vr = decord.VideoReader(str(video_path))
@@ -47,8 +52,8 @@ class GPT4OMiniStep1Sampler(Step1Sampler):
         }
 
         try:
-            response = openai.ChatCompletion.create(
-                model="gpt4o-mini",
+            response = client.chat.completions.create(
+                model="gpt-4o-mini",
                 messages=[message],
                 max_tokens=300
             )
@@ -98,7 +103,7 @@ if __name__ == '__main__':
     pipeline = DatasetGenerationPipeline(step1, step2, step3)
     
     # Example usage with a dummy video file path.
-    example_video_path = Path("/path/to/example_video.mp4")
+    example_video_path = Path("/data/kinetics400/cheerleading/zYbQPUCn8Bw_000003_000013.mp4")
     results = pipeline.generate_pipeline(example_video_path)
     
     print("Step 1 Output:", results["step1"])
