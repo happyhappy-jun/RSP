@@ -1,7 +1,9 @@
 # Example Implementation for the DatasetGenerationPipeline.
 # This file provides dummy implementations for each pipeline step.
-
+from dataclasses import asdict
 from pathlib import Path
+from pprint import pprint
+
 from base_pipeline import (
     Step1Sampler,
     Step2Grounding,
@@ -44,7 +46,13 @@ class GPT4OMiniStep1Sampler(Step1Sampler):
         image_data = f"data:image/jpeg;base64,{base64_image}"
 
         # Prepare the prompt for describing the scene.
-        prompt_text = "Briefly describe the scene depicted in the image, focusing on spatial relationships among objects."
+        prompt_text = (
+            "Describe the main action happening in this scene, focusing on the primary moving subject.\n"
+            "Response in following format:\n"
+            "<Scene>a kid with yellow hat is riding bike in a park</Scene>"
+            "<Objects>a red bicycle; a kid with yellow hat</Objects>"
+
+                       )
         message = {
             "role": "user",
             "content": [
@@ -55,7 +63,7 @@ class GPT4OMiniStep1Sampler(Step1Sampler):
 
         try:
             response = client.chat.completions.create(
-                model="gpt-4o-mini",
+                model="gpt-4o",
                 messages=[message],
                 max_tokens=300
             )
@@ -131,6 +139,6 @@ if __name__ == '__main__':
     example_video_path = Path("/data/kinetics400/cheerleading/zYbQPUCn8Bw_000003_000013.mp4")
     results = pipeline.generate_pipeline(example_video_path)
     
-    print("Step 1 Output:", results["step1"])
-    print("Step 2 Output:", results["step2"])
-    print("Step 3 Output:", results["step3"])
+    pprint(asdict(results["step1"]))
+    pprint(asdict(results["step2"]))
+    pprint(asdict(results["step3"]))
