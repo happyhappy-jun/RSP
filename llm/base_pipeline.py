@@ -19,8 +19,14 @@ class BoundingBox:
     height: float                  # Height of the box.
 
 @dataclass
+class Step2Detection:
+    bounding_box: BoundingBox  # Detected bounding box.
+    logit: float              # Corresponding logit value.
+    phrase: str               # Detected phrase.
+
+@dataclass
 class Step2Output:
-    bounding_boxes: List[BoundingBox]  # List of detected bounding boxes.
+    detections: List[Step2Detection]  # List of detection results.
 
 @dataclass
 class Step3Output:

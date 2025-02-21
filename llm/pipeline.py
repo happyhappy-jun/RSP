@@ -8,6 +8,7 @@ from base_pipeline import (
     Step3FutureDetection,
     Step1Output,
     Step2Output,
+    Step2Detection,
     Step3Output,
     BoundingBox,
     DatasetGenerationPipeline
@@ -98,12 +99,13 @@ class DummyStep2Grounding(Step2Grounding):
         annotated_frame = annotate(image_source=image_source, boxes=boxes, logits=logits, phrases=phrases)
         output_path = "annotated_" + frame_path.stem + ".jpg"
         cv2.imwrite(output_path, annotated_frame)
-        bounding_boxes = []
-        for box in boxes:
+        detections = []
+        for box, logit, phrase in zip(boxes, logits, phrases):
             x1, y1, x2, y2 = box
             bbox = BoundingBox(x=float(x1), y=float(y1), width=float(x2 - x1), height=float(y2 - y1))
-            bounding_boxes.append(bbox)
-        return Step2Output(bounding_boxes=bounding_boxes, logits=logits, phrases=phrases)
+            detection = Step2Detection(bounding_box=bbox, logit=logit, phrase=phrase)
+            detections.append(detection)
+        return Step2Output(detections=detections)
 
 class DummyStep3FutureDetection(Step3FutureDetection):
     def detect_in_future_frame(self, video_path: Path, bounding_box: BoundingBox) -> Step3Output:
