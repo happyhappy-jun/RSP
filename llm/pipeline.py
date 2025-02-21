@@ -12,14 +12,38 @@ from llm.base_pipeline import (
     BoundingBox,
     DatasetGenerationPipeline
 )
+import openai
 
-class DummyStep1Sampler(Step1Sampler):
+class GPT4OMiniStep1Sampler(Step1Sampler):
     def sample_frame_and_generate_caption(self, video_path: Path) -> Step1Output:
-        # Dummy implementation: Returns a fixed frame path, caption, and chain-of-thought reasoning.
+        # Implementation using OpenAI GPT4o-mini.
+        # In a real implementation, you would extract a frame from the video.
+        # For this example, we'll simulate frame extraction.
+        frame_path = Path("/tmp/extracted_frame.jpg")
+        prompt = f"Generate a descriptive caption and chain-of-thought reasoning for the image extracted from video: {video_path}"
+        try:
+            response = openai.ChatCompletion.create(
+                model="gpt4o-mini",
+                messages=[
+                    {"role": "system", "content": "You are an assistant that generates detailed descriptive captions with chain-of-thought for images."},
+                    {"role": "user", "content": prompt}
+                ]
+            )
+            generated_text = response.choices[0].message.content.strip()
+        except Exception as e:
+            generated_text = f"Error generating caption: {str(e)}"
+        # Assume the response format is: "Caption: <caption>\nChain-of-thought: <reasoning>"
+        parts = generated_text.split("\nChain-of-thought:")
+        if len(parts) == 2:
+            caption = parts[0].replace("Caption:", "").strip()
+            chain_of_thought = parts[1].strip()
+        else:
+            caption = generated_text
+            chain_of_thought = ""
         return Step1Output(
-            frame_path=Path("/tmp/dummy_frame.jpg"),
-            caption=f"Dummy caption for {video_path}",
-            chain_of_thought="Dummy chain-of-thought reasoning."
+            frame_path=frame_path,
+            caption=caption,
+            chain_of_thought=chain_of_thought
         )
 
 class DummyStep2Grounding(Step2Grounding):
@@ -40,8 +64,8 @@ class DummyStep3FutureDetection(Step3FutureDetection):
         return Step3Output(closed_bbox=new_bbox)
 
 if __name__ == '__main__':
-    # Create instances of each dummy step.
-    step1 = DummyStep1Sampler()
+    # Create instances of each step.
+    step1 = GPT4OMiniStep1Sampler()
     step2 = DummyStep2Grounding()
     step3 = DummyStep3FutureDetection()
     
