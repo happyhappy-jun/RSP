@@ -1,3 +1,6 @@
 [submodule "eval/DAVIS/davis2017-evaluation"]
 	path = eval/DAVIS/davis2017-evaluation
 	url = https://github.com/davisvideochallenge/davis2017-evaluation
+[submodule "llm/GroundingDINO"]
+	path = llm/GroundingDINO
+	url = https://github.com/IDEA-Research/GroundingDINO.git
