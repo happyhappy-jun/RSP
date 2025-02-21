@@ -103,7 +103,7 @@ class DummyStep2Grounding(Step2Grounding):
             x1, y1, x2, y2 = box
             bbox = BoundingBox(x=float(x1), y=float(y1), width=float(x2 - x1), height=float(y2 - y1))
             bounding_boxes.append(bbox)
-        return Step2Output(bounding_boxes=bounding_boxes)
+        return Step2Output(bounding_boxes=bounding_boxes, logits=logits, phrases=phrases)
 
 class DummyStep3FutureDetection(Step3FutureDetection):
     def detect_in_future_frame(self, video_path: Path, bounding_box: BoundingBox) -> Step3Output:
