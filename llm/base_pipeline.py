@@ -81,11 +81,12 @@ class DatasetGenerationPipeline:
         step1_output = self.step1.sample_frame_and_generate_caption(video_path)
         step2_output = self.step2.detect_bounding_boxes(step1_output.frame_path, step1_output.caption)
         
-        if not step2_output.bounding_boxes:
-            raise ValueError("No bounding boxes detected in step2.")
+        if not step2_output.detections:
+            raise ValueError("No detections detected in step2.")
         
-        # For this interface, pick the first bounding box for further processing.
-        selected_bbox = step2_output.bounding_boxes[0]
+        # For this interface, pick the first detection for further processing.
+        selected_detection = step2_output.detections[0]
+        selected_bbox = selected_detection.bounding_box
         step3_output = self.step3.detect_in_future_frame(video_path, selected_bbox)
 
         return {
