@@ -8,8 +8,8 @@ from typing import List, Optional, Dict
 @dataclass
 class Step1Output:
     frame_path: Path               # Path to the sampled image frame.
-    caption: str                   # Caption generated via an OpenAI-compatible server.
-    chain_of_thought: Optional[str] = None  # Optional chain-of-thought reasoning.
+    scene: str                     # Scene description extracted from the response.
+    objects: str                   # Detected objects extracted from the response.
 
 @dataclass
 class BoundingBox:
@@ -79,7 +79,7 @@ class DatasetGenerationPipeline:
         Returns a dictionary with keys 'step1', 'step2', and 'step3' holding their respective outputs.
         """
         step1_output = self.step1.sample_frame_and_generate_caption(video_path)
-        step2_output = self.step2.detect_bounding_boxes(step1_output.frame_path, step1_output.caption)
+        step2_output = self.step2.detect_bounding_boxes(step1_output.frame_path, step1_output.objects)
         
         if not step2_output.detections:
             raise ValueError("No detections detected in step2.")

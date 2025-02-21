@@ -71,19 +71,22 @@ class GPT4OMiniStep1Sampler(Step1Sampler):
         except Exception as e:
             generated_text = f"Error generating caption: {str(e)}"
 
-        # Assume the response format is: "Caption: <caption>\nChain-of-thought: <reasoning>"
-        parts = generated_text.split("\nChain-of-thought:")
-        if len(parts) == 2:
-            caption = parts[0].replace("Caption:", "").strip()
-            chain_of_thought = parts[1].strip()
-        else:
-            caption = generated_text
-            chain_of_thought = ""
+        # Parse the response format with <Scene> and <Objects> tags
+        try:
+            scene_start = generated_text.index("<Scene>")
+            scene_end = generated_text.index("</Scene>")
+            objects_start = generated_text.index("<Objects>")
+            objects_end = generated_text.index("</Objects>")
+            scene = generated_text[scene_start + len("<Scene>"):scene_end].strip()
+            objects = generated_text[objects_start + len("<Objects>"):objects_end].strip()
+        except Exception as e:
+            scene = "No scene info"
+            objects = "No objects info"
 
         return Step1Output(
             frame_path=frame_path,
-            caption=caption,
-            chain_of_thought=chain_of_thought
+            scene=scene,
+            objects=objects
         )
 
 class DummyStep2Grounding(Step2Grounding):
