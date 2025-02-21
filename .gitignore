@@ -8,3 +8,4 @@ artifacts/
 .aider*
 wandb/
 .secrets/
+.idea

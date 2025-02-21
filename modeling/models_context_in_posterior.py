@@ -12,7 +12,6 @@ class RspContextInPosterior(RspCaption):
     def __init__(self, 
                  enable_rms_norm=False, 
                  embed_scale_factor=1.0, 
-                 context_embed_dim=3072,
                  *args, 
                  **kwargs):
         super().__init__(*args, **kwargs)
