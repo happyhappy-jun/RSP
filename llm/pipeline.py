@@ -20,12 +20,11 @@ class GPT4OMiniStep1Sampler(Step1Sampler):
         # In a real implementation, you would extract a frame from the video.
         # For this example, we'll simulate frame extraction.
         frame_path = Path("/tmp/extracted_frame.jpg")
-        prompt = f"Generate a descriptive caption and chain-of-thought reasoning for the image extracted from video: {video_path}"
+        prompt = f"“Briefly describe the things in this scene and their spatial relations to each other"
         try:
             response = openai.ChatCompletion.create(
                 model="gpt4o-mini",
                 messages=[
-                    {"role": "system", "content": "You are an assistant that generates detailed descriptive captions with chain-of-thought for images."},
                     {"role": "user", "content": prompt}
                 ]
             )
