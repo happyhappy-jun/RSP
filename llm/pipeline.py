@@ -16,21 +16,50 @@ import openai
 
 class GPT4OMiniStep1Sampler(Step1Sampler):
     def sample_frame_and_generate_caption(self, video_path: Path) -> Step1Output:
-        # Implementation using OpenAI GPT4o-mini.
-        # In a real implementation, you would extract a frame from the video.
-        # For this example, we'll simulate frame extraction.
-        frame_path = Path("/tmp/extracted_frame.jpg")
-        prompt = f"“Briefly describe the things in this scene and their spatial relations to each other"
+        import random
+        import decord
+        import cv2
+        import base64
+
+        # Read the video and select a random frame using decord.
+        vr = decord.VideoReader(str(video_path))
+        num_frames = len(vr)
+        random_index = random.randint(0, num_frames - 1)
+        frame = vr[random_index].asnumpy()
+
+        # Save the extracted frame to a temporary file.
+        temp_frame_path = "/tmp/extracted_frame.jpg"
+        cv2.imwrite(temp_frame_path, frame)
+        frame_path = Path(temp_frame_path)
+
+        # Encode the image to Base64.
+        success, encoded_image = cv2.imencode('.jpg', frame)
+        if not success:
+            raise ValueError("Failed to encode the frame to JPEG format.")
+        image_bytes = encoded_image.tobytes()
+        base64_image = base64.b64encode(image_bytes).decode("utf-8")
+        image_data = f"data:image/jpeg;base64,{base64_image}"
+
+        # Prepare the prompt for describing the scene.
+        prompt_text = "Briefly describe the scene depicted in the image, focusing on spatial relationships among objects."
+        message = {
+            "role": "user",
+            "content": [
+                {"type": "text", "text": prompt_text},
+                {"type": "image_url", "image_url": {"url": image_data, "detail": "high"}}
+            ]
+        }
+
         try:
             response = openai.ChatCompletion.create(
                 model="gpt4o-mini",
-                messages=[
-                    {"role": "user", "content": prompt}
-                ]
+                messages=[message],
+                max_tokens=300
             )
             generated_text = response.choices[0].message.content.strip()
         except Exception as e:
             generated_text = f"Error generating caption: {str(e)}"
+
         # Assume the response format is: "Caption: <caption>\nChain-of-thought: <reasoning>"
         parts = generated_text.split("\nChain-of-thought:")
         if len(parts) == 2:
@@ -39,6 +68,7 @@ class GPT4OMiniStep1Sampler(Step1Sampler):
         else:
             caption = generated_text
             chain_of_thought = ""
+
         return Step1Output(
             frame_path=frame_path,
             caption=caption,
