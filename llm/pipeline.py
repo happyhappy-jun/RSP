@@ -77,7 +77,10 @@ class GPT4OMiniStep1Sampler(Step1Sampler):
 
 class DummyStep2Grounding(Step2Grounding):
     def __init__(self):
-        self.model = load_model("groundingdino/config/GroundingDINO_SwinT_OGC.py", "weights/groundingdino_swint_ogc.pth")
+        self.model = load_model(
+            "GroundingDINO/groundingdino/config/GroundingDINO_SwinT_OGC.py",
+            "GroundingDINO/weights/groundingdino_swint_ogc.pth"
+        )
         self.box_threshold = 0.3
         self.text_threshold = 0.2
 
