@@ -150,41 +150,34 @@ class DummyStep2Grounding(Step2Grounding):
         return Step2Output(detections=detections)
 
 class DummyStep3FutureDetection(Step3FutureDetection):
-    def detect_in_future_frame(self, video_path: Path, bounding_boxes: List[BoundingBox]) -> Step3Output:
-        import random
-        closed_bboxes = []
+    def compare_detections(self, detections1: List[Step2Detection], detections2: List[Step2Detection]) -> Step3Output:
+        threshold = 0.03
+        common_bboxes = []
         movement_captions = []
-        for bbox in bounding_boxes:
-            # Simulate movement: offset by random fraction of width/height (up to 10%)
-            max_offset_x = 0.1 * bbox.width
-            max_offset_y = 0.1 * bbox.height
-            delta_x = random.uniform(-max_offset_x, max_offset_x)
-            delta_y = random.uniform(-max_offset_y, max_offset_y)
-            new_bbox = BoundingBox(
-                x=bbox.x + delta_x,
-                y=bbox.y + delta_y,
-                width=bbox.width,
-                height=bbox.height
-            )
-            # Compute normalized displacement
-            norm_dx = delta_x / bbox.width
-            norm_dy = delta_y / bbox.height
-            threshold = 0.03
-            horiz_direction = ""
-            vert_direction = ""
-            if abs(norm_dx) >= threshold:
-                horiz_direction = "right" if norm_dx > 0 else "left"
-            if abs(norm_dy) >= threshold:
-                vert_direction = "down" if norm_dy > 0 else "up"
-            if horiz_direction or vert_direction:
-                movement = f"move {vert_direction} {horiz_direction}".strip()
-                movement = " ".join(movement.split())
-            else:
-                movement = "no significant movement"
-            caption = f"object {movement}"
-            closed_bboxes.append(new_bbox)
-            movement_captions.append(caption)
-        return Step3Output(closed_bboxes=closed_bboxes, movement_captions=movement_captions)
+        for det1 in detections1:
+            for det2 in detections2:
+                if det1.phrase == det2.phrase:
+                    bbox1 = det1.bounding_box
+                    bbox2 = det2.bounding_box
+                    delta_x = bbox2.x - bbox1.x
+                    delta_y = bbox2.y - bbox1.y
+                    norm_dx = delta_x / bbox1.width
+                    norm_dy = delta_y / bbox1.height
+                    horiz_direction = ""
+                    vert_direction = ""
+                    if abs(norm_dx) >= threshold:
+                        horiz_direction = "right" if norm_dx > 0 else "left"
+                    if abs(norm_dy) >= threshold:
+                        vert_direction = "down" if norm_dy > 0 else "up"
+                    if horiz_direction or vert_direction:
+                        movement = f"move {vert_direction} {horiz_direction}".strip()
+                        movement = " ".join(movement.split())
+                    else:
+                        movement = "no significant movement"
+                    caption = f"{det1.phrase} {movement}"
+                    common_bboxes.append(bbox2)
+                    movement_captions.append(caption)
+        return Step3Output(closed_bboxes=common_bboxes, movement_captions=movement_captions)
 
 if __name__ == '__main__':
     # Create instances of each step.

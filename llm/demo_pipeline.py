@@ -60,25 +60,25 @@ def main():
     step2 = DummyStep2Grounding()
     orig_images = []
     annotated_images = []
+    detections_outputs = []
     for img in demo_images:
         # Load original image
         orig = cv2.imread(str(img))
         orig = cv2.cvtColor(orig, cv2.COLOR_BGR2RGB)
         orig_images.append(orig)
-        # Run step2 on the image.
-        _ = step2.detect_bounding_boxes(img, output.objects)
+        # Run step2 on the image and store detection output.
+        det_out = step2.detect_bounding_boxes(img, output.objects)
+        detections_outputs.append(det_out)
         annotated_path = "annotated_" + img.stem + ".jpg"
         ann_img = cv2.imread(annotated_path)
         if ann_img is not None:
             ann_img = cv2.cvtColor(ann_img, cv2.COLOR_BGR2RGB)
         annotated_images.append(ann_img)
     
-    # Run step2 on the first demo image to capture detections for step3
-    step2_output = step2.detect_bounding_boxes(demo_images[0], output.objects)
-    # Run step3 to simulate movement caption generation from the captured detections
+    # Compare detections from the two demo images using step3's new method.
     from pipeline import DummyStep3FutureDetection
     step3 = DummyStep3FutureDetection()
-    step3_output = step3.detect_in_future_frame(demo_images[0], [d.bounding_box for d in step2_output.detections])
+    step3_output = step3.compare_detections(detections_outputs[0].detections, detections_outputs[1].detections)
     print("Step3 Movement Captions:")
     for cap in step3_output.movement_captions:
         print(cap)
