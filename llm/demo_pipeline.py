@@ -38,8 +38,11 @@ def main():
     if not selected_images:
         raise ValueError("No trajectory with at least 2 images found.")
     
-    # Sample two images from the selected trajectory (here, simply take the first two).
-    demo_images = selected_images[:2]
+    # Sample two images from the selected trajectory with random distance.
+    import random
+    idx1 = random.randint(0, len(selected_images) - 2)
+    idx2 = random.randint(idx1 + 1, len(selected_images) - 1)
+    demo_images = [selected_images[idx1], selected_images[idx2]]
     print("Using demo images:")
     for img in demo_images:
         print(img)
