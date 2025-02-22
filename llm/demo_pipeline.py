@@ -78,6 +78,8 @@ def main():
     # Compare detections from the two demo images using step3's new method.
     from pipeline import DummyStep3FutureDetection
     step3 = DummyStep3FutureDetection()
+    print("Image1 Detection output:", detections_outputs[0].detections)
+    print("Image2 Detection output:", detections_outputs[1].detections)
     step3_output = step3.compare_detections(detections_outputs[0].detections, detections_outputs[1].detections)
     print("Step3 Movement Captions:")
     for cap in step3_output.movement_captions:
