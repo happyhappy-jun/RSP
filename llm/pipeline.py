@@ -150,6 +150,10 @@ class DummyStep2Grounding(Step2Grounding):
         return Step2Output(detections=detections)
 
 class DummyStep3FutureDetection(Step3FutureDetection):
+    def detect_in_future_frame(self, video_path: Path, bounding_boxes: List[BoundingBox]) -> Step3Output:
+        # Dummy implementation not used in multi-image comparison.
+        return Step3Output(closed_bboxes=[], movement_captions=[])
+    
     def compare_detections(self, detections1: List[Step2Detection], detections2: List[Step2Detection]) -> Step3Output:
         threshold = 0.03
         common_bboxes = []
