@@ -98,31 +98,54 @@ class GPT4OMiniStep1Sampler(Step1Sampler):
 
 class DummyStep2Grounding(Step2Grounding):
     def __init__(self):
-        self.model = load_model(
-            "/slurm_home/byungjun/RSP/GroundingDINO/groundingdino/config/GroundingDINO_SwinT_OGC.py",
-            "/slurm_home/byungjun/RSP/GroundingDINO/weights/groundingdino_swint_ogc.pth"
-        )
-        self.box_threshold = 0.3
-        self.text_threshold = 0.2
+        from transformers import AutoProcessor, AutoModelForZeroShotObjectDetection
+        import torch
+        self.model_id = "IDEA-Research/grounding-dino-tiny"
+        self.device = "cuda"
+        self.processor = AutoProcessor.from_pretrained(self.model_id)
+        self.model = AutoModelForZeroShotObjectDetection.from_pretrained(self.model_id).to(self.device)
+        self.box_threshold = 0.4
+        self.text_threshold = 0.3
 
     def detect_bounding_boxes(self, frame_path: Path, caption: str) -> Step2Output:
-        image_source, image = load_image(str(frame_path))
-        boxes, logits, phrases = predict(
-            model=self.model,
-            image=image,
-            caption=caption ,
+        from PIL import Image
+        import numpy as np
+        import cv2
+        import torch
+
+        img = Image.open(frame_path).convert("RGB")
+
+        inputs = self.processor(images=img, text=[[caption]], return_tensors="pt").to(self.device)
+        with torch.no_grad():
+            outputs = self.model(**inputs)
+        results = self.processor.post_process_grounded_object_detection(
+            outputs,
+            inputs.input_ids,
             box_threshold=self.box_threshold,
-            text_threshold=self.text_threshold
+            text_threshold=self.text_threshold,
+            target_sizes=[img.size[::-1]]
         )
-        annotated_frame = annotate(image_source=image_source, boxes=boxes, logits=logits, phrases=phrases)
-        output_path = "annotated_" + frame_path.stem + ".jpg"
-        cv2.imwrite(output_path, annotated_frame)
+
+        # Convert PIL image to numpy array for annotation
+        image_np = np.array(img)
+        image_np = cv2.cvtColor(image_np, cv2.COLOR_RGB2BGR)
+
         detections = []
-        for box, logit, phrase in zip(boxes, logits, phrases):
-            x1, y1, x2, y2 = box
-            bbox = BoundingBox(x=float(x1), y=float(y1), width=float(x2 - x1), height=float(y2 - y1))
-            detection = Step2Detection(bounding_box=bbox, logit=logit, phrase=phrase)
-            detections.append(detection)
+        if len(results) > 0:
+            res = results[0]
+            boxes = res["boxes"]
+            scores = res["scores"]
+            labels = res["labels"]
+            for box, score, label in zip(boxes, scores, labels):
+                x1, y1, x2, y2 = map(int, box.tolist())
+                cv2.rectangle(image_np, (x1, y1), (x2, y2), (0, 255, 0), 2)
+                cv2.putText(image_np, f"{caption[:15]}: {score:.2f}", (x1, max(y1-10, 0)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+                bbox = BoundingBox(x=float(x1), y=float(y1), width=float(x2 - x1), height=float(y2 - y1))
+                detection = Step2Detection(bounding_box=bbox, logit=score.item(), phrase=caption)
+                detections.append(detection)
+
+        output_path = "annotated_" + frame_path.stem + ".jpg"
+        cv2.imwrite(output_path, image_np)
         return Step2Output(detections=detections)
 
 class DummyStep3FutureDetection(Step3FutureDetection):
