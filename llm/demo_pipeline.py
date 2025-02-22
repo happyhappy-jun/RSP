@@ -98,8 +98,9 @@ def main():
     axs[1, 1].imshow(annotated_images[1])
     axs[1, 1].set_title("Annotated Image 2")
     axs[1, 1].axis("off")
-    plt.figtext(0.5, 0.96, f"Caption: {output.scene}\nObjects: {output.objects}\nMovements: {'; '.join(step3_output.movement_captions)}", wrap=True, horizontalalignment='center', fontsize=14)
-    plt.tight_layout(rect=[0, 0, 1, 0.93])
+    plt.figtext(0.5, 0.98, f"Caption: {output.scene}", wrap=True, horizontalalignment='center', fontsize=16, fontweight='bold')
+    plt.figtext(0.5, 0.94, f"Objects: {output.objects}\nMovements: {'; '.join(step3_output.movement_captions)}", wrap=True, horizontalalignment='center', fontsize=14)
+    plt.tight_layout(rect=[0, 0, 1, 0.91])
     plt.savefig("output.png")
 
 if __name__ == '__main__':
