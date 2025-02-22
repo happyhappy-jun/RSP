@@ -48,9 +48,11 @@ class GPT4OMiniStep1Sampler(Step1Sampler):
         # Prepare the prompt for describing the scene.
         prompt_text = (
             "Describe the main action happening in this scene, focusing on the primary moving subject.\n"
+            "Separate objects with space-wrapped period\" . \"\n"
+            "Add \" .\" and the end of detection"
             "Response in following format:\n"
             "<Scene>a kid with yellow hat is riding bike in a park</Scene>"
-            "<Objects>a red bicycle; a kid with yellow hat</Objects>"
+            "<Objects>a red bicycle . a kid with yellow hat .</Objects>"
 
                        )
         message = {
@@ -103,7 +105,7 @@ class DummyStep2Grounding(Step2Grounding):
         boxes, logits, phrases = predict(
             model=self.model,
             image=image,
-            caption=caption,
+            caption=caption ,
             box_threshold=self.box_threshold,
             text_threshold=self.text_threshold
         )
