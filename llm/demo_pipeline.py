@@ -85,7 +85,7 @@ def main():
     axs[1, 1].axis("off")
     plt.suptitle(f"Caption: {output.scene} | Objects: {output.objects}", fontsize=14)
     plt.tight_layout(rect=[0, 0, 1, 0.95])
-    plt.show()
+    plt.savefig("output.png")
 
 if __name__ == '__main__':
     main()
