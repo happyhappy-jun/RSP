@@ -30,8 +30,8 @@ class Step2Output:
 
 @dataclass
 class Step3Output:
-    closed_bbox: BoundingBox            # Bounding box from closed detection in the future frame.
-    movement_caption: str = ""          # Movement caption comparing original and future detections.
+    closed_bboxes: List[BoundingBox]            # List of bounding boxes from closed detection in the future frame.
+    movement_captions: List[str] = None           # List of movement captions comparing original and future detections.
 
 # --- Abstract Interface Definitions for Each Step ---
 
@@ -55,10 +55,10 @@ class Step2Grounding(abc.ABC):
 
 class Step3FutureDetection(abc.ABC):
     @abc.abstractmethod
-    def detect_in_future_frame(self, video_path: Path, bounding_box: BoundingBox) -> Step3Output:
+    def detect_in_future_frame(self, video_path: Path, bounding_boxes: List[BoundingBox]) -> Step3Output:
         """
-        Given the original video and one bounding box detected in step2, sample a future frame 
-        and perform closed bounding box detection.
+        Given the original video and a list of bounding boxes detected in step2, sample a future frame 
+        and perform closed bounding box detection for each bounding box.
         """
         pass
 
@@ -85,10 +85,9 @@ class DatasetGenerationPipeline:
         if not step2_output.detections:
             raise ValueError("No detections detected in step2.")
         
-        # For this interface, pick the first detection for further processing.
-        selected_detection = step2_output.detections[0]
-        selected_bbox = selected_detection.bounding_box
-        step3_output = self.step3.detect_in_future_frame(video_path, selected_bbox)
+        # Process all detections from step2.
+        bounding_boxes = [d.bounding_box for d in step2_output.detections]
+        step3_output = self.step3.detect_in_future_frame(video_path, bounding_boxes)
 
         return {
             "step1": step1_output,
