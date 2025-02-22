@@ -32,7 +32,7 @@ class RspCaptionJoint(RspCaption):
         
         self.src_tgt_joint_proj = nn.Linear(self.embed_dim, self.decoder_embed_dim)
         self.joint_emb_decoder = nn.ModuleList([
-            CrossAttentionBlock(self.decoder_embed_dim, self.decoder_embed_dim, embed_decoder_num_heads)
+            CrossAttentionBlock(self.embed_dim, self.embed_dim, embed_decoder_num_heads)
         for _ in range(embed_decoder_depth)
         ])
         
