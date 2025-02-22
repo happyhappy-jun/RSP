@@ -14,12 +14,11 @@ class RspCaptionCos(RspCaption):
                  cos_scale=1.0, 
                  enable_rms_norm=False, 
                  embed_scale_factor=1.0, 
-                 context_embed_dim=3072,
                  **kwargs):
         super().__init__(*args, **kwargs)
         self.cos_scale = cos_scale
         self.image_type_embed = nn.Parameter(
-            torch.zeros(1, self.num_patches + 1, self.decoder_embed_dim),
+            torch.zeros(1, 1, self.decoder_embed_dim),
         )
         nn.init.normal_(self.image_type_embed, std=0.02)
         self.language_type_embed = nn.Parameter(
