@@ -31,6 +31,7 @@ class Step2Output:
 @dataclass
 class Step3Output:
     closed_bbox: BoundingBox            # Bounding box from closed detection in the future frame.
+    movement_caption: str = ""          # Movement caption comparing original and future detections.
 
 # --- Abstract Interface Definitions for Each Step ---
 
