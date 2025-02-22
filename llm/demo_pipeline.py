@@ -73,6 +73,16 @@ def main():
             ann_img = cv2.cvtColor(ann_img, cv2.COLOR_BGR2RGB)
         annotated_images.append(ann_img)
     
+    # Run step2 on the first demo image to capture detections for step3
+    step2_output = step2.detect_bounding_boxes(demo_images[0], output.objects)
+    # Run step3 to simulate movement caption generation from the captured detections
+    from pipeline import DummyStep3FutureDetection
+    step3 = DummyStep3FutureDetection()
+    step3_output = step3.detect_in_future_frame(demo_images[0], [d.bounding_box for d in step2_output.detections])
+    print("Step3 Movement Captions:")
+    for cap in step3_output.movement_captions:
+        print(cap)
+    
     fig, axs = plt.subplots(2, 2, figsize=(10, 10))
     axs[0, 0].imshow(orig_images[0])
     axs[0, 0].set_title("Original Image 1")
@@ -86,7 +96,7 @@ def main():
     axs[1, 1].imshow(annotated_images[1])
     axs[1, 1].set_title("Annotated Image 2")
     axs[1, 1].axis("off")
-    plt.suptitle(f"Caption: {output.scene} | Objects: {output.objects}", fontsize=14)
+    plt.suptitle(f"Caption: {output.scene} | Objects: {output.objects} | Movements: {'; '.join(step3_output.movement_captions)}", fontsize=14)
     plt.tight_layout(rect=[0, 0, 1, 0.95])
     plt.savefig("output.png")
 
