@@ -4,7 +4,7 @@ import torch.nn as nn
 
 from modeling.layers import RMSNorm, CrossAttention, CrossAttentionBlock
 from modeling.models_rsp_caption import RspCaption
-from torch.nn import functional as F
+
 
 class RspCaptionJointCut(RspCaption):
     """RSP model variant that uses MSE loss instead of KL divergence"""
@@ -19,7 +19,7 @@ class RspCaptionJointCut(RspCaption):
         super().__init__(*args, **kwargs)
         self.cos_scale = cos_scale
         self.image_type_embed = nn.Parameter(
-            torch.zeros(1, self.num_patches + 1, self.decoder_embed_dim),
+            torch.zeros(1, 1, self.decoder_embed_dim),
         )
         nn.init.normal_(self.image_type_embed, std=0.02)
         self.language_type_embed = nn.Parameter(
@@ -102,17 +102,6 @@ class RspCaptionJointCut(RspCaption):
         q = self.joint_emb_norm(q)
         return q
 
-    def patchify_embedding(self, embedding):
-        # Add sequence dimension if not present
-        if len(embedding.shape) == 2:
-            embedding = embedding.unsqueeze(1)
-
-        # normalize
-        embedding = F.normalize(embedding, p=2, dim=-1)
-        embedding_patch = embedding.reshape(embedding.shape[0], -1, self.embed_dim)
-        return embedding_patch
-
-
 
     def forward(self, src_imgs, tgt_imgs, embedding, epoch):
         # Extract embeddings
@@ -137,9 +126,16 @@ class RspCaptionJointCut(RspCaption):
         prior_dist = self.make_dist(prior_logits)
         prior_z = prior_dist.rsample()
 
-        tgt_pred = self.forward_decoder_fut(src_h, post_z)
+        # Project context to prior space
+        h_context_prime = self.to_language_prior(src_h[:, 0]) # [decoder_emb_dim]
+
+        h_context_decoder = self.resize_embed(embedding, self.decoder_embed_dim)
+        tgt_pred = self.forward_decoder_fut(src_h, h_context_decoder, post_z)
         loss_post = self.forward_loss(tgt_imgs, tgt_pred)
         kl_loss, kl_value = self.compute_kl_loss(post_logits, prior_logits)
+        h_context_prime = h_context_prime.view(h_context_decoder.shape)  # Ensure same shape as h_context
+        context_loss = 1 - torch.nn.functional.cosine_similarity(h_context_prime.squeeze(1), h_context_decoder.squeeze(1), dim=1)
+        context_loss = context_loss.mean()
 
         # MAE
         img_h, mask, ids_restore = self.forward_encoder(tgt_imgs, mask_ratio=self.mask_ratio)
@@ -147,10 +143,10 @@ class RspCaptionJointCut(RspCaption):
         mae_loss = self.forward_loss(tgt_imgs, pred_masked, mask)
 
         with torch.no_grad():
-            tgt_pred_prior = self.forward_decoder_fut(src_h, prior_z)
+            tgt_pred_prior = self.forward_decoder_fut(src_h, h_context_decoder, prior_z)
             loss_prior = self.forward_loss(tgt_imgs, tgt_pred_prior)
 
-        loss = loss_post + self.kl_scale * kl_loss  + mae_loss
+        loss = loss_post + self.kl_scale * kl_loss + self.cos_scale * context_loss + mae_loss
 
         detailed_loss = {
             "loss_post": loss_post,
