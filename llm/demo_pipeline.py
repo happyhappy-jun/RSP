@@ -104,12 +104,9 @@ def main():
         axs[1, 1].imshow(annotated_images[1])
         axs[1, 1].set_title("Annotated Image 2")
         axs[1, 1].axis("off")
-        plt.figtext(0.5, 0.98, f"Trajectory: {traj_key}", wrap=True, horizontalalignment='center', fontsize=16,
-                    fontweight='bold')
-        plt.figtext(0.5, 0.94,
-                    f"Caption: {output.scene}\nObjects: {output.objects}\nMovements: {'; '.join(step3_output.movement_captions)}",
-                    wrap=True, horizontalalignment='center', fontsize=14)
-        plt.tight_layout(rect=[0, 0, 1, 0.91])
+        plt.figtext(0.5, 0.98, f"Trajectory: {traj_key}", wrap=True, horizontalalignment='center', fontsize=16, fontweight='bold')
+        plt.figtext(0.5, 0.02, f"Caption: {output.scene}\nObjects: {output.objects}\nMovements: {'; '.join(step3_output.movement_captions)}", wrap=True, horizontalalignment='center', fontsize=14)
+        plt.tight_layout(rect=[0, 0.06, 1, 0.95])
         out_filename = f"output_{traj_key.replace(os.sep, '_')}.png"
         plt.savefig(out_filename)
         plt.close(fig)
