@@ -2,6 +2,7 @@
 # This file provides dummy implementations for each pipeline step.
 from dataclasses import asdict
 from pathlib import Path
+from typing import List
 from pprint import pprint
 
 from base_pipeline import (
@@ -19,49 +20,51 @@ from groundingdino.util.inference import load_model, load_image, predict, annota
 import cv2
 
 class GPT4OMiniStep1Sampler(Step1Sampler):
-    def sample_frame_and_generate_caption(self, video_path: Path) -> Step1Output:
-        import random
-        import decord
+    def sample_frame_and_generate_caption(self, image_paths: List[Path]) -> Step1Output:
         import cv2
         import base64
         from openai import OpenAI
 
-        client = OpenAI()
+        if len(image_paths) != 2:
+            raise ValueError("Expected exactly 2 images")
 
-        # Read the video and select a random frame using decord.
-        vr = decord.VideoReader(str(video_path))
-        num_frames = len(vr)
-        random_index = random.randint(0, num_frames - 1)
-        frame = vr[random_index].asnumpy()
-
-        # Encode the image to Base64 and save frame to a temporary file.
-        success, encoded_image = cv2.imencode('.jpg', frame)
+        # Read first image
+        img1 = cv2.imread(str(image_paths[0]))
+        if img1 is None:
+            raise ValueError("Failed to read the first image")
+        success, encoded_image1 = cv2.imencode('.jpg', img1)
         if not success:
-            raise ValueError("Failed to encode the frame to JPEG format.")
-        tmp_image_path = Path("tmp_frame.jpg")
-        cv2.imwrite(str(tmp_image_path), frame)
-        frame_path = tmp_image_path
-        image_bytes = encoded_image.tobytes()
-        base64_image = base64.b64encode(image_bytes).decode("utf-8")
-        image_data = f"data:image/jpeg;base64,{base64_image}"
+            raise ValueError("Failed to encode the first image")
+        base64_image1 = base64.b64encode(encoded_image1.tobytes()).decode("utf-8")
+        image_data1 = f"data:image/jpeg;base64,{base64_image1}"
 
-        # Prepare the prompt for describing the scene.
+        # Read second image
+        img2 = cv2.imread(str(image_paths[1]))
+        if img2 is None:
+            raise ValueError("Failed to read the second image")
+        success, encoded_image2 = cv2.imencode('.jpg', img2)
+        if not success:
+            raise ValueError("Failed to encode the second image")
+        base64_image2 = base64.b64encode(encoded_image2.tobytes()).decode("utf-8")
+        image_data2 = f"data:image/jpeg;base64,{base64_image2}"
+
         prompt_text = (
-            "Describe the main action happening in this scene, focusing on the primary moving subject.\n"
-            "Separate objects with space-wrapped period\" . \"\n"
-            "Add \" .\" and the end of detection"
-            "Response in following format:\n"
-            "<Scene>a kid with yellow hat is riding bike in a park</Scene>"
-            "<Objects>a red bicycle . a kid with yellow hat .</Objects>"
-
-                       )
+            "Describe the spatial change of the primary object between the two images provided.\n"
+            "Mention differences in position, size, or orientation.\n"
+            "Provide the result in the following format:\n"
+            "<SceneChange>description</SceneChange>\n"
+            "<Objects>object list</Objects>"
+        )
         message = {
             "role": "user",
             "content": [
                 {"type": "text", "text": prompt_text},
-                {"type": "image_url", "image_url": {"url": image_data, "detail": "high"}}
+                {"type": "image_url", "image_url": {"url": image_data1, "detail": "high"}},
+                {"type": "image_url", "image_url": {"url": image_data2, "detail": "high"}}
             ]
         }
+
+        client = OpenAI()
 
         try:
             response = client.chat.completions.create(
@@ -73,20 +76,19 @@ class GPT4OMiniStep1Sampler(Step1Sampler):
         except Exception as e:
             generated_text = f"Error generating caption: {str(e)}"
 
-        # Parse the response format with <Scene> and <Objects> tags
         try:
-            scene_start = generated_text.index("<Scene>")
-            scene_end = generated_text.index("</Scene>")
+            scene_start = generated_text.index("<SceneChange>")
+            scene_end = generated_text.index("</SceneChange>")
             objects_start = generated_text.index("<Objects>")
             objects_end = generated_text.index("</Objects>")
-            scene = generated_text[scene_start + len("<Scene>"):scene_end].strip()
+            scene = generated_text[scene_start + len("<SceneChange>"):scene_end].strip()
             objects = generated_text[objects_start + len("<Objects>"):objects_end].strip()
         except Exception as e:
-            scene = "No scene info"
+            scene = "No scene change info"
             objects = "No objects info"
 
         return Step1Output(
-            frame_path=frame_path,
+            frame_path=image_paths[0],
             scene=scene,
             objects=objects
         )
