@@ -52,11 +52,10 @@ class GPT4OMiniStep1Sampler(Step1Sampler):
             "Describe the spatial change of the primary object between the two images provided.\n"
             "Mention differences in position, size, or orientation.\n"
             "Provide the result in the following format:\n"
-            "    - Separate objects with space-wrapped period\" . \"\n"
-            "    - Add \" .\" and the end of detection\n"
+            "    - Separate objects with semi-colon ; \n"
             "Example1:\n"
             "<SceneChange>a kid with yellow hat is riding bike moving forward</SceneChange>\n"
-            "<Objects>a kid with yellow hat . bike .</Objects>"
+            "<Objects>a kid with yellow hat; bike</Objects>"
         )
         message = {
             "role": "user",
@@ -101,11 +100,11 @@ class DummyStep2Grounding(Step2Grounding):
         from transformers import AutoProcessor, AutoModelForZeroShotObjectDetection
         import torch
         self.model_id = "IDEA-Research/grounding-dino-tiny"
-        self.device = "cuda"
+        self.device = "cpu"
         self.processor = AutoProcessor.from_pretrained(self.model_id)
         self.model = AutoModelForZeroShotObjectDetection.from_pretrained(self.model_id).to(self.device)
-        self.box_threshold = 0.4
-        self.text_threshold = 0.3
+        self.box_threshold = 0.3
+        self.text_threshold = 0.2
 
     def detect_bounding_boxes(self, frame_path: Path, caption: str) -> Step2Output:
         from PIL import Image
@@ -115,7 +114,7 @@ class DummyStep2Grounding(Step2Grounding):
 
         img = Image.open(frame_path).convert("RGB")
 
-        inputs = self.processor(images=img, text=[[caption]], return_tensors="pt").to(self.device)
+        inputs = self.processor(images=img, text=[caption.split(";")], return_tensors="pt").to(self.device)
         with torch.no_grad():
             outputs = self.model(**inputs)
         results = self.processor.post_process_grounded_object_detection(
