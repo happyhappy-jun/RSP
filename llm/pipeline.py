@@ -51,6 +51,7 @@ class GPT4OMiniStep1Sampler(Step1Sampler):
         prompt_text = (
             "Describe the spatial change of the primary object between the two images provided.\n"
             "Mention differences in position, size, or orientation.\n"
+            "When describing objects, use descriptive language, so that agent can identify and distinguish object only with text descriptions.\n"
             "Provide the result in the following format:\n"
             "    - Separate objects with semi-colon ; \n"
             "Example1:\n"
@@ -113,8 +114,9 @@ class DummyStep2Grounding(Step2Grounding):
         import torch
 
         img = Image.open(frame_path).convert("RGB")
-
-        inputs = self.processor(images=img, text=[caption.split(";")], return_tensors="pt").to(self.device)
+        objects = [o.strip() for o in caption.split(",")]
+        print(objects)
+        inputs = self.processor(images=img, text=[objects], return_tensors="pt").to(self.device)
         with torch.no_grad():
             outputs = self.model(**inputs)
         results = self.processor.post_process_grounded_object_detection(
