@@ -120,7 +120,7 @@ class DummyStep2Grounding(Step2Grounding):
         results = self.processor.post_process_grounded_object_detection(
             outputs,
             inputs.input_ids,
-            box_threshold=self.box_threshold,
+            threshold=self.box_threshold,
             text_threshold=self.text_threshold,
             target_sizes=[img.size[::-1]]
         )
@@ -134,13 +134,13 @@ class DummyStep2Grounding(Step2Grounding):
             res = results[0]
             boxes = res["boxes"]
             scores = res["scores"]
-            labels = res["labels"]
-            for box, score, label in zip(boxes, scores, labels):
+            text_labels = res["text_labels"]
+            for box, score, text_label in zip(boxes, scores, text_labels):
                 x1, y1, x2, y2 = map(int, box.tolist())
                 cv2.rectangle(image_np, (x1, y1), (x2, y2), (0, 255, 0), 2)
-                cv2.putText(image_np, f"{caption[:15]}: {score:.2f}", (x1, max(y1-10, 0)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+                cv2.putText(image_np, f"{text_label[:15]}: {score:.2f}", (x1, max(y1-10, 0)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
                 bbox = BoundingBox(x=float(x1), y=float(y1), width=float(x2 - x1), height=float(y2 - y1))
-                detection = Step2Detection(bounding_box=bbox, logit=score.item(), phrase=caption)
+                detection = Step2Detection(bounding_box=bbox, logit=score.item(), phrase=text_label)
                 detections.append(detection)
 
         output_path = "annotated_" + frame_path.stem + ".jpg"
