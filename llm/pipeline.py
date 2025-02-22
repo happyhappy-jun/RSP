@@ -52,8 +52,11 @@ class GPT4OMiniStep1Sampler(Step1Sampler):
             "Describe the spatial change of the primary object between the two images provided.\n"
             "Mention differences in position, size, or orientation.\n"
             "Provide the result in the following format:\n"
-            "<SceneChange>description</SceneChange>\n"
-            "<Objects>object list</Objects>"
+            "    - Separate objects with space-wrapped period\" . \"\n"
+            "    - Add \" .\" and the end of detection\n"
+            "Example1:\n"
+            "<SceneChange>a kid with yellow hat is riding bike moving forward</SceneChange>\n"
+            "<Objects>a kid with yellow hat . bike .</Objects>"
         )
         message = {
             "role": "user",
@@ -96,8 +99,8 @@ class GPT4OMiniStep1Sampler(Step1Sampler):
 class DummyStep2Grounding(Step2Grounding):
     def __init__(self):
         self.model = load_model(
-            "GroundingDINO/groundingdino/config/GroundingDINO_SwinT_OGC.py",
-            "GroundingDINO/weights/groundingdino_swint_ogc.pth"
+            "/slurm_home/byungjun/RSP/GroundingDINO/groundingdino/config/GroundingDINO_SwinT_OGC.py",
+            "/slurm_home/byungjun/RSP/GroundingDINO/weights/groundingdino_swint_ogc.pth"
         )
         self.box_threshold = 0.3
         self.text_threshold = 0.2
