@@ -41,7 +41,6 @@ class BridgeCaption(Dataset):
         self.data_dir = data_dir
         self.repeated_sampling = repeated_sampling
         self.interval = interval
-        self.max_length = max_length
         self.seed = seed
 
         self.pair_transform = PairedRandomResizedCrop(seed=seed, hflip_p=0)
