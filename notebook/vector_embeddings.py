@@ -54,7 +54,7 @@ async def precompute_embeddings(data_dir: str, output_json: str, model: str, ope
     if missing:
         print(f"Warning: {len(missing)} embeddings were not computed for captions: {missing}")
     with open(output_json, "w") as f:
-        json.dump(embedding_map, f, indent=2)
+        json.dump(embedding_map, f)
     print(f"Saved embeddings to {output_json}")
 
 if __name__ == "__main__":
