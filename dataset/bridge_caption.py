@@ -145,12 +145,13 @@ def get_all_unique_captions(data_dir: str) -> List[str]:
 def precompute_embeddings(data_dir: str, output_json: str, openai_api_key: str):
     """Precompute embeddings for unique captions and save them to a JSON file."""
     openai.api_key = openai_api_key
+    client = openai.OpenAI()
     unique_captions = get_all_unique_captions(data_dir)
     embedding_map = {}
     for caption in unique_captions:
         try:
-            response = openai.Embedding.create(input=caption, model="text-embedding-3-large")
-            embedding = response['data'][0]['embedding']
+            response = client.embeddings.create(input=caption, model="text-embedding-3-large")
+            embedding = response.data[0].embedding
             embedding_map[caption] = embedding
         except Exception as e:
             logger.error(f"Error computing embedding for caption {caption}: {e}")

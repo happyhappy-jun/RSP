@@ -27,12 +27,13 @@ def get_all_unique_captions(data_dir: str) -> List[str]:
 def precompute_embeddings(data_dir: str, output_json: str, model: str, openai_api_key: str):
     """Precompute embeddings for unique captions using OpenAI embedding API."""
     openai.api_key = openai_api_key
+    client = openai.OpenAI()
     unique_captions = get_all_unique_captions(data_dir)
     print(f"Found {len(unique_captions)} unique captions")
     embedding_map = {}
     for idx, caption in enumerate(unique_captions):
         try:
-            response = openai.Embedding.create(input=caption, model=model)
+            response = client.embeddings.create(input=caption, model=model)
             embedding = response.data[0].embedding
             embedding_map[caption] = embedding
             print(f"Processed caption {idx + 1}/{len(unique_captions)}")
