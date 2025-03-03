@@ -8,7 +8,8 @@ from PIL import Image
 from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms
 from typing import Any, Dict, List, Optional
-from transformers import AutoTokenizer
+import openai
+import json
 from util.transform import PairedRandomResizedCrop
 
 logging.basicConfig(
@@ -33,9 +34,8 @@ class BridgeCaption(Dataset):
         data_dir: str,
         repeated_sampling: int = 2,
         interval: int = 4,
-        tokenizer_name: str = "Alibaba-NLP/gte-large-en-v1.5",
-        max_length: int = 128,
         seed: int = 42,
+        embedding_json_path: Optional[str] = None,
     ):
         super().__init__()
         self.data_dir = data_dir
@@ -52,7 +52,11 @@ class BridgeCaption(Dataset):
                                  std=[0.229, 0.224, 0.225]),
         ])
 
-        self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_name)
+        if embedding_json_path:
+            with open(embedding_json_path, 'r') as f:
+                self.embedding_map = json.load(f)
+        else:
+            self.embedding_map = {}
 
         # Discover all trajectory files, excluding those insufficient for repeated_sampling
         self.traj_files = self._get_trajectory_files()
@@ -89,15 +93,6 @@ class BridgeCaption(Dataset):
         obs_path, move_path = self.traj_files[idx]
         return self.process_trajectory(obs_path, move_path)
     
-    def tokenize_text(self, text):
-        """Tokenize a text string and return the token dictionary."""
-        return self.tokenizer(
-            text,
-            max_length=self.max_length,
-            padding='max_length',
-            truncation=True,
-            return_tensors='pt'
-        )
         
 
     def process_trajectory(self, obs_path, move_path):
@@ -119,8 +114,12 @@ class BridgeCaption(Dataset):
             tgt_tensor = self.basic_transform(tgt_cropped)
 
             caption_text = moves_list[src_idx]
-            token_dict = self.tokenize_text(caption_text)
-            embedding = token_dict['input_ids']
+            if caption_text not in self.embedding_map:
+                logger.warning(f"Caption not found in embedding map: {caption_text}")
+                embedding = []
+            else:
+                embedding = self.embedding_map[caption_text]
+            embedding = torch.tensor(embedding)
 
             src_images.append(src_tensor)
             tgt_images.append(tgt_tensor)
@@ -134,37 +133,72 @@ class BridgeCaption(Dataset):
             "captions": torch.stack(embeddings, dim=0)
         }
 
+def get_all_unique_captions(data_dir: str) -> List[str]:
+    """Collect unique movement captions from all trajectory files in the dataset."""
+    dataset = BridgeCaption(data_dir)
+    unique_captions = set()
+    for _, move_path in dataset.traj_files:
+        moves_list = npy_to_numpy_array(move_path)
+        unique_captions.update(moves_list)
+    return list(unique_captions)
+
+def precompute_embeddings(data_dir: str, output_json: str, openai_api_key: str):
+    """Precompute embeddings for unique captions and save them to a JSON file."""
+    openai.api_key = openai_api_key
+    unique_captions = get_all_unique_captions(data_dir)
+    embedding_map = {}
+    for caption in unique_captions:
+        try:
+            response = openai.Embedding.create(input=caption, model="text-embedding-3-large")
+            embedding = response['data'][0]['embedding']
+            embedding_map[caption] = embedding
+        except Exception as e:
+            logger.error(f"Error computing embedding for caption {caption}: {e}")
+    with open(output_json, 'w') as f:
+        json.dump(embedding_map, f)
+
 if __name__ == "__main__":
-    # Example usage
-    dataset = BridgeCaption(
-        data_dir="/root/RSP/demo/npy_dataset",
-        repeated_sampling=2,
-        interval=4,
-        seed=42,
-    )
-    
-    loader = DataLoader(
-        dataset,
-        batch_size=4,
-        num_workers=1,
-        pin_memory=True,
-        prefetch_factor=1,
-    )
-    
-    # Test the length estimation
-    print(f"Estimated length: {len(loader.dataset)}")
-    
-    # Count total samples to verify
-    print(len(dataset))
-    sample_count = 0
-    for i, batch in enumerate(loader):
-        print(
-            f"Batch {i}: src_images={batch['src_images'].shape}, "
-            f"tgt_images={batch['tgt_images'].shape}, "
-            f"captions shape={batch['captions'].shape}"
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--precompute', action='store_true', help='Precompute embeddings for unique captions')
+    parser.add_argument('--output_json', type=str, default='embedding_map.json', help='Output JSON file for embeddings')
+    parser.add_argument('--data_dir', type=str, default='/root/RSP/demo/npy_dataset', help='Dataset directory')
+    parser.add_argument('--openai_api_key', type=str, default='', help='OpenAI API Key')
+    args = parser.parse_args()
+
+    if args.precompute:
+        if not args.openai_api_key:
+            logger.error("OpenAI API Key is required for precomputation.")
+        else:
+            precompute_embeddings(args.data_dir, args.output_json, args.openai_api_key)
+            print(f"Precomputed embeddings saved to {args.output_json}")
+    else:
+        dataset = BridgeCaption(
+            data_dir=args.data_dir,
+            repeated_sampling=2,
+            interval=4,
+            seed=42,
+            embedding_json_path='embedding_map.json'
         )
-        sample_count += batch['src_images'].shape[0]
-        if i >= 5:
-            break
-    
-    print(f"Loaded {sample_count} samples successfully.")
+
+        loader = DataLoader(
+            dataset,
+            batch_size=4,
+            num_workers=1,
+            pin_memory=True,
+            prefetch_factor=1,
+        )
+
+        print(f"Loaded {len(dataset.traj_files)} eligible trajectories")
+        sample_count = 0
+        for i, batch in enumerate(loader):
+            print(
+                f"Batch {i}: src_images={batch['src_images'].shape}, "
+                f"tgt_images={batch['tgt_images'].shape}, "
+                f"captions shape={batch['captions'].shape}"
+            )
+            sample_count += batch['src_images'].shape[0]
+            if i >= 5:
+                break
+
+        print(f"Loaded {sample_count} samples successfully.")
