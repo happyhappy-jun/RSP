@@ -404,77 +404,70 @@ dataset, dataset_statistics = make_dataset_from_rlds(
     reasoning_dataset_path="/root/bridge/1.0.0/embodied_features_bridge.json",
 )
 
-import webdataset as wds
+import os
+import pickle
+import lmdb
+from tqdm import tqdm
 
-
-def create_webdataset_shards(
-        dataset,
-        output_dir="/root/RSP/demo/webdataset_shards",
-        prefix="bridge_arm_move",
-        num_shards=10,
-        interval=4
+def create_lmdb_dataset_for_repeated(
+    dataset,
+    output_dir="/root/RSP/demo/lmdb_dataset",
+    map_size=300 * 1024**3  # Aim for ~300GB to account for some overhead
 ):
     """
-    Create a WebDataset tar-based dataset, split into 'num_shards' shards, avoiding
-    loading too much data in memory at once by processing samples one at a time.
+    Create an LMDB dataset in which each sample is one entire trajectory.
+    This allows for repeated sampling at read time.
 
     Parameters:
-      dataset: an iterable (e.g., TF Dataset or similar) yielding trajectories
-      output_dir: where to place shard files
-      prefix: prefix for shard file names, e.g. "mydataset"
-      num_shards: number of .tar files to create (round-robin distribution)
-      interval: time-step gap for the "tgt" image
+      dataset: an iterable (e.g., TF Dataset or similar) producing one trajectory at a time.
+               Each "traj" item is assumed to have:
+                 - "observation"]["image_image_0"] => an array/list of raw image bytes
+                 - "move" => an array/list of move strings (or bytes)
+      output_dir: where to place the LMDB file
+      map_size: maximum size database may grow to; used to prevent map full errors.
     """
 
-    import os
-    import webdataset as wds
-    from tqdm import tqdm
-
     os.makedirs(output_dir, exist_ok=True)
+    lmdb_path = os.path.join(output_dir, "trajectories.lmdb")
 
-    # Use ".tar.gz" with compression=True, so each shard is gzipped
-    shard_pattern = os.path.join(output_dir, f"{prefix}-%02d.tar.gz")
-    writers = [wds.TarWriter(shard_pattern % i, compress=True) for i in range(num_shards)]
+    # Open LMDB environment with a large map size
+    env = lmdb.open(lmdb_path, map_size=map_size, writemap=True)
 
-    sample_idx = 0  # Global sample counter
-    traj_idx = 0    # Trajectory index
+    with env.begin(write=True) as txn:
+        sample_idx = 0
+        traj_idx = 0
 
-    for traj in tqdm(dataset, desc="Creating shards"):
-        observation = traj["observation"]["image_image_0"].numpy()
-        move = traj["move"].numpy()
+        for traj in tqdm(dataset, desc="Creating LMDB dataset"):
+            # 'observation["image_image_0"]' is a tensor of shape [T], each entry raw image bytes
+            observation = traj["observation"]["image_image_0"].numpy()  # shape (T,)
+            # 'move' is similarly a tensor of shape [T], each entry presumably a bytes-like object
+            move = traj["move"].numpy()
 
-        # Convert file_name from TensorFlow byte-string to Python string
-        traj_name = traj["file_name"].numpy().decode("utf-8")
-        # Clean the name for file usage
-        traj_name = traj_name.replace("/nfs/kun2/users/homer/datasets/bridge_data_all/numpy_256/", "")
-        traj_name = traj_name.replace("/train/out.npy", "")
-        traj_name = traj_name.replace("/", "_")
+            # Convert file_name from TF byte-string to str
+            traj_name = traj["file_name"].numpy().decode("utf-8")
+            # Clean the name for file usage
+            traj_name = traj_name.replace("/nfs/kun2/users/homer/datasets/bridge_data_all/numpy_256/", "")
+            traj_name = traj_name.replace("/train/out.npy", "")
+            traj_name = traj_name.replace("/", "_")
 
-        # Generate samples for each valid step
-        for step in range(0, len(observation) - interval):
-            src_bytes = observation[step]           # raw jpeg bytes
-            tgt_bytes = observation[step + interval]
-            caption_str = move[step].decode("utf-8")
+            # Convert observation and move data to Python lists for pickling
+            image_list = list(observation)
+            move_list = [m.decode("utf-8") for m in move]  
 
-            sample_key = f"traj{traj_idx:06d}_{traj_name}_step{step}"
+            # Serialize data
+            images_pkl = pickle.dumps(image_list)
+            moves_pkl = pickle.dumps(move_list)
 
-            sample = {
-                "__key__": sample_key,
-                "src.jpg": src_bytes,
-                "tgt.jpg": tgt_bytes,
-                "caption.txt": caption_str,
-            }
+            # Construct a single entry for the entire trajectory
+            sample_key = f"traj{traj_idx:06d}_{traj_name}".encode("ascii")
+            sample_value = pickle.dumps({'images': images_pkl, 'moves': moves_pkl})
 
-            shard_index = sample_idx % num_shards
-            writers[shard_index].write(sample)
+            # Store in LMDB using a transaction for performance
+            txn.put(sample_key, sample_value)
+
             sample_idx += 1
+            traj_idx += 1
 
-        traj_idx += 1
+    print(f"Created {sample_idx} trajectory-level samples in LMDB dataset at {lmdb_path}")
 
-    # Close shards
-    for w in writers:
-        w.close()
-
-    print(f"Created {num_shards} gzipped shard files in: {output_dir}")
-
-create_webdataset_shards(dataset, output_dir="/root/RSP/demo/webdataset_shards", prefix="bridge_arm_move", num_shards=10, interval=4)
+create_lmdb_dataset_for_repeated(dataset, output_dir="/root/RSP/demo/lmdb_dataset")

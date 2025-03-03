@@ -1,4 +1,5 @@
 from modeling import (
+    models_joint_cos_online,
     models_rsp,
     models_rsp_caption,
     models_mse,
@@ -63,3 +64,5 @@ rsp_joint_m3ae_implicit_vit_small_patch16 = models_joint_m3ae_implicit.rsp_joint
 rsp_joint_implicit_vit_small_patch16 = models_joint_implicit.rsp_joint_implicit_vit_small_patch16_dec512d8b
 
 rsp_joint_implicit_scale_vit_small_patch16 = models_joint_implicit_scale.rsp_joint_implicit_scale_vit_small_patch16_dec512d8b
+
+rsp_joint_cos_online_vit_small_patch16 = models_joint_cos_online.rsp_joint_cos_online_vit_small_patch16_dec512d8b

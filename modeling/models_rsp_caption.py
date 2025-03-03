@@ -456,8 +456,12 @@ class RspCaption(nn.Module):
         Returns:
             Normalized tensor where each vector has unit L2 norm
         """
+        # Ensure the input x is of float type
+        if x.dtype != torch.float32:
+            x = x.float()  # Convert to float if it's not already
+
         if x.dim() == 1:
-            norm = torch.norm(x)
+            norm = torch.norm(x, p=2)
             return x if norm == 0 else x / norm
         else:
             norm = torch.norm(x, p=2, dim=-1, keepdim=True)

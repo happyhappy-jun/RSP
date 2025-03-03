@@ -2,22 +2,16 @@ defaults:
   - main
   - _self_
 
-exp_name: context_in_post_video_label
+exp_name: bridge_caption_joint_cos
 
-model_name: rsp_context_in_posterior_vit_small_patch16
-
-data_root: /data
+model_name: rsp_joint_cos_online_vit_small_patch16
 
 dataset:
-  _target_: util.kinetics_caption_video_label.PairedKineticsCaptionVideoLabel
-  frame_root: ${..data_root}/kinetics400caption
-  frame_info_path: ${..data_root}/kinetics400caption/frame_info.json
-  class_embeddings_path: ${..data_root}/kinetics400caption/class_embeddings.json
-  frame_info_additional_path: ${..data_root}/kinetics400caption/frame_info_additional.json
-
+  _target_: util.bridge_caption.BridgeCaption
+  data_dir: "/root/RSP/demo/npy_dataset"
 
 train_loop:
-  _target_: engine_pretrain_repsamp.train_one_epoch_llm
+  _target_: engine_pretrain_repsamp.train_one_epoch_online
   _partial_: true
 
 num_workers: 4
@@ -25,5 +19,5 @@ batch_size: 24
 accum_iter: 8
 
 model_params:
-  enable_rms_norm: False
+  cos_scale: 1.0
   
