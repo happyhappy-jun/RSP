@@ -9,3 +9,6 @@ artifacts/
 wandb/
 .secrets/
 .idea
+*.egg-info/
+
+
