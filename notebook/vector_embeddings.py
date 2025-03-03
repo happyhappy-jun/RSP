@@ -37,9 +37,11 @@ async def precompute_embeddings(data_dir: str, output_json: str, model: str, ope
     semaphore = asyncio.Semaphore(50)  # Limit concurrent requests to ~50 (~3000 per minute)
 
     async def process_caption(idx, caption):
+        if not caption.strip():
+            return
         async with semaphore:
             try:
-                response = await client.embeddings.create(input=caption, model=model)
+                response = await asyncio.to_thread(client.embeddings.create, input=caption, model=model)
                 embedding = response.data[0].embedding
                 embedding_map[caption] = embedding
                 print(f"Processed caption {idx + 1}/{len(unique_captions)}")

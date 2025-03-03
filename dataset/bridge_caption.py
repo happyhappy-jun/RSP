@@ -151,9 +151,11 @@ async def precompute_embeddings(data_dir: str, output_json: str, openai_api_key:
     semaphore = asyncio.Semaphore(50)  # Limit concurrent requests to ~50 (~3000 per minute)
 
     async def process_caption(caption):
+        if not caption.strip():
+            return
         async with semaphore:
             try:
-                response = await client.embeddings.acreate(input=caption, model="text-embedding-3-large")
+                response = await asyncio.to_thread(client.embeddings.create, input=caption, model="text-embedding-3-large")
                 embedding = response.data[0].embedding
                 embedding_map[caption] = embedding
             except Exception as e:
