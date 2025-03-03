@@ -6,6 +6,9 @@ import openai
 import argparse
 from typing import List
 
+from tqdm import tqdm
+
+
 def npy_to_numpy_array(file_path: str):
     """Load numpy array from file, allowing for object arrays."""
     return np.load(file_path, allow_pickle=True)
@@ -26,12 +29,11 @@ def get_all_unique_captions(data_dir: str) -> List[str]:
 
 def precompute_embeddings(data_dir: str, output_json: str, model: str, openai_api_key: str):
     """Precompute embeddings for unique captions using OpenAI embedding API."""
-    openai.api_key = openai_api_key
-    client = openai.OpenAI()
+    client = openai.OpenAI(api_key=openai_api_key)
     unique_captions = get_all_unique_captions(data_dir)
     print(f"Found {len(unique_captions)} unique captions")
     embedding_map = {}
-    for idx, caption in enumerate(unique_captions):
+    for idx, caption in tqdm(enumerate(unique_captions), total=len(unique_captions)):
         try:
             response = client.embeddings.create(input=caption, model=model)
             embedding = response.data[0].embedding
