@@ -165,6 +165,10 @@ async def precompute_embeddings(data_dir: str, output_json: str, openai_api_key:
 
     tasks = [process_caption(caption) for caption in unique_captions]
     await asyncio.gather(*tasks)
+    # Check for missing embeddings
+    missing = [caption for caption in unique_captions if caption.strip() and caption not in embedding_map]
+    if missing:
+        logger.warning(f"{len(missing)} embeddings were not computed for captions: {missing}")
     with open(output_json, 'w') as f:
         json.dump(embedding_map, f)
 

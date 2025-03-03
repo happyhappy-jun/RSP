@@ -50,6 +50,9 @@ async def precompute_embeddings(data_dir: str, output_json: str, model: str, ope
 
     tasks = [process_caption(idx, caption) for idx, caption in enumerate(unique_captions)]
     await asyncio.gather(*tasks)
+    missing = [caption for caption in unique_captions if caption.strip() and caption not in embedding_map]
+    if missing:
+        print(f"Warning: {len(missing)} embeddings were not computed for captions: {missing}")
     with open(output_json, "w") as f:
         json.dump(embedding_map, f, indent=2)
     print(f"Saved embeddings to {output_json}")
