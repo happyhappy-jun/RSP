@@ -39,7 +39,7 @@ async def precompute_embeddings(data_dir: str, output_json: str, model: str, ope
     async def process_caption(idx, caption):
         async with semaphore:
             try:
-                response = await client.embeddings.acreate(input=caption, model=model)
+                response = await client.embeddings.create(input=caption, model=model)
                 embedding = response.data[0].embedding
                 embedding_map[caption] = embedding
                 print(f"Processed caption {idx + 1}/{len(unique_captions)}")
