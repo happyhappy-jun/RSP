@@ -113,7 +113,7 @@ class BridgeCaption(Dataset):
             src_tensor = self.basic_transform(src_cropped)
             tgt_tensor = self.basic_transform(tgt_cropped)
 
-            caption_text = moves_list[src_idx]
+            caption_text = str(moves_list[src_idx]).strip()
             if caption_text not in self.embedding_map:
                 print(f"Caption not found in embedding map: {caption_text}")
                 embedding = []
@@ -141,7 +141,8 @@ def get_all_unique_captions(data_dir: str) -> List[str]:
     unique_captions = set()
     for _, move_path in dataset.traj_files:
         moves_list = npy_to_numpy_array(move_path)
-        unique_captions.update(moves_list)
+        for caption in moves_list:
+            unique_captions.add(str(caption).strip())
     return list(unique_captions)
 
 async def precompute_embeddings(data_dir: str, output_json: str, openai_api_key: str):
@@ -153,15 +154,16 @@ async def precompute_embeddings(data_dir: str, output_json: str, openai_api_key:
     semaphore = asyncio.Semaphore(50)  # Limit concurrent requests to ~50 (~3000 per minute)
 
     async def process_caption(caption):
-        if not caption.strip():
+        norm_caption = str(caption).strip()
+        if not norm_caption:
             return
         async with semaphore:
             try:
-                response = await asyncio.to_thread(client.embeddings.create, input=caption, model="text-embedding-3-large")
+                response = await asyncio.to_thread(client.embeddings.create, input=norm_caption, model="text-embedding-3-large")
                 embedding = response.data[0].embedding
-                embedding_map[caption] = embedding
+                embedding_map[norm_caption] = embedding
             except Exception as e:
-                logger.error(f"Error computing embedding for caption {caption}: {e}")
+                logger.error(f"Error computing embedding for caption {norm_caption}: {e}")
 
     tasks = [process_caption(caption) for caption in unique_captions]
     await asyncio.gather(*tasks)

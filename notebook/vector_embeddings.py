@@ -25,7 +25,7 @@ def get_all_unique_captions(data_dir: str) -> List[str]:
                     file_path = os.path.join(subdir, file_name)
                     captions = npy_to_numpy_array(file_path)
                     for caption in captions:
-                        unique_captions.add(caption)
+                        unique_captions.add(str(caption).strip())
     return list(unique_captions)
 
 async def precompute_embeddings(data_dir: str, output_json: str, model: str, openai_api_key: str):
@@ -37,16 +37,17 @@ async def precompute_embeddings(data_dir: str, output_json: str, model: str, ope
     semaphore = asyncio.Semaphore(50)  # Limit concurrent requests to ~50 (~3000 per minute)
 
     async def process_caption(idx, caption):
-        if not caption.strip():
+        norm_caption = str(caption).strip()
+        if not norm_caption:
             return
         async with semaphore:
             try:
-                response = await asyncio.to_thread(client.embeddings.create, input=caption, model=model)
+                response = await asyncio.to_thread(client.embeddings.create, input=norm_caption, model=model)
                 embedding = response.data[0].embedding
-                embedding_map[caption] = embedding
+                embedding_map[norm_caption] = embedding
                 print(f"Processed caption {idx + 1}/{len(unique_captions)}")
             except Exception as e:
-                print(f"Error processing caption '{caption}': {e}")
+                print(f"Error processing caption '{norm_caption}': {e}")
 
     tasks = [process_caption(idx, caption) for idx, caption in enumerate(unique_captions)]
     await asyncio.gather(*tasks)
