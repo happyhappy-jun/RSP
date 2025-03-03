@@ -10,6 +10,7 @@ from torchvision import transforms
 from typing import Any, Dict, List, Optional
 import openai
 import json
+import asyncio
 from util.transform import PairedRandomResizedCrop
 
 logging.basicConfig(
@@ -141,24 +142,31 @@ def get_all_unique_captions(data_dir: str) -> List[str]:
         unique_captions.update(moves_list)
     return list(unique_captions)
 
-def precompute_embeddings(data_dir: str, output_json: str, openai_api_key: str):
-    """Precompute embeddings for unique captions and save them to a JSON file."""
+async def precompute_embeddings(data_dir: str, output_json: str, openai_api_key: str):
+    """Precompute embeddings for unique captions using OpenAI async API and save them to a JSON file."""
     openai.api_key = openai_api_key
-    client = openai.OpenAI()
+    client = openai.OpenAI(api_key=openai_api_key)
     unique_captions = get_all_unique_captions(data_dir)
     embedding_map = {}
-    for caption in unique_captions:
-        try:
-            response = client.embeddings.create(input=caption, model="text-embedding-3-large")
-            embedding = response.data[0].embedding
-            embedding_map[caption] = embedding
-        except Exception as e:
-            logger.error(f"Error computing embedding for caption {caption}: {e}")
+    semaphore = asyncio.Semaphore(50)  # Limit concurrent requests to ~50 (~3000 per minute)
+
+    async def process_caption(caption):
+        async with semaphore:
+            try:
+                response = await client.embeddings.acreate(input=caption, model="text-embedding-3-large")
+                embedding = response.data[0].embedding
+                embedding_map[caption] = embedding
+            except Exception as e:
+                logger.error(f"Error computing embedding for caption {caption}: {e}")
+
+    tasks = [process_caption(caption) for caption in unique_captions]
+    await asyncio.gather(*tasks)
     with open(output_json, 'w') as f:
         json.dump(embedding_map, f)
 
 if __name__ == "__main__":
     import argparse
+    import asyncio
     parser = argparse.ArgumentParser()
     parser.add_argument('--precompute', action='store_true', help='Precompute embeddings for unique captions')
     parser.add_argument('--output_json', type=str, default='embedding_map.json', help='Output JSON file for embeddings')
@@ -170,7 +178,7 @@ if __name__ == "__main__":
         if not args.openai_api_key:
             logger.error("OpenAI API Key is required for precomputation.")
         else:
-            precompute_embeddings(args.data_dir, args.output_json, args.openai_api_key)
+            asyncio.run(precompute_embeddings(args.data_dir, args.output_json, args.openai_api_key))
             print(f"Precomputed embeddings saved to {args.output_json}")
     else:
         dataset = BridgeCaption(
