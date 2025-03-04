@@ -166,7 +166,7 @@ async def precompute_embeddings(data_dir: str, output_json: str, openai_api_key:
             except Exception as e:
                 logger.error(f"Error computing embedding for caption {norm_caption}: {e}")
 
-    tasks = [process_caption(caption) for caption in unique_captions]
+    tasks = [process_caption(caption) for caption in unique_captions + [""]]
     await asyncio.gather(*tasks)
     # Check for missing embeddings
     missing = [caption for caption in unique_captions if caption.strip() and caption not in embedding_map]
