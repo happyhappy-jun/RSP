@@ -9,6 +9,8 @@ model_name: rsp_cos_joint_cut_vit_small_patch16
 dataset:
   _target_: dataset.bridge_caption.BridgeCaption
   data_dir: /shared/sjw_alinlab/RSP/npy_dataset
+  embedding_json_path: /shared/sjw_alinlab/RSP/bridge_embedding.json
+
 
 train_loop:
   _target_: engine_pretrain_repsamp.train_one_epoch_online
