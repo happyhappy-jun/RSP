@@ -12,6 +12,7 @@ import openai
 import json
 import asyncio
 from util.transform import PairedRandomResizedCrop
+from tqdm import tqdm
 
 logging.basicConfig(
     level=logging.INFO,
@@ -64,7 +65,7 @@ class BridgeCaption(Dataset):
 
     def _get_trajectory_files(self):
         traj_files = []
-        for traj_dir in os.listdir(self.data_dir):
+        for traj_dir in tqdm(os.listdir(self.data_dir)):
             full_path = os.path.join(self.data_dir, traj_dir)
             if os.path.isdir(full_path):
                 images_files = sorted([f for f in os.listdir(full_path) if f.startswith('images')])
