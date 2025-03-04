@@ -116,13 +116,11 @@ class BridgeCaption(Dataset):
 
             caption_text = str(moves_list[src_idx]).strip()
             if caption_text not in self.embedding_map:
-                print(f"Caption not found in embedding map: {caption_text}")
                 embedding = []
             else:
                 embedding = self.embedding_map[caption_text]
 
             embedding = torch.tensor(embedding)
-            print(embedding.shape)
 
             src_images.append(src_tensor)
             tgt_images.append(tgt_tensor)

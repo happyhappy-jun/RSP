@@ -423,8 +423,7 @@ def train_one_epoch_online(
             (
                 loss,
                 tgt_pred_post,            # The reconstruction from posterior path
-                detailed_loss,
-                artifacts
+                detailed_loss
             ) = model(
                 src_samples, 
                 tgt_samples, 
