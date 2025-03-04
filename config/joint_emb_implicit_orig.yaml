@@ -6,7 +6,7 @@ exp_name: rsp_cos_joint_emb_original
 
 model_name: rsp_joint_implicit_vit_small_patch16
 
-data_root: /data/rlwrld-common/junyoon
+data_root: /data
 
 dataset:
   _target_: util.kinetics_caption_8_pair.PairedKineticsWithCaption8Pair

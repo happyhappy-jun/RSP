@@ -28,6 +28,4 @@ train_loop:
   _partial_: true
 
 model_params:
-  kl_scale: 0.001
-  enable_rms_norm: false
-  embed_scale_factor: 1.0
+  enable_rms_norm: False

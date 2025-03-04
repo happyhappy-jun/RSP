@@ -16,7 +16,7 @@
 
 ## Env
 ```bash
-pip install hydra-core opencv-python-headless awscli openai tensorboard matplotlib wandb pandas scikit-image torchvision torch decord ujson joblib nvitop boto3 questionary
+pip install hydra-core opencv-python-headless awscli openai tensorboard matplotlib wandb pandas scikit-image torchvision torch decord ujson joblib nvitop boto3 questionary timm hydra_colorlog
 ```
 
 ## Dataset
