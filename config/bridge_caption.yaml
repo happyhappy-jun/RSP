@@ -7,7 +7,7 @@ exp_name: bridge_caption_joint_cos
 model_name: rsp_joint_cos_online_vit_small_patch16
 
 dataset:
-  _target_: util.bridge_caption.BridgeCaption
+  _target_: dataset.bridge_caption.BridgeCaption
   data_dir: /shared/sjw_alinlab/RSP/npy_dataset
 
 train_loop:
