@@ -5,6 +5,25 @@ import torch.nn as nn
 from modeling.layers import RMSNorm, CrossAttention, CrossAttentionBlock
 from modeling.models_rsp_caption import RspCaption
 
+def get_1d_sincos_pos_embed_from_grid(embed_dim, pos):
+    assert embed_dim % 2 == 0
+    device = pos.device if hasattr(pos, "device") else torch.device("cpu")
+    omega = torch.arange(embed_dim // 2, dtype=torch.float32, device=device)
+    omega /= embed_dim / 2.
+    omega = 1. / (10000 ** omega)
+    out = torch.einsum('m,d->md', pos, omega)
+    emb_sin = torch.sin(out)
+    emb_cos = torch.cos(out)
+    emb = torch.cat([emb_sin, emb_cos], dim=1)
+    return emb
+
+def get_1d_sincos_pos_embed(embed_dim, length):
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    pos = torch.arange(length, dtype=torch.float32, device=device)
+    emb = get_1d_sincos_pos_embed_from_grid(embed_dim, pos)
+    emb = emb.unsqueeze(0)
+    return emb
+
 
 class RspCaptionJointSelf(RspCaption):
     """RSP model variant that uses MSE loss instead of KL divergence"""
@@ -126,17 +145,16 @@ class RspCaptionJointSelf(RspCaption):
         input_ids = batch["input_ids"]
         attention_map = batch["attention_map"]
 
-        # Process text: Convert input_ids to embeddings (already contain [CLS] token)
-        text_input = self.text_embedding(input_ids)  # [B, L, d]
-
-        # Add positional encoding
-        text_input = text_input + self.text_pos_embed[:, :text_input.size(1), :]
-
+        # Process text: Convert input_ids to embeddings and add sincos positional encoding
+        text_x = (
+            self.text_embedding(input_ids)
+            + get_1d_sincos_pos_embed(self.embed_dim, input_ids.shape[1]).to(input_ids.device)
+            + self.get_type_embedding('encoder_text_type_embedding')
+        )
         # Transformer encoder expects [seq_len, batch, d]
-        text_encoded = self.text_encoder(text_input.transpose(0, 1),
+        text_encoded = self.text_encoder(text_x.transpose(0, 1),
                                          src_key_padding_mask=(attention_map==0))
         text_encoded = text_encoded.transpose(0, 1)  # [B, L, d]
-
         # Use [CLS] token representation (assuming first token is [CLS])
         caption_embedding = text_encoded[:, 0, :].unsqueeze(1)  # [B, 1, d]
 
