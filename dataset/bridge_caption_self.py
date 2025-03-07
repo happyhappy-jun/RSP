@@ -38,7 +38,6 @@ class BridgeCaptionSelf(Dataset):
         repeated_sampling: int = 2,
         interval: int = 4,
         seed: int = 42,
-        embedding_json_path: Optional[str] = None,
     ):
         super().__init__()
         self.data_dir = data_dir
@@ -62,7 +61,7 @@ class BridgeCaptionSelf(Dataset):
 
     def _get_trajectory_files(self):
         traj_files = []
-        for traj_dir in tqdm(os.listdir(self.data_dir)):
+        for traj_dir in tqdm(os.listdir(self.data_dir), desc="Loading trajectories"):
             full_path = os.path.join(self.data_dir, traj_dir)
             if os.path.isdir(full_path):
                 images_files = sorted([f for f in os.listdir(full_path) if f.startswith('images')])
@@ -90,8 +89,6 @@ class BridgeCaptionSelf(Dataset):
     def __getitem__(self, idx):
         obs_path, move_path = self.traj_files[idx]
         return self.process_trajectory(obs_path, move_path)
-    
-        
 
     def process_trajectory(self, obs_path, move_path):
         images_list = npy_to_numpy_array(obs_path)
@@ -189,7 +186,6 @@ if __name__ == "__main__":
             repeated_sampling=2,
             interval=4,
             seed=42,
-            embedding_json_path='embedding_map.json'
         )
 
         loader = DataLoader(
