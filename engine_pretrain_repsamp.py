@@ -131,6 +131,9 @@ def visualize_reconstruction(
 
     return grid
 
+# ---------------------------
+# Training Loop Definitions
+# ---------------------------
 def train_one_epoch(
     model: torch.nn.Module,
     data_loader: Iterable,
