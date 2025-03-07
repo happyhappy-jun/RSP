@@ -13,6 +13,7 @@ import json
 import asyncio
 from util.transform import PairedRandomResizedCrop
 from tqdm import tqdm
+from concurrent.futures import ThreadPoolExecutor
 from transformers import BertTokenizer
 
 logging.basicConfig(
@@ -62,11 +63,8 @@ class BridgeCaptionSelf(Dataset):
         print(f"Loaded {len(self.traj_files)} eligible trajectories")
 
     def _get_trajectory_files(self):
-        traj_files = []
-        dir_list = os.listdir(self.data_dir)
-        if self.is_debug:
-            dir_list = dir_list[:20]
-        for traj_dir in tqdm(dir_list, desc="Loading trajectories"):
+        def process_traj_dir(traj_dir):
+            local_traj_files = []
             full_path = os.path.join(self.data_dir, traj_dir)
             if os.path.isdir(full_path):
                 images_files = sorted([f for f in os.listdir(full_path) if f.startswith('images')])
@@ -74,9 +72,9 @@ class BridgeCaptionSelf(Dataset):
                 
                 image_map = {f.split('_traj')[1].split('.')[0]: f for f in images_files}
                 move_map = {f.split('_traj')[1].split('.')[0]: f for f in moves_files}
-
+                
                 common_indices = set(image_map.keys()).intersection(set(move_map.keys()))
-
+                
                 for index in common_indices:
                     image_path = os.path.join(full_path, image_map[index])
                     move_path = os.path.join(full_path, move_map[index])
@@ -84,8 +82,17 @@ class BridgeCaptionSelf(Dataset):
                     # Load npy files to verify at least repeated_sampling pairs
                     images_list = npy_to_numpy_array(image_path)
                     if (len(images_list) - self.interval) >= self.repeated_sampling:
-                        traj_files.append((image_path, move_path))
-                
+                        local_traj_files.append((image_path, move_path))
+            return local_traj_files
+
+        traj_files = []
+        dir_list = os.listdir(self.data_dir)
+        if self.is_debug:
+            dir_list = dir_list[:20]
+        with ThreadPoolExecutor() as executor:
+            results = list(tqdm(executor.map(process_traj_dir, dir_list), total=len(dir_list), desc="Loading trajectories"))
+        for res in results:
+            traj_files.extend(res)
         return traj_files
 
     def __len__(self):
