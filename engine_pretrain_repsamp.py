@@ -556,7 +556,7 @@ def train_one_epoch_online(
     print("Averaged stats:", metric_logger)
     return {k: meter.global_avg for k, meter in metric_logger.meters.items()}
 
-def train_one_epoch_m3ae_token(
+def train_one_epoch_self(
     model: torch.nn.Module,
     data_loader: Iterable,
     optimizer: torch.optim.Optimizer,
