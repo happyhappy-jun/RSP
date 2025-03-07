@@ -127,16 +127,11 @@ class RspCaptionJointSelf(RspCaption):
         input_ids = batch["input_ids"]
         attention_map = batch["attention_map"]
 
-        # Process text: Convert input_ids to embeddings
-        token_embed = self.text_embedding(input_ids)  # [B, L, d]
-        B, L, _ = token_embed.shape
-        # Prepend [CLS] token
-        cls_tokens = self.cls_token.expand(B, -1, -1)  # [B, 1, d]
-        text_input = torch.cat([cls_tokens, token_embed], dim=1)  # [B, L+1, d]
+        # Process text: Convert input_ids to embeddings (already contain [CLS] token)
+        text_input = self.text_embedding(input_ids)  # [B, L, d]
 
-        # Adjust attention mask: add mask for [CLS] token (1)
-        cls_mask = torch.ones((B, 1), dtype=attention_map.dtype, device=attention_map.device)
-        extended_attention_mask = torch.cat([cls_mask, attention_map], dim=1)  # [B, L+1]
+        # Use provided attention mask as is
+        extended_attention_mask = attention_map
 
         # Add positional encoding
         text_input = text_input + self.text_pos_embed[:, :text_input.size(1), :]
@@ -144,9 +139,9 @@ class RspCaptionJointSelf(RspCaption):
         # Transformer encoder expects [seq_len, batch, d]
         text_encoded = self.text_encoder(text_input.transpose(0, 1),
                                          src_key_padding_mask=(extended_attention_mask==0))
-        text_encoded = text_encoded.transpose(0, 1)  # [B, L+1, d]
+        text_encoded = text_encoded.transpose(0, 1)  # [B, L, d]
 
-        # Use [CLS] token representation
+        # Use [CLS] token representation (assuming first token is [CLS])
         caption_embedding = text_encoded[:, 0, :].unsqueeze(1)  # [B, 1, d]
 
         # Image encoding

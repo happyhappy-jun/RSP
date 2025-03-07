@@ -109,7 +109,7 @@ class BridgeCaptionSelf(Dataset):
             tgt_tensor = self.basic_transform(tgt_cropped)
 
             caption_text = str(moves_list[src_idx]).strip()
-            tokenized = self.tokenizer(caption_text, padding="max_length", truncation=True, max_length=32, return_tensors="pt")
+            tokenized = self.tokenizer(caption_text, add_special_tokens=True, padding="max_length", truncation=True, max_length=32, return_tensors="pt")
             input_ids_list.append(tokenized["input_ids"].squeeze(0))
             attention_map_list.append(tokenized["attention_mask"].squeeze(0))
 
