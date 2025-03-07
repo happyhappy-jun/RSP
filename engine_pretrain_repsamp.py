@@ -134,7 +134,7 @@ def visualize_reconstruction(
 # ---------------------------
 # Training Loop Definitions
 # ---------------------------
-def train_one_epoch(
+def run_train_epoch(
     model: torch.nn.Module,
     data_loader: Iterable,
     optimizer: torch.optim.Optimizer,
@@ -143,68 +143,63 @@ def train_one_epoch(
     loss_scaler,
     log_writer=None,
     args=None,
+    batch_step_fn=None,
 ):
+    """
+    Generic training loop for one epoch.
+
+    Args:
+        model: The model to train.
+        data_loader: Iterable data loader.
+        optimizer: Optimizer for model parameters.
+        device: Device to run the training on.
+        epoch: Current epoch number.
+        loss_scaler: Scaler for mixed precision training.
+        log_writer: Optional logger for writing logs.
+        args: Additional arguments.
+        batch_step_fn: Function to process each batch and return loss and detailed loss.
+
+    Returns:
+        Dictionary of averaged metrics.
+    """
     model.train(True)
     metric_logger = misc.MetricLogger(delimiter="  ")
     metric_logger.add_meter("lr", misc.SmoothedValue(window_size=1, fmt="{value:.6f}"))
-    header = "Epoch: [{}]".format(epoch)
+    header = f"Epoch: [{epoch}]"
     print_freq = 100
 
     accum_iter = args.accum_iter
     optimizer.zero_grad(set_to_none=True)
 
     if log_writer is not None:
-        print("log_dir: {}".format(log_writer.log_dir))
+        print(f"log_dir: {log_writer.log_dir}")
 
-
-    for data_iter_step, batch in enumerate(
-        metric_logger.log_every(data_loader, print_freq, header)
-    ):
-        # we use a per iteration (instead of per epoch) lr scheduler
+    for data_iter_step, batch in enumerate(metric_logger.log_every(data_loader, print_freq, header)):
         if data_iter_step % accum_iter == 0:
-            lr_sched.adjust_learning_rate(
-                optimizer, data_iter_step / len(data_loader) + epoch, args
-            )
+            lr_sched.adjust_learning_rate(optimizer, data_iter_step / len(data_loader) + epoch, args)
 
-        src_samples, tgt_samples, _ = batch
-        
-        src_samples = src_samples.to(device, non_blocking=True)
-        tgt_samples = tgt_samples.to(device, non_blocking=True)
-        
-        src_samples = src_samples.reshape(-1, *src_samples.shape[2:])
-        tgt_samples = tgt_samples.reshape(-1, *tgt_samples.shape[2:])
-
-        with torch.amp.autocast('cuda', enabled=args.amp):
-            loss, _, (loss_post, loss_prior, loss_kl, value_kl, loss_mae) = model(
-                src_samples, tgt_samples,
-                data_iter_step / len(data_loader) + epoch
-            )
+        loss, detailed_loss = batch_step_fn(batch, model, device, epoch, data_iter_step, data_loader, args)
 
         loss_value = loss.item()
-
         if not math.isfinite(loss_value):
-            print("Loss is {}, stopping training".format(loss_value))
+            print(f"Loss is {loss_value}, stopping training")
             sys.exit(1)
 
         loss = loss / accum_iter
         loss_scaler(
             loss,
             optimizer,
-            parameters=model.parameters(),
             clip_grad=1.0,
-            update_grad=(data_iter_step + 1) % accum_iter == 0,
+            parameters=model.parameters(),
+            update_grad=((data_iter_step + 1) % accum_iter == 0),
         )
         if (data_iter_step + 1) % accum_iter == 0:
             optimizer.zero_grad(set_to_none=True)
 
         torch.cuda.synchronize()
 
+        metric_logger.update(**detailed_loss)
         metric_logger.update(loss=loss_value)
-        metric_logger.update(loss_post=loss_post.item())
-        metric_logger.update(loss_prior=loss_prior.item())
-        metric_logger.update(loss_kl=loss_kl.item())
-        metric_logger.update(kl=value_kl.item())
-        metric_logger.update(loss_mae=loss_mae.item())
         lr = optimizer.param_groups[0]["lr"]
         metric_logger.update(lr=lr)
 
@@ -213,12 +208,9 @@ def train_one_epoch(
             epoch_1000x = int((data_iter_step / len(data_loader) + epoch) * 1000)
             log_writer.add_scalar("train_loss", loss_value_reduce, epoch_1000x)
             log_writer.add_scalar("lr", lr, epoch_1000x)
-            log_writer.add_scalar("loss_post", loss_post.item(), epoch_1000x)
-            log_writer.add_scalar("loss_prior", loss_prior.item(), epoch_1000x)
-            log_writer.add_scalar("loss_kl", loss_kl.item(), epoch_1000x)
-            log_writer.add_scalar("loss_mae", loss_mae.item(), epoch_1000x)
-            log_writer.add_scalar("kl", value_kl.item(), epoch_1000x)
-        
+            for k, v in detailed_loss.items():
+                log_writer.add_scalar(k, v.item(), epoch_1000x)
+
     metric_logger.synchronize_between_processes()
     print("Averaged stats:", metric_logger)
     return {k: meter.global_avg for k, meter in metric_logger.meters.items()}
@@ -234,18 +226,7 @@ def train_one_epoch_online_token(
     wandb_writer=None,
     args=None,
 ):
-    model.train(True)
-    metric_logger = misc.MetricLogger(delimiter="  ")
-    metric_logger.add_meter("lr", misc.SmoothedValue(window_size=1, fmt="{value:.6f}"))
-    header = f"Epoch: [{epoch}]"
-    print_freq = 100
-    accum_iter = args.accum_iter
-    optimizer.zero_grad(set_to_none=True)
-    if log_writer is not None:
-        print("log_dir: {}".format(log_writer.log_dir))
-    for data_iter_step, batch in enumerate(metric_logger.log_every(data_loader, print_freq, header)):
-        if data_iter_step % accum_iter == 0:
-            lr_sched.adjust_learning_rate(optimizer, data_iter_step / len(data_loader) + epoch, args)
+    def batch_step_fn(batch, model, device, epoch, data_iter_step, data_loader, args):
         src_samples = batch["src_images"].to(device, non_blocking=True)
         tgt_samples = batch["tgt_images"].to(device, non_blocking=True)
         input_ids = batch["input_ids"].to(device, non_blocking=True)
@@ -258,46 +239,19 @@ def train_one_epoch_online_token(
                 attention_map,
                 epoch + data_iter_step / len(data_loader)
             )
-        loss_value = loss.item()
-        if not math.isfinite(loss_value):
-            print(f"Loss is {loss_value}, stopping training")
-            sys.exit(1)
-        loss = loss / accum_iter
-        loss_scaler(
-            loss,
-            optimizer,
-            clip_grad=1.0,
-            parameters=model.parameters(),
-            update_grad=((data_iter_step + 1) % accum_iter == 0),
-        )
-        if (data_iter_step + 1) % accum_iter == 0:
-            optimizer.zero_grad(set_to_none=True)
-        torch.cuda.synchronize()
-        metric_logger.update(**detailed_loss)
-        metric_logger.update(loss=loss_value)
-        lr = optimizer.param_groups[0]["lr"]
-        metric_logger.update(lr=lr)
-        loss_value_reduce = misc.all_reduce_mean(loss_value)
-        if log_writer is not None and (data_iter_step + 1) % accum_iter == 0:
-            epoch_1000x = int((data_iter_step / len(data_loader) + epoch) * 1000)
-            log_writer.add_scalar("train_loss", loss_value_reduce, epoch_1000x)
-            log_writer.add_scalar("lr", lr, epoch_1000x)
-            for k, v in detailed_loss.items():
-                log_writer.add_scalar(k, v.item(), epoch_1000x)
-        if (data_iter_step % 200 == 0) and (log_writer is not None):
-            visualize_reconstruction(
-                model=model.module,
-                src_imgs=src_samples.reshape(-1, *src_samples.shape[2:]),
-                tgt_imgs=tgt_samples.reshape(-1, *tgt_samples.shape[2:]),
-                artifacts=artifacts,
-                device=device,
-                step=epoch * len(data_loader) + data_iter_step,
-                log_to_wandb=True,
-                revert_norm_pix_loss=True
-            )
-    metric_logger.synchronize_between_processes()
-    print("Averaged stats:", metric_logger)
-    return {k: meter.global_avg for k, meter in metric_logger.meters.items()}
+        return loss, detailed_loss
+
+    return run_train_epoch(
+        model=model,
+        data_loader=data_loader,
+        optimizer=optimizer,
+        device=device,
+        epoch=epoch,
+        loss_scaler=loss_scaler,
+        log_writer=log_writer,
+        args=args,
+        batch_step_fn=batch_step_fn,
+    )
 
 
 def train_one_epoch_llm(
@@ -310,71 +264,28 @@ def train_one_epoch_llm(
     log_writer=None,
     args=None,
 ):
-    model.train(True)
-    metric_logger = misc.MetricLogger(delimiter="  ")
-    metric_logger.add_meter("lr", misc.SmoothedValue(window_size=1, fmt="{value:.6f}"))
-    header = "Epoch: [{}]".format(epoch)
-    print_freq = 100
-
-    accum_iter = args.accum_iter
-    optimizer.zero_grad(set_to_none=True)
-
-    if log_writer is not None:
-        print("log_dir: {}".format(log_writer.log_dir))
-
-    for data_iter_step, batch in enumerate(
-        metric_logger.log_every(data_loader, print_freq, header)
-    ):
-        # we use a per iteration (instead of per epoch) lr scheduler
-        if data_iter_step % accum_iter == 0:
-            lr_sched.adjust_learning_rate(
-                optimizer, data_iter_step / len(data_loader) + epoch, args
-            )
-
+    def batch_step_fn(batch, model, device, epoch, data_iter_step, data_loader, args):
         src_samples = batch["src_images"].to(device, non_blocking=True)
         tgt_samples = batch["tgt_images"].to(device, non_blocking=True)
         lm_logits = batch["embeddings"].to(device, non_blocking=True)
+        with torch.amp.autocast('cuda', enabled=args.amp):
+            loss, _, detailed_loss = model(
+                src_samples, tgt_samples, lm_logits,
+                data_iter_step / len(data_loader) + epoch
+            )
+        return loss, detailed_loss
 
-        loss, _, detailed_loss = model(
-            src_samples, tgt_samples, lm_logits,
-            data_iter_step / len(data_loader) + epoch
-        )
-
-        loss_value = loss.item()
-
-        if not math.isfinite(loss_value):
-            print("Loss is {}, stopping training".format(loss_value))
-            sys.exit(1)
-
-        loss = loss / accum_iter
-        loss_scaler(
-            loss,
-            optimizer,
-            clip_grad=1.0,
-            parameters=model.parameters(),
-            update_grad=(data_iter_step + 1) % accum_iter == 0,
-        )
-        if (data_iter_step + 1) % accum_iter == 0:
-            optimizer.zero_grad(set_to_none=True)
-
-        torch.cuda.synchronize()
-
-        metric_logger.update(**detailed_loss)
-        metric_logger.update(loss=loss_value)
-        lr = optimizer.param_groups[0]["lr"]
-        metric_logger.update(lr=lr)
-
-        loss_value_reduce = misc.all_reduce_mean(loss_value)
-        if log_writer is not None and (data_iter_step + 1) % accum_iter == 0:
-            epoch_1000x = int((data_iter_step / len(data_loader) + epoch) * 1000)
-            log_writer.add_scalar("train_loss", loss_value_reduce, epoch_1000x)
-            log_writer.add_scalar("lr", lr, epoch_1000x)
-            for k, v in detailed_loss.items():
-                log_writer.add_scalar(k, v.item(), epoch_1000x)
-
-    metric_logger.synchronize_between_processes()
-    print("Averaged stats:", metric_logger)
-    return {k: meter.global_avg for k, meter in metric_logger.meters.items()}
+    return run_train_epoch(
+        model=model,
+        data_loader=data_loader,
+        optimizer=optimizer,
+        device=device,
+        epoch=epoch,
+        loss_scaler=loss_scaler,
+        log_writer=log_writer,
+        args=args,
+        batch_step_fn=batch_step_fn,
+    )
 
 def train_one_epoch_m3ae(
     model: torch.nn.Module,
@@ -386,72 +297,29 @@ def train_one_epoch_m3ae(
     log_writer=None,
     args=None,
 ):
-    model.train(True)
-    metric_logger = misc.MetricLogger(delimiter="  ")
-    metric_logger.add_meter("lr", misc.SmoothedValue(window_size=1, fmt="{value:.6f}"))
-    header = "Epoch: [{}]".format(epoch)
-    print_freq = 100
-
-    accum_iter = args.accum_iter
-    optimizer.zero_grad(set_to_none=True)
-
-    if log_writer is not None:
-        print("log_dir: {}".format(log_writer.log_dir))
-
-    for data_iter_step, batch in enumerate(
-        metric_logger.log_every(data_loader, print_freq, header)
-    ):
-        # we use a per iteration (instead of per epoch) lr scheduler
-        if data_iter_step % accum_iter == 0:
-            lr_sched.adjust_learning_rate(
-                optimizer, data_iter_step / len(data_loader) + epoch, args
-            )
-
+    def batch_step_fn(batch, model, device, epoch, data_iter_step, data_loader, args):
         src_samples = batch["src_images"].to(device, non_blocking=True)
         tgt_samples = batch["tgt_images"].to(device, non_blocking=True)
         lm_logits = batch["embeddings"].to(device, non_blocking=True)
         future_lm = batch["future_embeddings"].to(device, non_blocking=True)
+        with torch.amp.autocast('cuda', enabled=args.amp):
+            loss, _, detailed_loss = model(
+                src_samples, tgt_samples, lm_logits, future_lm, 
+                data_iter_step / len(data_loader) + epoch
+            )
+        return loss, detailed_loss
 
-        loss, _, detailed_loss = model(
-            src_samples, tgt_samples, lm_logits, future_lm, 
-            data_iter_step / len(data_loader) + epoch
-        )
-
-        loss_value = loss.item()
-
-        if not math.isfinite(loss_value):
-            print("Loss is {}, stopping training".format(loss_value))
-            sys.exit(1)
-
-        loss = loss / accum_iter
-        loss_scaler(
-            loss,
-            optimizer,
-            clip_grad=1.0,
-            parameters=model.parameters(),
-            update_grad=(data_iter_step + 1) % accum_iter == 0,
-        )
-        if (data_iter_step + 1) % accum_iter == 0:
-            optimizer.zero_grad(set_to_none=True)
-
-        torch.cuda.synchronize()
-
-        metric_logger.update(**detailed_loss)
-        metric_logger.update(loss=loss_value)
-        lr = optimizer.param_groups[0]["lr"]
-        metric_logger.update(lr=lr)
-
-        loss_value_reduce = misc.all_reduce_mean(loss_value)
-        if log_writer is not None and (data_iter_step + 1) % accum_iter == 0:
-            epoch_1000x = int((data_iter_step / len(data_loader) + epoch) * 1000)
-            log_writer.add_scalar("train_loss", loss_value_reduce, epoch_1000x)
-            log_writer.add_scalar("lr", lr, epoch_1000x)
-            for k, v in detailed_loss.items():
-                log_writer.add_scalar(k, v.item(), epoch_1000x)
-
-    metric_logger.synchronize_between_processes()
-    print("Averaged stats:", metric_logger)
-    return {k: meter.global_avg for k, meter in metric_logger.meters.items()}
+    return run_train_epoch(
+        model=model,
+        data_loader=data_loader,
+        optimizer=optimizer,
+        device=device,
+        epoch=epoch,
+        loss_scaler=loss_scaler,
+        log_writer=log_writer,
+        args=args,
+        batch_step_fn=batch_step_fn,
+    )
 
 def train_one_epoch_online(
     model: torch.nn.Module,
@@ -464,29 +332,10 @@ def train_one_epoch_online(
     wandb_writer=None,
     args=None,
 ):
-    model.train(True)
-    metric_logger = misc.MetricLogger(delimiter="  ")
-    metric_logger.add_meter("lr", misc.SmoothedValue(window_size=1, fmt="{value:.6f}"))
-    header = f"Epoch: [{epoch}]"
-    print_freq = 100
-
-    accum_iter = args.accum_iter
-    optimizer.zero_grad(set_to_none=True)
-
-    if log_writer is not None:
-        print("log_dir: {}".format(log_writer.log_dir))
-
-    for data_iter_step, batch in enumerate(metric_logger.log_every(data_loader, print_freq, header)):
-        # Update the learning rate per iteration if you have such a schedule
-        if data_iter_step % accum_iter == 0:
-            lr_sched.adjust_learning_rate(
-                optimizer, data_iter_step / len(data_loader) + epoch, args
-            )
-
+    def batch_step_fn(batch, model, device, epoch, data_iter_step, data_loader, args):
         src_samples = batch["src_images"].to(device, non_blocking=True)
         tgt_samples = batch["tgt_images"].to(device, non_blocking=True)
         captions = batch["captions"].to(device, non_blocking=True)  # tokenized texts
-
         with torch.amp.autocast('cuda', enabled=args.amp):                
             (
                 loss,
@@ -499,54 +348,19 @@ def train_one_epoch_online(
                 captions,
                 epoch + data_iter_step / len(data_loader)
             )
+        return loss, detailed_loss
 
-        loss_value = loss.item()
-        if not math.isfinite(loss_value):
-            print(f"Loss is {loss_value}, stopping training")
-            sys.exit(1)
-
-        # Gradient accumulation
-        loss = loss / accum_iter
-        loss_scaler(
-            loss,
-            optimizer,
-            clip_grad=1.0,
-            parameters=model.parameters(),
-            update_grad=((data_iter_step + 1) % accum_iter == 0),
-        )
-        if (data_iter_step + 1) % accum_iter == 0:
-            optimizer.zero_grad(set_to_none=True)
-
-        torch.cuda.synchronize()
-
-        metric_logger.update(**detailed_loss)
-        metric_logger.update(loss=loss_value)
-        lr = optimizer.param_groups[0]["lr"]
-        metric_logger.update(lr=lr)
-
-        loss_value_reduce = misc.all_reduce_mean(loss_value)
-        if log_writer is not None and (data_iter_step + 1) % accum_iter == 0:
-            epoch_1000x = int((data_iter_step / len(data_loader) + epoch) * 1000)
-            log_writer.add_scalar("train_loss", loss_value_reduce, epoch_1000x)
-            log_writer.add_scalar("lr", lr, epoch_1000x)
-            for k, v in detailed_loss.items():
-                log_writer.add_scalar(k, v.item(), epoch_1000x)
-
-        if (data_iter_step % 200 == 0) and (log_writer is not None):
-            visualize_reconstruction(
-                model=model.module,
-                src_imgs=src_samples.reshape(-1, *src_samples.shape[2:]),
-                tgt_imgs=tgt_samples.reshape(-1, *tgt_samples.shape[2:]),
-                artifacts=artifacts,
-                device=device,
-                step=epoch * len(data_loader) + data_iter_step,
-                log_to_wandb=True,
-                revert_norm_pix_loss=True  # or False, depending on your training setting
-            )
-
-    metric_logger.synchronize_between_processes()
-    print("Averaged stats:", metric_logger)
-    return {k: meter.global_avg for k, meter in metric_logger.meters.items()}
+    return run_train_epoch(
+        model=model,
+        data_loader=data_loader,
+        optimizer=optimizer,
+        device=device,
+        epoch=epoch,
+        loss_scaler=loss_scaler,
+        log_writer=log_writer,
+        args=args,
+        batch_step_fn=batch_step_fn,
+    )
 
 def train_one_epoch_self(
     model: torch.nn.Module,
@@ -558,71 +372,27 @@ def train_one_epoch_self(
     log_writer=None,
     args=None,
 ):
-    model.train(True)
-    metric_logger = misc.MetricLogger(delimiter="  ")
-    metric_logger.add_meter("lr", misc.SmoothedValue(window_size=1, fmt="{value:.6f}"))
-    header = "Epoch: [{}]".format(epoch)
-    print_freq = 100
-
-    accum_iter = args.accum_iter
-    optimizer.zero_grad(set_to_none=True)
-
-    if log_writer is not None:
-        print("log_dir: {}".format(log_writer.log_dir))
-
-    for data_iter_step, batch in enumerate(
-        metric_logger.log_every(data_loader, print_freq, header)
-    ):
-        # we use a per iteration (instead of per epoch) lr scheduler
-        if data_iter_step % accum_iter == 0:
-            lr_sched.adjust_learning_rate(
-                optimizer, data_iter_step / len(data_loader) + epoch, args
-            )
-
+    def batch_step_fn(batch, model, device, epoch, data_iter_step, data_loader, args):
         src_samples = batch["src_images"].to(device, non_blocking=True)
         tgt_samples = batch["tgt_images"].to(device, non_blocking=True)
         lm_logits = batch["embeddings"].to(device, non_blocking=True)
         future_caption_tokens = batch["future_tokenized_caption"].to(device, non_blocking=True)
         future_padding_mask = batch["future_padding_mask"].to(device, non_blocking=True)
+        with torch.amp.autocast('cuda', enabled=args.amp):
+            loss, _, detailed_loss = model(
+                src_samples, tgt_samples, lm_logits, future_caption_tokens, future_padding_mask,
+                data_iter_step / len(data_loader) + epoch
+            )
+        return loss, detailed_loss
 
-
-        loss, _, detailed_loss = model(
-            src_samples, tgt_samples, lm_logits, future_caption_tokens, future_padding_mask,
-            data_iter_step / len(data_loader) + epoch
-        )
-
-        loss_value = loss.item()
-
-        if not math.isfinite(loss_value):
-            print("Loss is {}, stopping training".format(loss_value))
-            sys.exit(1)
-
-        loss = loss / accum_iter
-        loss_scaler(
-            loss,
-            optimizer,
-            clip_grad=1.0,
-            parameters=model.parameters(),
-            update_grad=(data_iter_step + 1) % accum_iter == 0,
-        )
-        if (data_iter_step + 1) % accum_iter == 0:
-            optimizer.zero_grad(set_to_none=True)
-
-        torch.cuda.synchronize()
-
-        metric_logger.update(**detailed_loss)
-        metric_logger.update(loss=loss_value)
-        lr = optimizer.param_groups[0]["lr"]
-        metric_logger.update(lr=lr)
-
-        loss_value_reduce = misc.all_reduce_mean(loss_value)
-        if log_writer is not None and (data_iter_step + 1) % accum_iter == 0:
-            epoch_1000x = int((data_iter_step / len(data_loader) + epoch) * 1000)
-            log_writer.add_scalar("train_loss", loss_value_reduce, epoch_1000x)
-            log_writer.add_scalar("lr", lr, epoch_1000x)
-            for k, v in detailed_loss.items():
-                log_writer.add_scalar(k, v.item(), epoch_1000x)
-
-    metric_logger.synchronize_between_processes()
-    print("Averaged stats:", metric_logger)
-    return {k: meter.global_avg for k, meter in metric_logger.meters.items()}
+    return run_train_epoch(
+        model=model,
+        data_loader=data_loader,
+        optimizer=optimizer,
+        device=device,
+        epoch=epoch,
+        loss_scaler=loss_scaler,
+        log_writer=log_writer,
+        args=args,
+        batch_step_fn=batch_step_fn,
+    )
