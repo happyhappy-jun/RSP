@@ -59,8 +59,6 @@ class BridgeCaptionSelf(Dataset):
 
         # Discover all trajectory files, excluding those insufficient for repeated_sampling
         self.traj_files = self._get_trajectory_files()
-        if self.is_debug:
-            self.traj_files = self.traj_files[:3]
         print(f"Loaded {len(self.traj_files)} eligible trajectories")
 
     def _get_trajectory_files(self):
