@@ -13,6 +13,7 @@ import json
 import asyncio
 from util.transform import PairedRandomResizedCrop
 from tqdm import tqdm
+from transformers import BertTokenizer
 
 logging.basicConfig(
     level=logging.INFO,
@@ -53,11 +54,7 @@ class BridgeCaptionSelf(Dataset):
                                  std=[0.229, 0.224, 0.225]),
         ])
 
-        if embedding_json_path:
-            with open(embedding_json_path, 'r') as f:
-                self.embedding_map = json.load(f)
-        else:
-            self.embedding_map = {}
+        self.tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
 
         # Discover all trajectory files, excluding those insufficient for repeated_sampling
         self.traj_files = self._get_trajectory_files()
@@ -103,7 +100,7 @@ class BridgeCaptionSelf(Dataset):
         pair_indices = [(i, i + self.interval) for i in range(len(images_list) - self.interval)]
         sampled_pairs = random.sample(pair_indices, min(self.repeated_sampling, len(pair_indices)))
 
-        src_images, tgt_images, embeddings = [], [], []
+        src_images, tgt_images, input_ids_list, attention_map_list = [], [], [], []
 
         for src_idx, tgt_idx in sampled_pairs:
             src_arr = load_image_from_bytes(images_list[src_idx])
@@ -115,25 +112,20 @@ class BridgeCaptionSelf(Dataset):
             tgt_tensor = self.basic_transform(tgt_cropped)
 
             caption_text = str(moves_list[src_idx]).strip()
-            if caption_text not in self.embedding_map:
-                print(f"Caption not found in embedding map: {caption_text}")
-                embedding = []
-            else:
-                embedding = self.embedding_map[caption_text]
-
-            embedding = torch.tensor(embedding)
-            print(embedding.shape)
+            tokenized = self.tokenizer(caption_text, padding="max_length", truncation=True, max_length=32, return_tensors="pt")
+            input_ids_list.append(tokenized["input_ids"].squeeze(0))
+            attention_map_list.append(tokenized["attention_mask"].squeeze(0))
 
             src_images.append(src_tensor)
             tgt_images.append(tgt_tensor)
-            embeddings.append(embedding)
         
         assert len(src_images) == 2
 
         return {
             "src_images": torch.stack(src_images, dim=0),
             "tgt_images": torch.stack(tgt_images, dim=0),
-            "captions": torch.stack(embeddings, dim=0)
+            "input_ids": torch.stack(input_ids_list, dim=0),
+            "attention_map": torch.stack(attention_map_list, dim=0)
         }
 
 def get_all_unique_captions(data_dir: str) -> List[str]:
