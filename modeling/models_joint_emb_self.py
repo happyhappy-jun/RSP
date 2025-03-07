@@ -229,3 +229,102 @@ rsp_cos_joint_cut_vit_small_patch8 = rsp_cos_joint_cut_vit_small_patch8_dec512d8
 rsp_cos_joint_cut_vit_small_patch16 = rsp_cos_joint_cut_vit_small_patch16_dec512d8b
 rsp_cos_joint_cut_vit_base_patch16 = rsp_cos_joint_cut_vit_base_patch16_dec512d8b
 rsp_cos_joint_cut_vit_large_patch16 = rsp_cos_joint_cut_vit_large_patch16_dec512d8b
+
+class RspCaptionJointSelf(RspCaption):
+    """RSP model variant that uses self-attention based text encoder instead of precomputed embeddings."""
+    def __init__(self,
+                 *args,
+                 vocab_size=30522,
+                 text_embed_dim=None,
+                 num_text_layers=2,
+                 nhead_text=8,
+                 max_text_length=33,
+                 **kwargs):
+        super().__init__(*args, **kwargs)
+        if text_embed_dim is None:
+            text_embed_dim = self.embed_dim
+        self.text_embedding = nn.Embedding(vocab_size, text_embed_dim)
+        self.cls_token = nn.Parameter(torch.zeros(1, 1, text_embed_dim))
+        nn.init.trunc_normal_(self.cls_token, std=0.02)
+        self.text_encoder = nn.TransformerEncoder(
+            nn.TransformerEncoderLayer(d_model=text_embed_dim, nhead=nhead_text),
+            num_layers=num_text_layers
+        )
+        self.text_pos_embed = nn.Parameter(torch.zeros(1, max_text_length, text_embed_dim))
+        nn.init.trunc_normal_(self.text_pos_embed, std=0.02)
+
+    def forward(self, batch, epoch):
+        # Extract data from batch dictionary
+        src_imgs = batch["src_images"]
+        tgt_imgs = batch["tgt_images"]
+        input_ids = batch["input_ids"]
+        attention_map = batch["attention_map"]
+
+        # Process text: Convert input_ids to embeddings
+        token_embed = self.text_embedding(input_ids)  # [B, L, d]
+        B, L, _ = token_embed.shape
+        # Prepend [CLS] token
+        cls_tokens = self.cls_token.expand(B, -1, -1)  # [B, 1, d]
+        text_input = torch.cat([cls_tokens, token_embed], dim=1)  # [B, L+1, d]
+
+        # Adjust attention mask: add mask for [CLS] token (1)
+        cls_mask = torch.ones((B, 1), dtype=attention_map.dtype, device=attention_map.device)
+        extended_attention_mask = torch.cat([cls_mask, attention_map], dim=1)  # [B, L+1]
+
+        # Add positional encoding
+        text_input = text_input + self.text_pos_embed[:, :text_input.size(1), :]
+
+        # Transformer encoder expects [seq_len, batch, d]
+        text_encoded = self.text_encoder(text_input.transpose(0, 1),
+                                         src_key_padding_mask=(extended_attention_mask==0))
+        text_encoded = text_encoded.transpose(0, 1)  # [B, L+1, d]
+
+        # Use [CLS] token representation
+        caption_embedding = text_encoded[:, 0, :].unsqueeze(1)  # [B, 1, d]
+
+        # Image encoding
+        src_imgs = src_imgs.reshape(-1, *src_imgs.shape[2:])
+        tgt_imgs = tgt_imgs.reshape(-1, *tgt_imgs.shape[2:])
+        src_h, _, _ = self.forward_encoder(src_imgs, mask_ratio=0)
+        tgt_h, _, _ = self.forward_encoder(self.perturb(tgt_imgs), mask_ratio=0)
+
+        h_context_embed_dim = self.resize_embed(caption_embedding, self.embed_dim)
+        post_h = self.forward_joint_emb(src_h[:, 0], tgt_h[:, 0], h_context_embed_dim)
+        post_logits = self.to_posterior(post_h)
+        post_dist = self.make_dist(post_logits)
+        post_z = post_dist.rsample()
+
+        prior_h = src_h[:, 0]
+        prior_logits = self.to_prior(prior_h)
+        prior_dist = self.make_dist(prior_logits)
+        prior_z = prior_dist.rsample()
+
+        h_context_prime = self.to_language_prior(src_h[:, 0])
+        h_context_decoder = self.resize_embed(caption_embedding, self.decoder_embed_dim)
+        tgt_pred = self.forward_decoder_fut(src_h, h_context_decoder, post_z)
+        loss_post = self.forward_loss(tgt_imgs, tgt_pred)
+        kl_loss, kl_value = self.compute_kl_loss(post_logits, prior_logits)
+        h_context_prime = h_context_prime.view(h_context_decoder.shape)
+        context_loss = 1 - torch.nn.functional.cosine_similarity(h_context_prime.squeeze(1), h_context_decoder.squeeze(1), dim=1)
+        context_loss = context_loss.mean()
+
+        img_h, mask, ids_restore = self.forward_encoder(tgt_imgs, mask_ratio=self.mask_ratio)
+        pred_masked = self.forward_decoder_mae(img_h, ids_restore)
+        mae_loss = self.forward_loss(tgt_imgs, pred_masked, mask)
+
+        with torch.no_grad():
+            tgt_pred_prior = self.forward_decoder_fut(src_h, h_context_decoder, prior_z)
+            loss_prior = self.forward_loss(tgt_imgs, tgt_pred_prior)
+
+        loss = loss_post + self.kl_scale * kl_loss + self.cos_scale * context_loss + mae_loss
+
+        detailed_loss = {
+            "loss_post": loss_post,
+            "loss_prior": loss_prior,
+            "loss_kl": kl_loss,
+            "kl": kl_value,
+            "context_loss": context_loss,
+            "loss_mae": mae_loss,
+        }
+
+        return loss, tgt_pred, detailed_loss
