@@ -178,7 +178,12 @@ def run_train_epoch(
         if data_iter_step % accum_iter == 0:
             lr_sched.adjust_learning_rate(optimizer, data_iter_step / len(data_loader) + epoch, args)
 
-        loss, detailed_loss = batch_step_fn(batch, model, device, epoch, data_iter_step, data_loader, args)
+        out = batch_step_fn(batch, model, device, epoch, data_iter_step, data_loader, args)
+        if isinstance(out, tuple) and len(out) == 3:
+            loss, detailed_loss, artifacts = out
+        else:
+            loss, detailed_loss = out
+            artifacts = None
 
         if artifacts is not None and data_iter_step % 100 == 0:
             visualize_reconstruction(model, batch["src_images"], batch["tgt_images"], artifacts, device, step=int(epoch * len(data_loader) + data_iter_step))
