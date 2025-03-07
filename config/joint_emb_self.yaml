@@ -29,3 +29,8 @@ model_params:
   embed_decoder_depth: 4
   kl_scale: 0.005
   cos_scale: 0.1
+  vocab_size: 30522
+  text_embed_dim: null
+  num_text_layers: 2
+  nhead_text: 8
+  max_text_length: 33
