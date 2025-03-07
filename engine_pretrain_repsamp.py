@@ -239,6 +239,8 @@ def train_one_epoch_online_token(
                 attention_map,
                 epoch + data_iter_step / len(data_loader)
             )
+        if data_iter_step % 100 == 0:
+            visualize_reconstruction(model, src_samples, tgt_samples, artifacts, device, step=int(epoch * len(data_loader) + data_iter_step))
         return loss, detailed_loss
 
     return run_train_epoch(
@@ -348,6 +350,8 @@ def train_one_epoch_online(
                 captions,
                 epoch + data_iter_step / len(data_loader)
             )
+        if data_iter_step % 100 == 0:
+            visualize_reconstruction(model, src_samples, tgt_samples, artifacts, device, step=int(epoch * len(data_loader) + data_iter_step))
         return loss, detailed_loss
 
     return run_train_epoch(
