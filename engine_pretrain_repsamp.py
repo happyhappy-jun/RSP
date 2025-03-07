@@ -231,6 +231,82 @@ def train_one_epoch(
     print("Averaged stats:", metric_logger)
     return {k: meter.global_avg for k, meter in metric_logger.meters.items()}
 
+def train_one_epoch_online_token(
+    model: torch.nn.Module,
+    data_loader: Iterable,
+    optimizer: torch.optim.Optimizer,
+    device: torch.device,
+    epoch: int,
+    loss_scaler,
+    log_writer=None,
+    wandb_writer=None,
+    args=None,
+):
+    model.train(True)
+    metric_logger = misc.MetricLogger(delimiter="  ")
+    metric_logger.add_meter("lr", misc.SmoothedValue(window_size=1, fmt="{value:.6f}"))
+    header = f"Epoch: [{epoch}]"
+    print_freq = 100
+    accum_iter = args.accum_iter
+    optimizer.zero_grad(set_to_none=True)
+    if log_writer is not None:
+        print("log_dir: {}".format(log_writer.log_dir))
+    for data_iter_step, batch in enumerate(metric_logger.log_every(data_loader, print_freq, header)):
+        if data_iter_step % accum_iter == 0:
+            lr_sched.adjust_learning_rate(optimizer, data_iter_step / len(data_loader) + epoch, args)
+        src_samples = batch["src_images"].to(device, non_blocking=True)
+        tgt_samples = batch["tgt_images"].to(device, non_blocking=True)
+        input_ids = batch["input_ids"].to(device, non_blocking=True)
+        attention_map = batch["attention_map"].to(device, non_blocking=True)
+        with torch.amp.autocast('cuda', enabled=args.amp):
+            loss, tgt_pred_post, detailed_loss, artifacts = model(
+                src_samples,
+                tgt_samples,
+                input_ids,
+                attention_map,
+                epoch + data_iter_step / len(data_loader)
+            )
+        loss_value = loss.item()
+        if not math.isfinite(loss_value):
+            print(f"Loss is {loss_value}, stopping training")
+            sys.exit(1)
+        loss = loss / accum_iter
+        loss_scaler(
+            loss,
+            optimizer,
+            clip_grad=1.0,
+            parameters=model.parameters(),
+            update_grad=((data_iter_step + 1) % accum_iter == 0),
+        )
+        if (data_iter_step + 1) % accum_iter == 0:
+            optimizer.zero_grad(set_to_none=True)
+        torch.cuda.synchronize()
+        metric_logger.update(**detailed_loss)
+        metric_logger.update(loss=loss_value)
+        lr = optimizer.param_groups[0]["lr"]
+        metric_logger.update(lr=lr)
+        loss_value_reduce = misc.all_reduce_mean(loss_value)
+        if log_writer is not None and (data_iter_step + 1) % accum_iter == 0:
+            epoch_1000x = int((data_iter_step / len(data_loader) + epoch) * 1000)
+            log_writer.add_scalar("train_loss", loss_value_reduce, epoch_1000x)
+            log_writer.add_scalar("lr", lr, epoch_1000x)
+            for k, v in detailed_loss.items():
+                log_writer.add_scalar(k, v.item(), epoch_1000x)
+        if (data_iter_step % 200 == 0) and (log_writer is not None):
+            visualize_reconstruction(
+                model=model.module,
+                src_imgs=src_samples.reshape(-1, *src_samples.shape[2:]),
+                tgt_imgs=tgt_samples.reshape(-1, *tgt_samples.shape[2:]),
+                artifacts=artifacts,
+                device=device,
+                step=epoch * len(data_loader) + data_iter_step,
+                log_to_wandb=True,
+                revert_norm_pix_loss=True
+            )
+    metric_logger.synchronize_between_processes()
+    print("Averaged stats:", metric_logger)
+    return {k: meter.global_avg for k, meter in metric_logger.meters.items()}
+
 
 def train_one_epoch_llm(
     model: torch.nn.Module,
