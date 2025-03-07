@@ -180,6 +180,8 @@ def run_train_epoch(
 
         loss, detailed_loss = batch_step_fn(batch, model, device, epoch, data_iter_step, data_loader, args)
 
+        if artifacts is not None and data_iter_step % 100 == 0:
+            visualize_reconstruction(model, batch["src_images"], batch["tgt_images"], artifacts, device, step=int(epoch * len(data_loader) + data_iter_step))
         loss_value = loss.item()
         if not math.isfinite(loss_value):
             print(f"Loss is {loss_value}, stopping training")
@@ -449,7 +451,12 @@ def train_one_epoch_general(
                 batch[key] = value.to(device, non_blocking=True)
 
         with torch.amp.autocast('cuda', enabled=args.amp):
-            loss, _, detailed_loss = model(batch, epoch + data_iter_step / len(data_loader))
+            outputs = model(batch, epoch + data_iter_step / len(data_loader))
+            if isinstance(outputs, tuple) and len(outputs) == 4:
+                loss, _, detailed_loss, artifacts = outputs
+            else:
+                loss, _, detailed_loss = outputs
+                artifacts = None
         loss_value = loss.item()
         if not math.isfinite(loss_value):
             print(f"Loss is {loss_value}, stopping training")
