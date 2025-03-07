@@ -121,7 +121,6 @@ class RspCaptionJointSelf(RspCaption):
 
 
     def forward(self, batch, epoch):
-        # Extract data from batch dictionary
         src_imgs = batch["src_images"]
         tgt_imgs = batch["tgt_images"]
         input_ids = batch["input_ids"]
@@ -130,15 +129,12 @@ class RspCaptionJointSelf(RspCaption):
         # Process text: Convert input_ids to embeddings (already contain [CLS] token)
         text_input = self.text_embedding(input_ids)  # [B, L, d]
 
-        # Use provided attention mask as is
-        extended_attention_mask = attention_map
-
         # Add positional encoding
         text_input = text_input + self.text_pos_embed[:, :text_input.size(1), :]
 
         # Transformer encoder expects [seq_len, batch, d]
         text_encoded = self.text_encoder(text_input.transpose(0, 1),
-                                         src_key_padding_mask=(extended_attention_mask==0))
+                                         src_key_padding_mask=(attention_map==0))
         text_encoded = text_encoded.transpose(0, 1)  # [B, L, d]
 
         # Use [CLS] token representation (assuming first token is [CLS])
