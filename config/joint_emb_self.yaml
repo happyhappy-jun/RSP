@@ -14,6 +14,7 @@ dataset:
   repeated_sampling: 2
   interval: 4
   seed: 42
+  is_debug: False
 
 train_loop:
   _target_: engine_pretrain_repsamp.train_one_epoch_general
