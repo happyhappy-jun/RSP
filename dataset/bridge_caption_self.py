@@ -65,7 +65,10 @@ class BridgeCaptionSelf(Dataset):
 
     def _get_trajectory_files(self):
         traj_files = []
-        for traj_dir in tqdm(os.listdir(self.data_dir), desc="Loading trajectories"):
+        dir_list = os.listdir(self.data_dir)
+        if self.is_debug:
+            dir_list = dir_list[:3]
+        for traj_dir in tqdm(dir_list, desc="Loading trajectories"):
             full_path = os.path.join(self.data_dir, traj_dir)
             if os.path.isdir(full_path):
                 images_files = sorted([f for f in os.listdir(full_path) if f.startswith('images')])
