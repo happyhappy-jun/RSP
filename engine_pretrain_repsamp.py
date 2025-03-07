@@ -1,30 +1,19 @@
 import sys
 import math
-import wandb
+from pathlib import Path
 from typing import Iterable
+
 import torch
 import torch.nn.functional as F
-import sys
-from pathlib import Path
-sys.path.append(str(Path(__file__).resolve().parents[2]))  # Add project root to path
+import torchvision.utils as vutils
+
+import wandb
+
 import util.misc as misc
 import util.lr_sched as lr_sched
-import torchvision.utils as vutils
-import math
-import sys
-import torch
-import torchvision.utils as vutils
-import wandb
-from typing import Iterable
 
-
-import torch
-import torch.nn.functional as F
-import torchvision.utils as vutils
-import wandb
-import torch
-import torchvision.utils as vutils
-import wandb
+# Add project root to path
+sys.path.append(str(Path(__file__).resolve().parents[2]))
 
 def visualize_reconstruction(
     model,
