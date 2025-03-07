@@ -375,12 +375,11 @@ def train_one_epoch_self(
     def batch_step_fn(batch, model, device, epoch, data_iter_step, data_loader, args):
         src_samples = batch["src_images"].to(device, non_blocking=True)
         tgt_samples = batch["tgt_images"].to(device, non_blocking=True)
-        lm_logits = batch["embeddings"].to(device, non_blocking=True)
-        future_caption_tokens = batch["future_tokenized_caption"].to(device, non_blocking=True)
-        future_padding_mask = batch["future_padding_mask"].to(device, non_blocking=True)
+        input_ids = batch["input_ids"].to(device, non_blocking=True)
+        attention_map = batch["attention_map"].to(device, non_blocking=True)
         with torch.amp.autocast('cuda', enabled=args.amp):
             loss, _, detailed_loss = model(
-                src_samples, tgt_samples, lm_logits, future_caption_tokens, future_padding_mask,
+                src_samples, tgt_samples, input_ids, attention_map,
                 data_iter_step / len(data_loader) + epoch
             )
         return loss, detailed_loss
