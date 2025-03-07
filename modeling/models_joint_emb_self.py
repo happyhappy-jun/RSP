@@ -64,7 +64,7 @@ class RspCaptionJointSelf(RspCaption):
         )
         
         if text_embed_dim is None:
-            text_embed_dim = self.embed_dim
+            text_embed_dim = self.decoder_embed_dim
         self.text_embedding = nn.Embedding(vocab_size, text_embed_dim)
         self.cls_token = nn.Parameter(torch.zeros(1, 1, text_embed_dim))
         nn.init.trunc_normal_(self.cls_token, std=0.02)
@@ -149,13 +149,12 @@ class RspCaptionJointSelf(RspCaption):
         text_x = (
             self.text_embedding(input_ids)
             + get_1d_sincos_pos_embed(self.embed_dim, input_ids.shape[1]).to(input_ids.device)
-            + self.get_type_embedding('encoder_text_type_embedding')
         )
         # Transformer encoder expects [seq_len, batch, d]
         text_encoded = self.text_encoder(text_x.transpose(0, 1),
                                          src_key_padding_mask=(attention_map==0))
         text_encoded = text_encoded.transpose(0, 1)  # [B, L, d]
-        # Use [CLS] token representation (assuming first token is [CLS])
+        # Use [CLS] token representation
         caption_embedding = text_encoded[:, 0, :].unsqueeze(1)  # [B, 1, d]
 
         # Image encoding

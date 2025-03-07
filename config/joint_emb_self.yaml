@@ -16,7 +16,7 @@ dataset:
   seed: 42
 
 train_loop:
-  _target_: engine_pretrain_repsamp.train_one_epoch_self
+  _target_: engine_pretrain_repsamp.train_one_epoch_general
   _partial_: true
 
 num_workers: 4
