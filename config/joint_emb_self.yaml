@@ -4,7 +4,7 @@ defaults:
 
 exp_name: rsp_joint_self
 
-model_name: rsp_joint_self_vit_small_patch16
+model_name: rsp_cos_joint_self_vit_small_patch16
 
 data_root: /data
 
