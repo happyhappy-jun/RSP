@@ -38,12 +38,14 @@ class BridgeCaptionSelf(Dataset):
         repeated_sampling: int = 2,
         interval: int = 4,
         seed: int = 42,
+        is_debug: bool = False,
     ):
         super().__init__()
         self.data_dir = data_dir
         self.repeated_sampling = repeated_sampling
         self.interval = interval
         self.seed = seed
+        self.is_debug = is_debug
 
         self.pair_transform = PairedRandomResizedCrop(seed=seed, hflip_p=0)
 
@@ -57,6 +59,8 @@ class BridgeCaptionSelf(Dataset):
 
         # Discover all trajectory files, excluding those insufficient for repeated_sampling
         self.traj_files = self._get_trajectory_files()
+        if self.is_debug:
+            self.traj_files = self.traj_files[:3]
         print(f"Loaded {len(self.traj_files)} eligible trajectories")
 
     def _get_trajectory_files(self):
