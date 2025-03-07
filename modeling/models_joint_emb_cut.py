@@ -156,7 +156,7 @@ class RspCaptionJointCut(RspCaption):
             "context_loss": context_loss,
             "loss_mae": mae_loss,
         }
-
+        
         return loss, tgt_pred, detailed_loss
 
 

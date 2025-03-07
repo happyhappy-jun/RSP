@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=rsp-cosine
-#SBATCH --output=/shared/sjw_alinlab/RSP/slurm-logs/test.out  # log
+#SBATCH --output=/shared/sjw_alinlab/RSP/slurm-logs/test_%j.out  # log
 #SBATCH --nodes=1            # 노드 1개 사용
 #SBATCH --gpus=4
 #SBATCH --partition=batch
@@ -12,4 +12,5 @@ conda activate rsp2
 echo $(which python)
 
 cd /shared/sjw_alinlab/RSP
-torchrun --nproc_per_node=1 main_pretrain.py -cn bridge_caption model_params.kl_scale=0.00001 model_params.cos_scale=0.001
+torchrun --nproc_per_node=4 main_pretrain.py \
+    -cn joint_emb_self model_params.kl_scale=0.00001 model_params.cos_scale=0.001 dataset.data_dir=/shared/sjw_alinlab/RSP/npy_dataset 

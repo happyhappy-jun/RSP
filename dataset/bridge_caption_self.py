@@ -65,7 +65,7 @@ class BridgeCaptionSelf(Dataset):
         traj_files = []
         dir_list = os.listdir(self.data_dir)
         if self.is_debug:
-            dir_list = dir_list[:3]
+            dir_list = dir_list[:20]
         for traj_dir in tqdm(dir_list, desc="Loading trajectories"):
             full_path = os.path.join(self.data_dir, traj_dir)
             if os.path.isdir(full_path):

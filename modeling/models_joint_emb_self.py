@@ -63,17 +63,14 @@ class RspCaptionJointSelf(RspCaption):
             nn.Linear(self.embed_dim * 2, self.decoder_embed_dim),
         )
         
-        if text_embed_dim is None:
-            text_embed_dim = self.decoder_embed_dim
-        self.text_embedding = nn.Embedding(vocab_size, text_embed_dim)
-        self.cls_token = nn.Parameter(torch.zeros(1, 1, text_embed_dim))
-        nn.init.trunc_normal_(self.cls_token, std=0.02)
+        self.text_embed_dim = text_embed_dim
+        if self.text_embed_dim is None:
+            self.text_embed_dim = self.decoder_embed_dim
+        self.text_embedding = nn.Embedding(vocab_size, self.text_embed_dim)
         self.text_encoder = nn.TransformerEncoder(
-            nn.TransformerEncoderLayer(d_model=text_embed_dim, nhead=nhead_text),
+            nn.TransformerEncoderLayer(d_model=self.text_embed_dim, nhead=nhead_text),
             num_layers=num_text_layers
         )
-        self.text_pos_embed = nn.Parameter(torch.zeros(1, max_text_length, text_embed_dim))
-        nn.init.trunc_normal_(self.text_pos_embed, std=0.02)
 
 
     def get_feat(self, h, h_context, z):
@@ -149,11 +146,16 @@ class RspCaptionJointSelf(RspCaption):
         tgt_imgs = batch["tgt_images"]
         input_ids = batch["input_ids"]
         attention_map = batch["attention_map"]
+        
+        src_imgs = src_imgs.reshape(-1, *src_imgs.shape[2:])
+        tgt_imgs = tgt_imgs.reshape(-1, *tgt_imgs.shape[2:])
+        input_ids = input_ids.reshape(-1, *input_ids.shape[2:])
+        attention_map = attention_map.reshape(-1, *attention_map.shape[2:])
 
         # Process text: Convert input_ids to embeddings and add sincos positional encoding
         text_x = (
             self.text_embedding(input_ids)
-            + get_1d_sincos_pos_embed(self.embed_dim, input_ids.shape[1]).to(input_ids.device)
+            + get_1d_sincos_pos_embed(self.text_embed_dim, input_ids.shape[1]).to(input_ids.device)
         )
         # Transformer encoder expects [seq_len, batch, d]
         text_encoded = self.text_encoder(text_x.transpose(0, 1),
@@ -163,8 +165,6 @@ class RspCaptionJointSelf(RspCaption):
         caption_embedding = text_encoded[:, 0, :].unsqueeze(1)  # [B, 1, d]
 
         # Image encoding
-        src_imgs = src_imgs.reshape(-1, *src_imgs.shape[2:])
-        tgt_imgs = tgt_imgs.reshape(-1, *tgt_imgs.shape[2:])
         src_h, _, _ = self.forward_encoder(src_imgs, mask_ratio=0)
         tgt_h, _, _ = self.forward_encoder(self.perturb(tgt_imgs), mask_ratio=0)
 

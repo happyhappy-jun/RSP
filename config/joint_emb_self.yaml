@@ -21,7 +21,7 @@ train_loop:
   _partial_: true
 
 num_workers: 4
-batch_size: 24
+batch_size: 48
 accum_iter: 8
 
 model_params:

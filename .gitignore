@@ -10,5 +10,7 @@ wandb/
 .secrets/
 .idea
 *.egg-info/
-
-
+npy_dataset/
+slurm-logs/
+*.tar.gz
+*.log

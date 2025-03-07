@@ -445,7 +445,7 @@ def train_one_epoch_general(
                 batch[key] = value.to(device, non_blocking=True)
 
         with torch.amp.autocast('cuda', enabled=args.amp):
-            loss, detailed_loss, artifacts = model(batch, epoch + data_iter_step / len(data_loader))
+            loss, _, detailed_loss = model(batch, epoch + data_iter_step / len(data_loader))
         loss_value = loss.item()
         if not math.isfinite(loss_value):
             print(f"Loss is {loss_value}, stopping training")
