@@ -207,7 +207,13 @@ class RspCaptionJointSelf(RspCaption):
             "loss_mae": mae_loss,
         }
 
-        return loss, tgt_pred, detailed_loss
+        artifacts = {
+            "src_imgs": src_imgs,
+            "tgt_imgs": tgt_imgs,
+            "reconstructions": tgt_pred,
+        }
+
+        return loss, tgt_pred, detailed_loss, artifacts
 
 
 def rsp_cos_joint_self_vit_small_patch8_dec512d8b(**kwargs):
