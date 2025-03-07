@@ -139,7 +139,10 @@ class RspCaptionJointSelf(RspCaption):
         return q
 
 
-    def forward(self, batch, epoch, **kwargs):
+    def forward(self, batch=None, epoch=None, **kwargs):
+        if batch is None or epoch is None:
+            print("DEBUG: RspCaptionJointSelf.forward called without batch or epoch; returning None")
+            return None
         if kwargs:
             print("DEBUG: RspCaptionJointSelf.forward called with kwargs:", kwargs)
         src_imgs = batch["src_images"]
